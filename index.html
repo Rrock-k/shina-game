@@ -11,13 +11,17 @@
       padding: 0;
       overflow: hidden;
       background: #222;
-      /* background: #3a6f3e; */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
 
     canvas {
       display: block;
-      width: 100vw;
-      height: 100vh;
+      width: 1200px;
+      height: 800px;
+      border: 2px solid #444;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
@@ -36,7 +40,7 @@
       DASH_GAP: 60,
       COLORS: {
         grid: 0xffffff,
-        border: 0xffffff,
+        border: 0xff0000,
         road: 0x666666,
         roadLine: 0xffffff,
         house: 0xffe0e0,
@@ -70,7 +74,7 @@
     const CAR_SPEED = 2;
 
     // globals
-    let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, uiLayer, car;
+    let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer, uiLayer, car;
     let carPath = [], carSegment = 0, carProgress = 0;
     let avatar;
 
@@ -79,14 +83,13 @@
     createCar();
     layout();
     window.addEventListener('resize', () => {
-      app.renderer.resize(window.innerWidth, window.innerHeight);
       layout();
     });
 
     function setupApp () {
       app = new PIXI.Application({
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: 1200,
+        height: 800,
         autoDensity: true,
         resolution: window.devicePixelRatio || 1,
         backgroundColor: 0x3a6f3e
@@ -103,16 +106,17 @@
       zonesLayer = new PIXI.Container();
       labelsLayer = new PIXI.Container();
       decorLayer = new PIXI.Container();
+      borderLayer = new PIXI.Container();
 
-      world.addChild(gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer);
+      world.addChild(gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
 
       drawGrid(gridLayer);
-      drawWorldBorder(gridLayer);
       drawRoads(roadsLayer);
       drawZones(zonesLayer);
       placeLabels(labelsLayer);
       drawTrafficLights(decorLayer);
       drawAlina(decorLayer);
+      drawWorldBorder(borderLayer);
 
       uiLayer = new PIXI.Container();
       app.stage.addChild(uiLayer);
@@ -141,7 +145,7 @@
 
     function drawWorldBorder (layer) {
       const g = new PIXI.Graphics();
-      g.lineStyle(2, CONFIG.COLORS.border, 0.5);
+      g.lineStyle(8, CONFIG.COLORS.border, 1.0);
       g.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
       layer.addChild(g);
     }
@@ -274,8 +278,8 @@
     }
 
     function layout () {
-      const w = app.screen.width;
-      const h = app.screen.height;
+      const w = 1200; // фиксированная ширина канваса
+      const h = 800;  // фиксированная высота канваса
       const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
       world.scale.set(scale);
       world.position.set(
