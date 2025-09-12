@@ -14,6 +14,11 @@ canvas{display:block;width:100vw;height:100vh;}
 const CONFIG = {
   WORLD_SIZE: 2000,
   GRID_STEP: 100,
+  ROAD_SPACING: 400,
+  ROAD_WIDTH: 48,
+  ROAD_LINE_WIDTH: 12,
+  DASH_LENGTH: 60,
+  DASH_GAP: 60,
   COLORS: {
     grid: 0xffffff,
     border: 0xffffff,
@@ -22,25 +27,27 @@ const CONFIG = {
     house: 0xffe0e0,
     work: 0xe0e8ff,
     box: 0xfff2cc,
-    parents: 0xe0ffe0,
+    relatives: 0xe0ffe0,
+    institute: 0xd0f0ff,
   },
   ZONES: {
     house: { type:'rect', x:300, y:150, w:220, h:160, label:'Дом Шины' },
-    parents: { type:'circle', x:1500, y:400, r:220, label:'Родители', alpha:0.6 },
+    relatives: { type:'rect', x:1280, y:180, w:440, h:440, label:'Родственники' },
     work: { type:'rect', x:1100, y:1100, w:260, h:180, label:'Работа' },
     box: { type:'rect', x:450, y:1450, w:200, h:160, label:'Бокс' },
+    institute: { type:'circle', x:1700, y:1600, r:100, label:'Институт', alpha:0.6 },
   },
-  ROADS: [
-    [{x:410,y:230},{x:410,y:700},{x:1230,y:700},{x:1230,y:1190}],
-    [{x:1230,y:1190},{x:1230,y:1530},{x:550,y:1530}],
-    [{x:550,y:1530},{x:550,y:400},{x:1500,y:400}],
-    [{x:1500,y:400},{x:410,y:400},{x:410,y:230}],
-  ],
   TRAFFIC_LIGHTS: [
-    {x:410,y:400},
-    {x:550,y:400},
-    {x:550,y:1530},
-    {x:1230,y:700}
+    {x:400,y:400},
+    {x:1600,y:400},
+    {x:1600,y:1600},
+    {x:400,y:1600}
+  ],
+  CAR_PATH: [
+    {x:400,y:400},
+    {x:400,y:1600},
+    {x:1600,y:1600},
+    {x:1600,y:400}
   ],
   BASE_FONT: 24
 };
@@ -90,6 +97,7 @@ function setupWorld(){
   drawZones(zonesLayer);
   placeLabels(labelsLayer);
   drawTrafficLights(decorLayer);
+  drawAlina(decorLayer);
 
   uiLayer = new PIXI.Container();
   app.stage.addChild(uiLayer);
@@ -141,18 +149,30 @@ function drawZones(layer){
 }
 
 function drawRoads(layer){
-  CONFIG.ROADS.forEach(points=>{
-    const road = new PIXI.Graphics();
-    road.lineStyle(16, CONFIG.COLORS.road, 1);
-    road.moveTo(points[0].x, points[0].y);
-    for(let i=1;i<points.length;i++) road.lineTo(points[i].x, points[i].y);
-    layer.addChild(road);
+  const step = CONFIG.ROAD_SPACING;
+  for(let pos=0; pos<=CONFIG.WORLD_SIZE; pos+=step){
+    const h = [{x:0,y:pos},{x:CONFIG.WORLD_SIZE,y:pos}];
+    const roadH = new PIXI.Graphics();
+    roadH.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
+    roadH.moveTo(h[0].x, h[0].y);
+    roadH.lineTo(h[1].x, h[1].y);
+    layer.addChild(roadH);
+    const dashH = new PIXI.Graphics();
+    dashH.lineStyle(CONFIG.ROAD_LINE_WIDTH, CONFIG.COLORS.roadLine, 1);
+    drawDashedPath(dashH, h, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
+    layer.addChild(dashH);
 
-    const dashed = new PIXI.Graphics();
-    dashed.lineStyle(4, CONFIG.COLORS.roadLine, 1);
-    drawDashedPath(dashed, points, 20, 20);
-    layer.addChild(dashed);
-  });
+    const v = [{x:pos,y:0},{x:pos,y:CONFIG.WORLD_SIZE}];
+    const roadV = new PIXI.Graphics();
+    roadV.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
+    roadV.moveTo(v[0].x, v[0].y);
+    roadV.lineTo(v[1].x, v[1].y);
+    layer.addChild(roadV);
+    const dashV = new PIXI.Graphics();
+    dashV.lineStyle(CONFIG.ROAD_LINE_WIDTH, CONFIG.COLORS.roadLine, 1);
+    drawDashedPath(dashV, v, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
+    layer.addChild(dashV);
+  }
 }
 
 function drawDashedPath(g, points, dash, gap){
@@ -189,6 +209,24 @@ function drawTrafficLights(layer){
     c.addChild(pole, box, red, yellow, green);
     layer.addChild(c);
   });
+}
+
+function drawAlina(layer){
+  const house = CONFIG.ZONES.house;
+  const container = new PIXI.Container();
+  container.position.set(house.x + house.w - 40, house.y + house.h - 40);
+  const circle = new PIXI.Graphics();
+  circle.beginFill(0xffffff).drawCircle(0,0,15).endFill();
+  const text = new PIXI.Text('A', {
+    fontFamily:'sans-serif',
+    fontSize: 20,
+    fill: 0x000000,
+    stroke: 0xffffff,
+    strokeThickness: 2
+  });
+  text.anchor.set(0.5);
+  container.addChild(circle, text);
+  layer.addChild(container);
 }
 
 function placeLabels(layer){
@@ -230,11 +268,7 @@ function layout(){
 }
 
 function buildCarPath(){
-  const path = [];
-  CONFIG.ROADS.forEach((road, ri) => {
-    path.push(...(ri === 0 ? road : road.slice(1)));
-  });
-  return path;
+  return CONFIG.CAR_PATH;
 }
 
 function createCar(){
@@ -242,13 +276,13 @@ function createCar(){
   car = new PIXI.Container();
 
   const body = new PIXI.Graphics();
-  body.beginFill(0xff8800).drawRect(-30,-15,60,30).endFill();
+  body.beginFill(0xff8800).drawRect(-60,-30,120,60).endFill();
   car.addChild(body);
 
   avatar = PIXI.Sprite.from('shina.jpeg');
   avatar.anchor.set(0.5);
-  avatar.width = 30;
-  avatar.height = 30;
+  avatar.width = 60;
+  avatar.height = 60;
   car.addChild(avatar);
   car.position.set(carPath[0].x, carPath[0].y);
   decorLayer.addChild(car);
