@@ -238,8 +238,18 @@ function buildCarPath(){
 
 function createCar(){
   carPath = buildCarPath();
-  car = new PIXI.Graphics();
-  car.beginFill(0xff8800).drawRect(-10,-5,20,10).endFill();
+  car = new PIXI.Container();
+
+  const body = new PIXI.Graphics();
+  body.beginFill(0xff8800).drawRect(-30,-15,60,30).endFill();
+  car.addChild(body);
+
+  const avatar = PIXI.Sprite.from('avatar.png');
+  avatar.anchor.set(0.5);
+  avatar.width = 30;
+  avatar.height = 30;
+  car.addChild(avatar);
+
   car.position.set(carPath[0].x, carPath[0].y);
   decorLayer.addChild(car);
   app.ticker.add(updateCar);
