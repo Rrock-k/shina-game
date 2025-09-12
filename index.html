@@ -5,7 +5,7 @@
 <title>Карта Шины</title>
 <style>
 html,body{margin:0;padding:0;overflow:hidden;background:#222;}
-canvas{display:block;}
+canvas{display:block;width:100vw;height:100vh;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
 </head>
@@ -211,11 +211,13 @@ function placeLabels(layer){
 }
 
 function layout(){
-  const scale = Math.min(app.renderer.width/CONFIG.WORLD_SIZE, app.renderer.height/CONFIG.WORLD_SIZE);
+  const w = app.screen.width;
+  const h = app.screen.height;
+  const scale = Math.min(w/CONFIG.WORLD_SIZE, h/CONFIG.WORLD_SIZE);
   world.scale.set(scale);
   world.position.set(
-    (app.renderer.width - CONFIG.WORLD_SIZE * scale)/2,
-    (app.renderer.height - CONFIG.WORLD_SIZE * scale)/2
+    (w - CONFIG.WORLD_SIZE * scale)/2,
+    (h - CONFIG.WORLD_SIZE * scale)/2
   );
   labelsLayer.scale.set(1/scale);
 }
