@@ -50,6 +50,7 @@ const CAR_SPEED = 2;
 // globals
 let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, uiLayer, car;
 let carPath = [], carSegment = 0, carProgress = 0;
+let avatar;
 
 setupApp();
 setupWorld();
@@ -244,7 +245,7 @@ function createCar(){
   body.beginFill(0xff8800).drawRect(-30,-15,60,30).endFill();
   car.addChild(body);
 
-  const avatar = PIXI.Sprite.from('shina.jpeg');
+  avatar = PIXI.Sprite.from('shina.jpeg');
   avatar.anchor.set(0.5);
   avatar.width = 30;
   avatar.height = 30;
@@ -274,6 +275,7 @@ function updateCar(delta){
   const t = carProgress / segLen;
   car.position.set(p1.x + dx * t, p1.y + dy * t);
   car.rotation = Math.atan2(dy, dx);
+  avatar.rotation = -car.rotation;
 }
 </script>
 </body>
