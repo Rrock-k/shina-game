@@ -76,9 +76,11 @@
     const CAR_SPEED = 2;
 
     // globals
-    let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer, uiLayer, car;
+    let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, borderLayer, uiLayer, car;
     let carPath = [], carSegment = 0, carProgress = 0;
     let avatar;
+    let horizontalRoadYs = [], verticalRoadXs = [];
+    let hoverLabel;
 
     setupApp();
     setupWorld();
@@ -97,6 +99,9 @@
         backgroundColor: 0x3a6f3e
       });
       document.body.appendChild(app.view);
+      // Включаем систему событий для всей сцены
+      app.stage.eventMode = 'static';
+      app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
     }
 
     function setupWorld () {
@@ -107,13 +112,15 @@
       roadsLayer = new PIXI.Container();
       zonesLayer = new PIXI.Container();
       labelsLayer = new PIXI.Container();
+      intersectionsLayer = new PIXI.Container();
       decorLayer = new PIXI.Container();
       borderLayer = new PIXI.Container();
 
-      world.addChild(gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
+      world.addChild(gridLayer, roadsLayer, intersectionsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
 
       drawGrid(gridLayer);
       drawRoads(roadsLayer);
+      createIntersections(intersectionsLayer);
       drawZones(zonesLayer);
       placeLabels(labelsLayer);
       drawTrafficLights(decorLayer);
@@ -131,6 +138,24 @@
       });
       title.position.set(10, 10);
       uiLayer.addChild(title);
+    }
+
+    function getRoadPositions () {
+      const margin = CONFIG.ROAD_MARGIN;
+      const horizontalPositions = [];
+      const verticalPositions = [];
+      const availableHeight = CONFIG.WORLD_HEIGHT - 2 * margin;
+      for (let i = 0; i < 4; i++) {
+        const y = margin + (availableHeight / (4 - 1)) * i;
+        horizontalPositions.push(y);
+      }
+      const availableWidth = CONFIG.WORLD_WIDTH - 2 * margin;
+      for (let i = 0; i < 7; i++) {
+        const x = margin + (availableWidth / (7 - 1)) * i;
+        verticalPositions.push(x);
+      }
+      const maxVerticalPos = verticalPositions[verticalPositions.length - 1];
+      return { horizontalPositions, verticalPositions, maxVerticalPos };
     }
 
     function drawGrid (layer) {
@@ -172,32 +197,13 @@
     }
 
     function drawRoads (layer) {
-      const margin = CONFIG.ROAD_MARGIN;
-
-      // Явно задаем позиции для сетки 6×3 (7 вертикальных × 4 горизонтальные дороги)
-      const horizontalPositions = [];
-      const verticalPositions = [];
-
-      // 4 горизонтальные дороги - равномерно распределены (для сетки 6×3)
-      const availableHeight = CONFIG.WORLD_HEIGHT - 2 * margin;
-      for (let i = 0; i < 4; i++) {
-        const y = margin + (availableHeight / (4 - 1)) * i;
-        horizontalPositions.push(y);
-      }
-
-      // 7 вертикальных дорог - равномерно распределены (для сетки 6×3)
-      const availableWidth = CONFIG.WORLD_WIDTH - 2 * margin;
-      for (let i = 0; i < 7; i++) {
-        const x = margin + (availableWidth / (7 - 1)) * i;
-        verticalPositions.push(x);
-      }
-
-      // Самая правая позиция для трассы
-      const maxVerticalPos = verticalPositions[verticalPositions.length - 1];
+      const { horizontalPositions, verticalPositions, maxVerticalPos } = getRoadPositions();
+      horizontalRoadYs = horizontalPositions;
+      verticalRoadXs = verticalPositions;
 
       // Рисуем горизонтальные дороги
-      horizontalPositions.forEach(y => {
-        const h = [{ x: verticalPositions[0], y: y }, { x: maxVerticalPos, y: y }];
+      horizontalRoadYs.forEach(y => {
+        const h = [{ x: verticalRoadXs[0], y: y }, { x: maxVerticalPos, y: y }];
         const roadH = new PIXI.Graphics();
         roadH.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
         roadH.moveTo(h[0].x, h[0].y);
@@ -210,14 +216,12 @@
       });
 
       // Рисуем вертикальные дороги
-      verticalPositions.forEach(x => {
+      verticalRoadXs.forEach(x => {
         let v;
-        // Самая правая дорога (трасса) - продолжается за пределы карты
         if (x === maxVerticalPos) {
           v = [{ x: x, y: 0 }, { x: x, y: CONFIG.WORLD_HEIGHT }];
         } else {
-          // Остальные вертикальные дороги ограничены границами дорожной сетки
-          v = [{ x: x, y: horizontalPositions[0] }, { x: x, y: horizontalPositions[horizontalPositions.length - 1] }];
+          v = [{ x: x, y: horizontalRoadYs[0] }, { x: x, y: horizontalRoadYs[horizontalRoadYs.length - 1] }];
         }
         const roadV = new PIXI.Graphics();
         roadV.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
@@ -229,6 +233,51 @@
         drawDashedPath(dashV, v, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
         layer.addChild(dashV);
       });
+    }
+
+    function createIntersections (layer) {
+      // Подпись при наведении
+      if (!hoverLabel) {
+        hoverLabel = new PIXI.Text('', {
+          fontFamily: 'sans-serif',
+          fontSize: CONFIG.BASE_FONT,
+          fill: 0xffff66,
+          stroke: 0x000000,
+          strokeThickness: 4
+        });
+        hoverLabel.anchor.set(0.5, 1);
+        hoverLabel.visible = false;
+        labelsLayer.addChild(hoverLabel);
+      }
+
+      const hitRadius = 60;
+      for (let j = 0; j < horizontalRoadYs.length; j++) {
+        for (let i = 0; i < verticalRoadXs.length; i++) {
+          const x = verticalRoadXs[i];
+          const y = horizontalRoadYs[j];
+          const labelText = String.fromCharCode(65 + i) + (j + 1);
+          const g = new PIXI.Graphics();
+          // Прозрачный круг-хитбокс + явная hitArea для стабильного хит-теста
+          g.beginFill(0x000000, 0).drawCircle(0, 0, hitRadius).endFill();
+          g.position.set(x, y);
+          g.eventMode = 'static';
+          g.cursor = 'pointer';
+          g.hitArea = new PIXI.Circle(0, 0, hitRadius);
+          const show = () => {
+            hoverLabel.text = labelText;
+            hoverLabel.position.set(x, y - 16);
+            hoverLabel.visible = true;
+          };
+          const hide = () => {
+            hoverLabel.visible = false;
+          };
+          g.on('pointerover', show);
+          g.on('pointerout', hide);
+          g.on('pointerenter', show);
+          g.on('pointerleave', hide);
+          layer.addChild(g);
+        }
+      }
     }
 
     function drawDashedPath (g, points, dash, gap) {
