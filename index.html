@@ -171,9 +171,16 @@
 
     function drawRoads (layer) {
       const step = CONFIG.ROAD_SPACING;
-      // Горизонтальные дороги
-      for (let pos = 0; pos <= CONFIG.WORLD_HEIGHT; pos += step) {
-        const h = [{ x: 0, y: pos }, { x: CONFIG.WORLD_WIDTH, y: pos }];
+
+      // Определяем самую правую позицию для вертикальных дорог
+      let maxVerticalPos = 0;
+      for (let pos = 0; pos <= CONFIG.WORLD_WIDTH; pos += step) {
+        maxVerticalPos = pos;
+      }
+
+      // Горизонтальные дороги (исключаем крайние позиции по верху и низу)
+      for (let pos = step; pos <= CONFIG.WORLD_HEIGHT - step; pos += step) {
+        const h = [{ x: step, y: pos }, { x: maxVerticalPos, y: pos }];
         const roadH = new PIXI.Graphics();
         roadH.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
         roadH.moveTo(h[0].x, h[0].y);
@@ -184,9 +191,17 @@
         drawDashedPath(dashH, h, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
         layer.addChild(dashH);
       }
-      // Вертикальные дороги
-      for (let pos = 0; pos <= CONFIG.WORLD_WIDTH; pos += step) {
-        const v = [{ x: pos, y: 0 }, { x: pos, y: CONFIG.WORLD_HEIGHT }];
+
+      // Вертикальные дороги (исключаем крайнюю левую позицию)
+      for (let pos = step; pos <= CONFIG.WORLD_WIDTH; pos += step) {
+        let v;
+        // Самая правая дорога (трасса) - продолжается за пределы карты
+        if (pos === maxVerticalPos) {
+          v = [{ x: pos, y: 0 }, { x: pos, y: CONFIG.WORLD_HEIGHT }];
+        } else {
+          // Остальные вертикальные дороги ограничены границами карты
+          v = [{ x: pos, y: step }, { x: pos, y: CONFIG.WORLD_HEIGHT - step }];
+        }
         const roadV = new PIXI.Graphics();
         roadV.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
         roadV.moveTo(v[0].x, v[0].y);
