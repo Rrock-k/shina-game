@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Карта Шины</title>
+<style>
+html,body{margin:0;padding:0;overflow:hidden;background:#222;}
+canvas{display:block;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
+</head>
+<body>
+<script>
+const CONFIG = {
+  WORLD_SIZE: 2000,
+  GRID_STEP: 100,
+  COLORS: {
+    grid: 0xffffff,
+    border: 0xffffff,
+    road: 0x666666,
+    roadLine: 0xffffff,
+    house: 0xffe0e0,
+    work: 0xe0e8ff,
+    box: 0xfff2cc,
+    parents: 0xe0ffe0,
+  },
+  ZONES: {
+    house: { type:'rect', x:300, y:150, w:220, h:160, label:'Дом Шины' },
+    parents: { type:'circle', x:1500, y:400, r:220, label:'Родители', alpha:0.6 },
+    work: { type:'rect', x:1100, y:1100, w:260, h:180, label:'Работа' },
+    box: { type:'rect', x:450, y:1450, w:200, h:160, label:'Бокс' },
+  },
+  ROADS: [
+    [{x:410,y:230},{x:410,y:700},{x:1230,y:700},{x:1230,y:1190}],
+    [{x:1230,y:1190},{x:1230,y:1530},{x:550,y:1530}],
+    [{x:550,y:1530},{x:550,y:400},{x:1500,y:400}],
+    [{x:1500,y:400},{x:410,y:400},{x:410,y:230}],
+  ],
+  TRAFFIC_LIGHTS: [
+    {x:410,y:400},
+    {x:550,y:400},
+    {x:550,y:1530},
+    {x:1230,y:700}
+  ],
+  BASE_FONT: 24
+};
+
+// globals
+let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, uiLayer;
+
+setupApp();
+setupWorld();
+layout();
+window.addEventListener('resize', () => {
+  app.renderer.resize(window.innerWidth, window.innerHeight);
+  layout();
+});
+
+function setupApp(){
+  app = new PIXI.Application({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    autoDensity: true,
+    resolution: window.devicePixelRatio || 1,
+    backgroundColor: 0x222222
+  });
+  document.body.appendChild(app.view);
+}
+
+function setupWorld(){
+  world = new PIXI.Container();
+  app.stage.addChild(world);
+
+  gridLayer = new PIXI.Container();
+  roadsLayer = new PIXI.Container();
+  zonesLayer = new PIXI.Container();
+  labelsLayer = new PIXI.Container();
+  decorLayer = new PIXI.Container();
+
+  world.addChild(gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer);
+
+  drawGrid(gridLayer);
+  drawWorldBorder(gridLayer);
+  drawRoads(roadsLayer);
+  drawZones(zonesLayer);
+  placeLabels(labelsLayer);
+  drawTrafficLights(decorLayer);
+
+  uiLayer = new PIXI.Container();
+  app.stage.addChild(uiLayer);
+  const title = new PIXI.Text('Карта города (наблюдатель)', {
+    fontFamily: 'sans-serif',
+    fontSize: 20,
+    fill: 0xffffff,
+    stroke: 0x000000,
+    strokeThickness: 3
+  });
+  title.position.set(10,10);
+  uiLayer.addChild(title);
+}
+
+function drawGrid(layer){
+  const g = new PIXI.Graphics();
+  g.lineStyle(1, CONFIG.COLORS.grid, 0.15);
+  for(let i=0;i<=CONFIG.WORLD_SIZE;i+=CONFIG.GRID_STEP){
+    g.moveTo(i,0); g.lineTo(i,CONFIG.WORLD_SIZE);
+    g.moveTo(0,i); g.lineTo(CONFIG.WORLD_SIZE,i);
+  }
+  layer.addChild(g);
+}
+
+function drawWorldBorder(layer){
+  const g = new PIXI.Graphics();
+  g.lineStyle(2, CONFIG.COLORS.border, 0.5);
+  g.drawRect(0,0,CONFIG.WORLD_SIZE,CONFIG.WORLD_SIZE);
+  layer.addChild(g);
+}
+
+function drawZones(layer){
+  const zones = CONFIG.ZONES;
+  for(const key in zones){
+    const z = zones[key];
+    const g = new PIXI.Graphics();
+    g.lineStyle(2, 0x333333, 0.8);
+    if(z.type === 'rect'){
+      g.beginFill(CONFIG.COLORS[key], 0.8);
+      g.drawRect(z.x, z.y, z.w, z.h);
+      g.endFill();
+    }else if(z.type === 'circle'){
+      g.beginFill(CONFIG.COLORS[key], z.alpha || 0.4);
+      g.drawCircle(z.x, z.y, z.r);
+      g.endFill();
+    }
+    layer.addChild(g);
+  }
+}
+
+function drawRoads(layer){
+  CONFIG.ROADS.forEach(points=>{
+    const road = new PIXI.Graphics();
+    road.lineStyle(16, CONFIG.COLORS.road, 1);
+    road.moveTo(points[0].x, points[0].y);
+    for(let i=1;i<points.length;i++) road.lineTo(points[i].x, points[i].y);
+    layer.addChild(road);
+
+    const dashed = new PIXI.Graphics();
+    dashed.lineStyle(4, CONFIG.COLORS.roadLine, 1);
+    drawDashedPath(dashed, points, 20, 20);
+    layer.addChild(dashed);
+  });
+}
+
+function drawDashedPath(g, points, dash, gap){
+  for(let i=0;i<points.length-1;i++){
+    const p1 = points[i], p2 = points[i+1];
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    let t = 0;
+    while(t <= len){
+      const from = t;
+      const to = Math.min(t + dash, len);
+      const sx = p1.x + dx * (from/len);
+      const sy = p1.y + dy * (from/len);
+      const ex = p1.x + dx * (to/len);
+      const ey = p1.y + dy * (to/len);
+      g.moveTo(sx, sy);
+      g.lineTo(ex, ey);
+      t += dash + gap;
+    }
+  }
+}
+
+function drawTrafficLights(layer){
+  CONFIG.TRAFFIC_LIGHTS.forEach(pos=>{
+    const c = new PIXI.Container();
+    c.position.set(pos.x, pos.y);
+    const pole = new PIXI.Graphics();
+    pole.beginFill(0x555555).drawRect(-3,-20,6,40).endFill();
+    const box = new PIXI.Graphics();
+    box.beginFill(0x111111).drawRect(-8,-32,16,28).endFill();
+    const red = new PIXI.Graphics(); red.beginFill(0xff0000).drawCircle(0,-26,5).endFill();
+    const yellow = new PIXI.Graphics(); yellow.beginFill(0xffff00).drawCircle(0,-16,5).endFill();
+    const green = new PIXI.Graphics(); green.beginFill(0x00ff00).drawCircle(0,-6,5).endFill();
+    c.addChild(pole, box, red, yellow, green);
+    layer.addChild(c);
+  });
+}
+
+function placeLabels(layer){
+  for(const key in CONFIG.ZONES){
+    const z = CONFIG.ZONES[key];
+    let x,y;
+    if(z.type==='rect'){
+      x = z.x + z.w/2;
+      y = z.y + z.h/2;
+    }else{
+      x = z.x;
+      y = z.y;
+    }
+    const text = new PIXI.Text(z.label, {
+      fontFamily:'sans-serif',
+      fontSize: CONFIG.BASE_FONT,
+      fill: 0xffffff,
+      stroke: 0x000000,
+      strokeThickness: 4
+    });
+    text.anchor.set(0.5);
+    text.position.set(x, y);
+    layer.addChild(text);
+  }
+}
+
+function layout(){
+  const scale = Math.min(app.renderer.width/CONFIG.WORLD_SIZE, app.renderer.height/CONFIG.WORLD_SIZE);
+  world.scale.set(scale);
+  world.position.set(
+    (app.renderer.width - CONFIG.WORLD_SIZE * scale)/2,
+    (app.renderer.height - CONFIG.WORLD_SIZE * scale)/2
+  );
+  labelsLayer.scale.set(1/scale);
+}
+</script>
+</body>
+</html>
