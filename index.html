@@ -33,8 +33,8 @@
       WORLD_WIDTH: 3000,
       WORLD_HEIGHT: 2000,
       GRID_STEP: 100,
-      ROAD_SPACING_H: 540,  // шаг между вертикальными дорогами (6 дорог)
-      ROAD_SPACING_V: 850,  // шаг между горизонтальными дорогами (3 дороги)
+      ROAD_SPACING_H: 450,  // шаг между вертикальными дорогами (7 дорог)
+      ROAD_SPACING_V: 567,  // шаг между горизонтальными дорогами (4 дороги)
       ROAD_MARGIN: 150,
       ROAD_WIDTH: 48,
       ROAD_LINE_WIDTH: 12,
@@ -59,16 +59,16 @@
         institute: { type: 'circle', x: 2550, y: 1425, r: 200, label: 'Институт', alpha: 0.6 },
       },
       TRAFFIC_LIGHTS: [
-        { x: 690, y: 1000 },
-        { x: 1230, y: 1000 },
-        { x: 1770, y: 1000 },
-        { x: 2310, y: 1000 }
+        { x: 600, y: 1283 },
+        { x: 1050, y: 1283 },
+        { x: 1500, y: 1283 },
+        { x: 1950, y: 1283 }
       ],
       CAR_PATH: [
-        { x: 690, y: 1000 },
-        { x: 1230, y: 1000 },
-        { x: 1770, y: 1000 },
-        { x: 2310, y: 1000 }
+        { x: 600, y: 1283 },
+        { x: 1050, y: 1283 },
+        { x: 1500, y: 1283 },
+        { x: 1950, y: 1283 }
       ],
       BASE_FONT: 24
     };
@@ -174,21 +174,21 @@
     function drawRoads (layer) {
       const margin = CONFIG.ROAD_MARGIN;
 
-      // Явно задаем позиции для сетки 6x3
+      // Явно задаем позиции для сетки 6×3 (7 вертикальных × 4 горизонтальные дороги)
       const horizontalPositions = [];
       const verticalPositions = [];
 
-      // 3 горизонтальные дороги
+      // 4 горизонтальные дороги - равномерно распределены (для сетки 6×3)
       const availableHeight = CONFIG.WORLD_HEIGHT - 2 * margin;
-      for (let i = 0; i < 3; i++) {
-        const y = margin + (availableHeight / 2) * i;
+      for (let i = 0; i < 4; i++) {
+        const y = margin + (availableHeight / (4 - 1)) * i;
         horizontalPositions.push(y);
       }
 
-      // 6 вертикальных дорог
+      // 7 вертикальных дорог - равномерно распределены (для сетки 6×3)
       const availableWidth = CONFIG.WORLD_WIDTH - 2 * margin;
-      for (let i = 0; i < 6; i++) {
-        const x = margin + (availableWidth / 5) * i;
+      for (let i = 0; i < 7; i++) {
+        const x = margin + (availableWidth / (7 - 1)) * i;
         verticalPositions.push(x);
       }
 
