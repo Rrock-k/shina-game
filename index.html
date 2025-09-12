@@ -45,11 +45,15 @@ const CONFIG = {
   BASE_FONT: 24
 };
 
+const CAR_SPEED = 2;
+
 // globals
-let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, uiLayer;
+let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, decorLayer, uiLayer, car;
+let carPath = [], carSegment = 0, carProgress = 0;
 
 setupApp();
 setupWorld();
+createCar();
 layout();
 window.addEventListener('resize', () => {
   app.renderer.resize(window.innerWidth, window.innerHeight);
@@ -222,6 +226,45 @@ function layout(){
   labelsLayer.children.forEach(label => {
     label.scale.set(1/scale);
   });
+}
+
+function buildCarPath(){
+  const path = [];
+  CONFIG.ROADS.forEach((road, ri) => {
+    path.push(...(ri === 0 ? road : road.slice(1)));
+  });
+  return path;
+}
+
+function createCar(){
+  carPath = buildCarPath();
+  car = new PIXI.Graphics();
+  car.beginFill(0xff8800).drawRect(-10,-5,20,10).endFill();
+  car.position.set(carPath[0].x, carPath[0].y);
+  decorLayer.addChild(car);
+  app.ticker.add(updateCar);
+}
+
+function updateCar(delta){
+  const speed = CAR_SPEED * delta;
+  let p1 = carPath[carSegment];
+  let p2 = carPath[(carSegment + 1) % carPath.length];
+  let dx = p2.x - p1.x;
+  let dy = p2.y - p1.y;
+  let segLen = Math.hypot(dx, dy);
+  carProgress += speed;
+  while(carProgress > segLen){
+    carProgress -= segLen;
+    carSegment = (carSegment + 1) % carPath.length;
+    p1 = carPath[carSegment];
+    p2 = carPath[(carSegment + 1) % carPath.length];
+    dx = p2.x - p1.x;
+    dy = p2.y - p1.y;
+    segLen = Math.hypot(dx, dy);
+  }
+  const t = carProgress / segLen;
+  car.position.set(p1.x + dx * t, p1.y + dy * t);
+  car.rotation = Math.atan2(dy, dx);
 }
 </script>
 </body>
