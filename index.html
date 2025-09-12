@@ -50,6 +50,16 @@
         box: 0xfff2cc,
         relatives: 0xe0ffe0,
         institute: 0xd0f0ff,
+        lotFill: 0xf1e9d2,
+        lotBorder: 0x777777,
+      },
+      LOTS: {
+        SLOTS_PER_BLOCK: 6,
+        GAP: 10,
+        PADDING: 20,
+        MAX_MULTI_SLOT: 3,
+        MIN_LOT_HEIGHT: 60,
+        FILL_ALPHA: 0.9
       },
       ZONES: {
         house: { type: 'rect', x: 200, y: 200, w: 440, h: 750, label: 'Дом Шины' },
@@ -76,7 +86,7 @@
     const CAR_SPEED = 2;
 
     // globals
-    let app, world, gridLayer, roadsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, borderLayer, uiLayer, car;
+    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, borderLayer, uiLayer, car;
     let carPath = [], carSegment = 0, carProgress = 0;
     let avatar;
     let horizontalRoadYs = [], verticalRoadXs = [];
@@ -110,21 +120,23 @@
 
       gridLayer = new PIXI.Container();
       roadsLayer = new PIXI.Container();
+      lotsLayer = new PIXI.Container();
       zonesLayer = new PIXI.Container();
       labelsLayer = new PIXI.Container();
       intersectionsLayer = new PIXI.Container();
       decorLayer = new PIXI.Container();
       borderLayer = new PIXI.Container();
 
-      world.addChild(gridLayer, roadsLayer, intersectionsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
+      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
 
       drawGrid(gridLayer);
       drawRoads(roadsLayer);
       createIntersections(intersectionsLayer);
-      drawZones(zonesLayer);
-      placeLabels(labelsLayer);
+      drawLots(lotsLayer);
+      // drawZones(zonesLayer);
+      // placeLabels(labelsLayer);
       drawTrafficLights(decorLayer);
-      drawAlina(decorLayer);
+      // drawAlina(decorLayer);
       drawWorldBorder(borderLayer);
 
       uiLayer = new PIXI.Container();
@@ -175,6 +187,72 @@
       g.lineStyle(8, CONFIG.COLORS.border, 1.0);
       g.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
       layer.addChild(g);
+    }
+
+    function randInt (min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function generateBuildingSlots (maxSlots) {
+      const sizes = [];
+      const target = randInt(Math.max(3, Math.floor(maxSlots / 2)), maxSlots);
+      let used = 0;
+      while (used < target) {
+        const remaining = target - used;
+        const maxTake = Math.min(remaining, CONFIG.LOTS.MAX_MULTI_SLOT);
+        const roll = Math.random();
+        let take = 1;
+        if (maxTake >= 3 && roll < 0.18) take = 3;
+        else if (maxTake >= 2 && roll < 0.55) take = 2;
+        sizes.push(take);
+        used += take;
+      }
+      return sizes;
+    }
+
+    function drawLots (layer) {
+      if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
+      const roadHalf = CONFIG.ROAD_WIDTH / 2;
+      const cols = 2; // по горизонтали
+      const rows = 3; // по вертикали
+      const gap = CONFIG.LOTS.GAP;
+      const padding = CONFIG.LOTS.PADDING;
+
+      for (let j = 0; j < horizontalRoadYs.length - 1; j++) {
+        const yTop = horizontalRoadYs[j] + roadHalf;
+        const yBottom = horizontalRoadYs[j + 1] - roadHalf;
+        const blockHeight = Math.max(0, yBottom - yTop);
+        const innerHeight = Math.max(0, blockHeight - padding * 2);
+        if (innerHeight <= 0) continue;
+        const totalGapsV = gap * (rows - 1);
+        const lotHeight = (innerHeight - totalGapsV) / rows;
+
+        for (let i = 0; i < verticalRoadXs.length - 1; i++) {
+          const xLeft = verticalRoadXs[i] + roadHalf;
+          const xRight = verticalRoadXs[i + 1] - roadHalf;
+          const blockWidth = Math.max(0, xRight - xLeft);
+          const innerWidth = Math.max(0, blockWidth - padding * 2);
+          if (innerWidth <= 0) continue;
+          const totalGapsH = gap * (cols - 1);
+          const lotWidth = (innerWidth - totalGapsH) / cols;
+
+          const startX = xLeft + padding;
+          const startY = yTop + padding;
+
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const rx = startX + c * (lotWidth + gap);
+              const ry = startY + r * (lotHeight + gap);
+              const g = new PIXI.Graphics();
+              g.lineStyle(1, CONFIG.COLORS.lotBorder, 0.9);
+              g.beginFill(CONFIG.COLORS.lotFill, CONFIG.LOTS.FILL_ALPHA);
+              g.drawRect(rx, ry, lotWidth, lotHeight);
+              g.endFill();
+              layer.addChild(g);
+            }
+          }
+        }
+      }
     }
 
     function drawZones (layer) {
