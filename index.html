@@ -219,7 +219,9 @@ function layout(){
     (w - CONFIG.WORLD_SIZE * scale)/2,
     (h - CONFIG.WORLD_SIZE * scale)/2
   );
-  labelsLayer.scale.set(1/scale);
+  labelsLayer.children.forEach(label => {
+    label.scale.set(1/scale);
+  });
 }
 </script>
 </body>
