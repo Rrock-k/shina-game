@@ -61,6 +61,14 @@
         MIN_LOT_HEIGHT: 60,
         FILL_ALPHA: 0.9
       },
+      ZONE_LAYOUT: {
+        // индексы блоков: 0..(кол-во-1) слева-направо и сверху-вниз
+        house: { block: { i: 0, j: 0 }, cells: [[0, 0]] },           // 1x1
+        relatives: { block: { i: 5, j: 0 }, cells: [[1, 0]] },       // 1x1
+        work: { block: { i: 3, j: 1 }, cells: [[0, 1], [1, 1]] },    // 2x1 (две колонки в одном ряду)
+        box: { block: { i: 1, j: 2 }, cells: [[0, 1], [0, 2]] },     // 1x2 (две строки в одном столбце)
+        institute: { block: { i: 5, j: 2 }, cells: [[0, 0], [1, 0], [1, 1]] } // Г-образно 3 ячейки
+      },
       ZONES: {
         house: { type: 'rect', x: 200, y: 200, w: 440, h: 750, label: 'Дом Шины' },
         relatives: { type: 'rect', x: 1300, y: 200, w: 440, h: 750, label: 'Родственники' },
@@ -80,7 +88,7 @@
         { x: 1500, y: 1283 },
         { x: 1950, y: 1283 }
       ],
-      BASE_FONT: 24
+      BASE_FONT: 32
     };
 
     const CAR_SPEED = 2;
@@ -133,7 +141,7 @@
       drawRoads(roadsLayer);
       createIntersections(intersectionsLayer);
       drawLots(lotsLayer);
-      // drawZones(zonesLayer);
+      drawZones(zonesLayer);
       // placeLabels(labelsLayer);
       drawTrafficLights(decorLayer);
       // drawAlina(decorLayer);
@@ -256,22 +264,158 @@
     }
 
     function drawZones (layer) {
-      const zones = CONFIG.ZONES;
-      for (const key in zones) {
-        const z = zones[key];
-        const g = new PIXI.Graphics();
-        g.lineStyle(2, 0x333333, 0.8);
-        if (z.type === 'rect') {
-          g.beginFill(CONFIG.COLORS[key], 0.8);
-          g.drawRect(z.x, z.y, z.w, z.h);
-          g.endFill();
-        } else if (z.type === 'circle') {
-          g.beginFill(CONFIG.COLORS[key], z.alpha || 0.4);
-          g.drawCircle(z.x, z.y, z.r);
-          g.endFill();
-        }
-        layer.addChild(g);
+      if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
+      const roadHalf = CONFIG.ROAD_WIDTH / 2;
+      const cols = 2;
+      const rows = 3;
+      const gap = CONFIG.LOTS.GAP;
+      const padding = CONFIG.LOTS.PADDING;
+
+      const zoneLayout = CONFIG.ZONE_LAYOUT;
+      const blocksAcross = verticalRoadXs.length - 1;
+      const blocksDown = horizontalRoadYs.length - 1;
+
+      function getBlockRect (bi, bj) {
+        const yTop = horizontalRoadYs[bj] + roadHalf;
+        const yBottom = horizontalRoadYs[bj + 1] - roadHalf;
+        const xLeft = verticalRoadXs[bi] + roadHalf;
+        const xRight = verticalRoadXs[bi + 1] - roadHalf;
+        const blockWidth = Math.max(0, xRight - xLeft);
+        const blockHeight = Math.max(0, yBottom - yTop);
+        const innerWidth = Math.max(0, blockWidth - padding * 2);
+        const innerHeight = Math.max(0, blockHeight - padding * 2);
+        const totalGapsH = gap * (cols - 1);
+        const totalGapsV = gap * (rows - 1);
+        const lotWidth = (innerWidth - totalGapsH) / cols;
+        const lotHeight = (innerHeight - totalGapsV) / rows;
+        const startX = xLeft + padding;
+        const startY = yTop + padding;
+        return { startX, startY, lotWidth, lotHeight };
       }
+
+      function drawZoneRect (x, y, w, h, color) {
+        const g = new PIXI.Graphics();
+        g.lineStyle(2, 0x333333, 0.9);
+        g.beginFill(color, 1.0);
+        g.drawRect(x, y, w, h);
+        g.endFill();
+        layer.addChild(g);
+        return g;
+      }
+
+      function drawLabel (textValue, x, y, maxWidth) {
+        const label = createWrappedLabel(textValue, CONFIG.BASE_FONT, Math.max(60, maxWidth * 0.9));
+        label.position.set(x, y);
+        layer.addChild(label);
+      }
+
+      function createWrappedLabel (textValue, fontSize, maxWidth) {
+        const style = new PIXI.TextStyle({
+          fontFamily: 'sans-serif',
+          fontSize,
+          fill: 0x000000,
+          wordWrap: true,
+          wordWrapWidth: maxWidth,
+          breakWords: true,
+          align: 'center',
+          stroke: 0xffffff,
+          strokeThickness: 4
+        });
+        const label = new PIXI.Text(textValue, style);
+        label.anchor.set(0.5);
+        return label;
+      }
+
+      function drawZoneFromCells (name, colorKey) {
+        const conf = zoneLayout[name];
+        if (!conf) return;
+        const bi = conf.block.i;
+        const bj = conf.block.j;
+        if (bi < 0 || bj < 0 || bi >= blocksAcross || bj >= blocksDown) return;
+        const { startX, startY, lotWidth, lotHeight } = getBlockRect(bi, bj);
+
+        // Для института рисуем Г-образно, иначе — объединённый прямоугольник
+        if (name === 'institute') {
+          // Ячейки по конфигу в координатах сетки лотов
+          const cells = conf.cells.map(([c, r]) => ({ c, r }));
+
+          // Вспомогательная: группировать последовательные числа
+          const groupConsecutive = (arr) => {
+            const groups = [];
+            let start = null, prev = null;
+            arr.forEach(v => {
+              if (start === null) { start = v; prev = v; return; }
+              if (v === prev + 1) { prev = v; return; }
+              groups.push([start, prev]);
+              start = v; prev = v;
+            });
+            if (start !== null) groups.push([start, prev]);
+            return groups;
+          };
+
+          // Горизонтальные полосы: по каждому ряду объединяем соседние колонки и ЗАПОЛНЯЕМ внутренние гэпы
+          const rowsUsed = Array.from(new Set(cells.map(x => x.r))).sort((a, b) => a - b);
+          rowsUsed.forEach(r => {
+            const colsHere = cells.filter(x => x.r === r).map(x => x.c).sort((a, b) => a - b);
+            const seqs = groupConsecutive(colsHere);
+            seqs.forEach(([c0, c1]) => {
+              const x = startX + c0 * (lotWidth + gap);
+              const y = startY + r * (lotHeight + gap);
+              const w = (c1 - c0 + 1) * lotWidth + (c1 - c0) * gap; // перекрываем горизонтальные гэпы
+              const h = lotHeight;
+              drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
+            });
+          });
+
+          // Вертикальные полосы: по каждой колонке объединяем соседние ряды и ЗАПОЛНЯЕМ вертикальные гэпы
+          const colsUsed = Array.from(new Set(cells.map(x => x.c))).sort((a, b) => a - b);
+          colsUsed.forEach(c => {
+            const rowsHere = cells.filter(x => x.c === c).map(x => x.r).sort((a, b) => a - b);
+            const seqs = groupConsecutive(rowsHere);
+            seqs.forEach(([r0, r1]) => {
+              const x = startX + c * (lotWidth + gap);
+              const y = startY + r0 * (lotHeight + gap);
+              const w = lotWidth;
+              const h = (r1 - r0 + 1) * lotHeight + (r1 - r0) * gap; // перекрываем вертикальные гэпы
+              drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
+            });
+          });
+
+          // Подпись в центре тяжести фигуры (среднее центров занятых ячеек)
+          const centers = cells.map(({ c, r }) => ({
+            cx: startX + c * (lotWidth + gap) + lotWidth / 2,
+            cy: startY + r * (lotHeight + gap) + lotHeight / 2
+          }));
+          const cgx = centers.reduce((s, p) => s + p.cx, 0) / centers.length;
+          const cgy = centers.reduce((s, p) => s + p.cy, 0) / centers.length;
+          // Ширина для переноса: охватывающая ширина фигуры
+          const minX = Math.min(...cells.map(({ c }) => startX + c * (lotWidth + gap)));
+          const maxX = Math.max(...cells.map(({ c }) => startX + c * (lotWidth + gap) + lotWidth));
+          drawLabel(CONFIG.ZONES[name].label, cgx, cgy, maxX - minX);
+          return;
+        }
+
+        // Общее объединение для прямоугольных зон
+        let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+        conf.cells.forEach(([c, r]) => {
+          minC = Math.min(minC, c);
+          minR = Math.min(minR, r);
+          maxC = Math.max(maxC, c);
+          maxR = Math.max(maxR, r);
+        });
+        const x = startX + minC * (lotWidth + gap);
+        const y = startY + minR * (lotHeight + gap);
+        const w = (maxC - minC + 1) * lotWidth + (maxC - minC) * gap;
+        const h = (maxR - minR + 1) * lotHeight + (maxR - minR) * gap;
+        drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
+        drawLabel(CONFIG.ZONES[name].label, x + w / 2, y + h / 2, w);
+      }
+
+      drawZoneFromCells('house', 'house');
+      drawZoneFromCells('relatives', 'relatives');
+      drawZoneFromCells('work', 'work');
+      drawZoneFromCells('box', 'box');
+      drawZoneFromCells('institute', 'institute');
     }
 
     function drawRoads (layer) {
