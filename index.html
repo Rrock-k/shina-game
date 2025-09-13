@@ -75,15 +75,19 @@
     }
 
     .control-panel .clock {
-      font-size: 24px;
+      font-size: 18px;
       color: #f39c12;
       font-weight: bold;
       text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
     }
 
+    .control-panel .clock .date-part {
+      color: #ecf0f1;
+    }
+
     .control-panel .route-info {
       color: #e74c3c;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: bold;
     }
 
@@ -131,6 +135,180 @@
       background: linear-gradient(135deg, #7f8c8d, #95a5a6);
       transform: none;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Кнопка-бургер */
+    .burger-button {
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      border: none;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 50px;
+      height: 50px;
+      margin-right: 15px;
+    }
+
+    .burger-button:hover {
+      background: linear-gradient(135deg, #2980b9, #1f618d);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .burger-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .burger-line {
+      width: 25px;
+      height: 3px;
+      background: white;
+      margin: 2px 0;
+      transition: all 0.3s ease;
+      border-radius: 2px;
+    }
+
+    .burger-button.active .burger-line:nth-child(1) {
+      transform: rotate(45deg) translate(5px, 5px);
+    }
+
+    .burger-button.active .burger-line:nth-child(2) {
+      opacity: 0;
+    }
+
+    .burger-button.active .burger-line:nth-child(3) {
+      transform: rotate(-45deg) translate(7px, -6px);
+    }
+
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      border-radius: 15px;
+      padding: 30px;
+      max-width: 400px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border: 2px solid #3498db;
+      position: relative;
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.8) translateY(-50px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #3498db;
+    }
+
+    .modal-title {
+      color: #ecf0f1;
+      font-size: 24px;
+      font-weight: bold;
+      margin: 0;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-close {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      border: none;
+      color: white;
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+      transform: scale(1.1);
+    }
+
+    .menu-item {
+      background: linear-gradient(135deg, #34495e, #2c3e50);
+      border: 2px solid #3498db;
+      border-radius: 10px;
+      padding: 15px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: #ecf0f1;
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .menu-item:hover {
+      background: linear-gradient(135deg, #3498db, #2980b9);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .menu-item:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .menu-item.disabled {
+      background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+      border-color: #95a5a6;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .menu-item.disabled:hover {
+      background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+      transform: none;
+      box-shadow: none;
     }
 
     /* Игровая область */
@@ -186,7 +364,11 @@
       }
 
       .control-panel .clock {
-        font-size: 20px;
+        font-size: 16px;
+      }
+
+      .control-panel .route-info {
+        font-size: 16px;
       }
     }
 
@@ -234,7 +416,11 @@
       }
 
       .control-panel .clock {
-        font-size: 18px;
+        font-size: 14px;
+      }
+
+      .control-panel .route-info {
+        font-size: 14px;
       }
 
       .control-panel .speed-button {
@@ -251,16 +437,10 @@
   <div class="control-panel">
     <div class="info-section">
       <div class="info-item">
-        <div class="info-label">Время</div>
-        <div class="info-value clock" id="game-clock">08:00</div>
+        <div class="info-value clock" id="game-datetime">Вс 07 Сен - 08:00</div>
       </div>
       <div class="info-item">
-        <div class="info-label">Маршрут</div>
-        <div class="info-value route-info" id="route-info">Дом (2ч)</div>
-      </div>
-      <div class="info-item">
-        <div class="info-label">Статус</div>
-        <div class="info-value" id="game-status">В пути</div>
+        <div class="info-value route-info" id="route-info">В пути в: Институт</div>
       </div>
     </div>
     <div class="controls-section">
@@ -274,6 +454,24 @@
   <!-- Игровая область -->
   <div class="game-container">
     <!-- Canvas будет добавлен сюда через JavaScript -->
+  </div>
+
+  <!-- Модальное окно меню -->
+  <div class="modal-overlay" id="menu-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Меню игры</h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="menu-items">
+        <div class="menu-item" id="menu-speed">⚡ Управление скоростью</div>
+        <div class="menu-item" id="menu-zoom">🔍 Масштабирование</div>
+        <div class="menu-item" id="menu-route">🗺️ Маршрут</div>
+        <div class="menu-item" id="menu-settings">⚙️ Настройки</div>
+        <div class="menu-item" id="menu-help">❓ Помощь</div>
+        <div class="menu-item" id="menu-about">ℹ️ О игре</div>
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -381,6 +579,39 @@
       console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
     }
 
+    // Функции для работы с датами
+    function getMonthName (monthIndex) {
+      const months = [
+        'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+      ];
+      return months[monthIndex];
+    }
+
+    function getDayOfWeekShort (dayOfWeek) {
+      const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+      return days[dayOfWeek];
+    }
+
+    function getDayOfWeek (year, month, day) {
+      const date = new Date(year, month, day);
+      return date.getDay();
+    }
+
+    function getDaysInMonth (year, month) {
+      return new Date(year, month + 1, 0).getDate();
+    }
+
+    function formatGameDateTime () {
+      const dayOfWeek = getDayOfWeek(gameTime.year, gameTime.month, gameTime.day);
+      const dayShort = getDayOfWeekShort(dayOfWeek);
+      const day = gameTime.day.toString().padStart(2, '0');
+      const monthShort = getMonthName(gameTime.month).substring(0, 3);
+      const hours = Math.floor(gameTime.hours).toString().padStart(2, '0');
+      const minutes = Math.floor(gameTime.minutes).toString().padStart(2, '0');
+      return `<span class="date-part">${dayShort} ${day} ${monthShort} - </span>${hours}:${minutes}`;
+    }
+
 
     // Показать уведомление о скорости
     function showSpeedNotification (message) {
@@ -443,10 +674,16 @@
     const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
 
     // Система маршрутов и времени
-    let gameTime = { hours: 8, minutes: 0 }; // начинаем с 8:00
+    let gameTime = {
+      year: 2025,
+      month: 8, // сентябрь (0-индексированный)
+      day: 7,
+      hours: 8,
+      minutes: 0
+    }; // начинаем с 7 сентября 2025, 8:00
     let BASE_TIME_SPEED = 60; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
     let lastTimeUpdate = Date.now();
-    let clockDisplay;
+    let datetimeDisplay;
     let routeDisplay;
     let currentRouteIndex = 0;
     let stayTimer = 0; // таймер пребывания в текущем месте
@@ -568,9 +805,8 @@
       app.stage.addChild(uiLayer);
 
       // Получаем ссылки на HTML элементы панели управления
-      clockDisplay = document.getElementById('game-clock');
+      datetimeDisplay = document.getElementById('game-datetime');
       routeDisplay = document.getElementById('route-info');
-      const statusDisplay = document.getElementById('game-status');
       const speedButton = document.getElementById('speed-button');
       const zoomButton = document.getElementById('zoom-button');
       const zoomInButton = document.getElementById('zoom-in-button');
@@ -663,8 +899,12 @@
         updateZoomButton();
       }
 
-      // Инициализируем дисплей маршрута
+      // Инициализируем дисплеи
       updateRouteDisplay();
+      // Инициализируем дисплей даты и времени
+      if (datetimeDisplay) {
+        datetimeDisplay.innerHTML = formatGameDateTime();
+      }
       // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
       setTimeout(() => {
         // перестроим путь, когда геометрия зон уже известна
@@ -674,19 +914,128 @@
       }, 0);
     }
 
+    // Инициализация меню-бургера
+    function initMenu () {
+      const burgerButton = document.getElementById('burger-button');
+      const menuModal = document.getElementById('menu-modal');
+      const modalClose = document.getElementById('modal-close');
+      const menuItems = document.querySelectorAll('.menu-item');
+
+      // Открытие/закрытие меню по клику на бургер
+      burgerButton.addEventListener('click', () => {
+        menuModal.classList.toggle('active');
+        burgerButton.classList.toggle('active');
+      });
+
+      // Закрытие меню по клику на крестик
+      modalClose.addEventListener('click', () => {
+        menuModal.classList.remove('active');
+        burgerButton.classList.remove('active');
+      });
+
+      // Закрытие меню по клику на фон
+      menuModal.addEventListener('click', (e) => {
+        if (e.target === menuModal) {
+          menuModal.classList.remove('active');
+          burgerButton.classList.remove('active');
+        }
+      });
+
+      // Закрытие меню по нажатию Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menuModal.classList.contains('active')) {
+          menuModal.classList.remove('active');
+          burgerButton.classList.remove('active');
+        }
+      });
+
+      // Обработчики для пунктов меню
+      menuItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const itemId = item.id;
+
+          // Закрываем меню
+          menuModal.classList.remove('active');
+          burgerButton.classList.remove('active');
+
+          // Выполняем действие в зависимости от выбранного пункта
+          switch (itemId) {
+            case 'menu-speed':
+              // Переключаем скорость
+              speedButton.click();
+              showMenuNotification('⚡ Скорость переключена');
+              break;
+            case 'menu-zoom':
+              // Переключаем масштаб
+              if (typeof panningController !== 'undefined' && panningController) {
+                panningController.toggleZoom();
+                updateZoomButton();
+                showMenuNotification('🔍 Масштаб изменен');
+              }
+              break;
+            case 'menu-route':
+              showMenuNotification('🗺️ Информация о маршруте', 'Текущий маршрут: ' + ROUTE_SCHEDULE[currentRouteIndex].name);
+              break;
+            case 'menu-settings':
+              showMenuNotification('⚙️ Настройки', 'Настройки игры будут добавлены в следующих версиях');
+              break;
+            case 'menu-help':
+              showMenuNotification('❓ Помощь', 'Используйте мышь для панорамирования, колесо мыши для масштабирования. На мобильных: касание для панорамирования, два пальца для масштабирования.');
+              break;
+            case 'menu-about':
+              showMenuNotification('ℹ️ О игре', 'Карта Шины - симулятор движения по городу с системой светофоров и маршрутизацией.');
+              break;
+          }
+        });
+      });
+    }
+
+    // Показать уведомление из меню
+    function showMenuNotification (title, message = '') {
+      const notification = document.createElement('div');
+      notification.innerHTML = `<strong>${title}</strong>${message ? '<br>' + message : ''}`;
+      notification.style.cssText = `
+        position: fixed;
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 1001;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+        text-align: center;
+        max-width: 300px;
+        animation: slideDown 0.3s ease-out;
+      `;
+
+      document.body.appendChild(notification);
+
+      // Убираем уведомление через 3 секунды
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.style.animation = 'slideDown 0.3s ease-out reverse';
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 300);
+        }
+      }, 3000);
+    }
+
     // Обновление дисплея маршрута
     function updateRouteDisplay () {
       if (!routeDisplay) return; // защита от вызова до инициализации
       const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
-      const statusDisplay = document.getElementById('game-status');
 
       if (isAtDestination) {
-        const remainingHours = Math.max(0, stayTimer).toFixed(1);
-        routeDisplay.textContent = `${currentDest.name} (${remainingHours}ч)`;
-        if (statusDisplay) statusDisplay.textContent = 'В пункте';
+        routeDisplay.textContent = `В пункте: ${currentDest.name}`;
       } else {
-        routeDisplay.textContent = `${currentDest.name} (${currentDest.stayHours}ч)`;
-        if (statusDisplay) statusDisplay.textContent = 'В пути';
+        routeDisplay.textContent = `В пути в: ${currentDest.name}`;
       }
     }
 
@@ -1537,14 +1886,23 @@
         gameTime.hours += 1;
         if (gameTime.hours >= 24) {
           gameTime.hours = 0;
+          // Переходим к следующему дню
+          gameTime.day += 1;
+          const daysInMonth = getDaysInMonth(gameTime.year, gameTime.month);
+          if (gameTime.day > daysInMonth) {
+            gameTime.day = 1;
+            gameTime.month += 1;
+            if (gameTime.month >= 12) {
+              gameTime.month = 0;
+              gameTime.year += 1;
+            }
+          }
         }
       }
 
-      // Обновляем дисплей часов
-      const hours = Math.floor(gameTime.hours).toString().padStart(2, '0');
-      const minutes = Math.floor(gameTime.minutes).toString().padStart(2, '0');
-      if (clockDisplay) {
-        clockDisplay.textContent = `${hours}:${minutes}`;
+      // Обновляем дисплей даты и времени
+      if (datetimeDisplay) {
+        datetimeDisplay.innerHTML = formatGameDateTime();
       }
 
       // Если находимся в пункте назначения, уменьшаем таймер ожидания
