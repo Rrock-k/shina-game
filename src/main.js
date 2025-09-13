@@ -1,70 +1,11 @@
 
-import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from '../trafficLights.js';
-import { CarTrafficController } from '../carTrafficControl.js';
-import { PanningController } from '../panning.js';
-const CONFIG = {
-  WORLD_WIDTH: 3000,
-  WORLD_HEIGHT: 2000,
-  GRID_STEP: 100,
-  ROAD_SPACING_H: 450,  // шаг между вертикальными дорогами (7 дорог)
-  ROAD_SPACING_V: 567,  // шаг между горизонтальными дорогами (4 дороги)
-  ROAD_MARGIN: 150,
-  ROAD_WIDTH: 48,
-  ROAD_LINE_WIDTH: 12,
-  DASH_LENGTH: 60,
-  DASH_GAP: 60,
-  COLORS: {
-    grid: 0xffffff,
-    border: 0xff0000,
-    road: 0x666666,
-    roadLine: 0xffffff,
-    house: 0xffe0e0,
-    work: 0xe0e8ff,
-    box: 0xfff2cc,
-    relatives: 0xe0ffe0,
-    institute: 0xd0f0ff,
-    lotFill: 0xf1e9d2,
-    lotBorder: 0x777777,
-  },
-  LOTS: {
-    SLOTS_PER_BLOCK: 6,
-    GAP: 10,
-    PADDING: 20,
-    MAX_MULTI_SLOT: 3,
-    MIN_LOT_HEIGHT: 60,
-    FILL_ALPHA: 0.9
-  },
-  ZONE_LAYOUT: {
-    // индексы блоков: 0..(кол-во-1) слева-направо и сверху-вниз
-    house: { block: { i: 0, j: 0 }, cells: [[0, 0]] },           // 1x1
-    relatives: { block: { i: 5, j: 0 }, cells: [[1, 0]] },       // 1x1
-    work: { block: { i: 3, j: 1 }, cells: [[0, 1], [1, 1]] },    // 2x1 (две колонки в одном ряду)
-    box: { block: { i: 1, j: 2 }, cells: [[0, 1], [0, 2]] },     // 1x2 (две строки в одном столбце)
-    institute: { block: { i: 5, j: 2 }, cells: [[0, 0], [1, 0], [1, 1]] } // Г-образно 3 ячейки
-  },
-  ZONES: {
-    house: { type: 'rect', x: 200, y: 200, w: 440, h: 750, label: 'Дом Шины' },
-    relatives: { type: 'rect', x: 1300, y: 200, w: 440, h: 750, label: 'Родственники' },
-    work: { type: 'rect', x: 1840, y: 1100, w: 440, h: 700, label: 'Работа' },
-    box: { type: 'rect', x: 200, y: 1100, w: 440, h: 700, label: 'Бокс' },
-    institute: { type: 'circle', x: 2550, y: 1425, r: 200, label: 'Институт', alpha: 0.6 },
-  },
-  TRAFFIC_LIGHTS: [
-    { x: 600, y: 1283 },
-    { x: 1050, y: 1283 },
-    { x: 1500, y: 1283 },
-    { x: 1950, y: 1283 }
-  ],
-  CAR_PATH: [
-    { x: 600, y: 1283 },
-    { x: 1050, y: 1283 },
-    { x: 1500, y: 1283 },
-    { x: 1950, y: 1283 }
-  ],
-  BASE_FONT: 32
-};
-
-const BASE_CAR_SPEED = 11.7; // Базовая скорость машины
+import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './systems/trafficLights.js';
+import { CarTrafficController } from './systems/carTrafficControl.js';
+import { PanningController } from './systems/panning.js';
+import { CONFIG, BASE_CAR_SPEED } from './config/gameConfig.js';
+import { TimeManager } from './game/TimeManager.js';
+import { PauseManager } from './game/PauseManager.js';
+import { DayNightManager } from './game/DayNightManager.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -74,6 +15,9 @@ let horizontalRoadYs = [], verticalRoadXs = [];
 let hoverLabel;
 let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
+
+// Менеджеры
+let timeManager, pauseManager, dayNightManager;
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -190,67 +134,65 @@ function getMonthName (monthIndex) {
 
 // Функции для ночного режима
 function isNightTime () {
-  // Если режим принудительно установлен
-  if (dayNightMode === 'night') return true;
-  if (dayNightMode === 'day') return false;
-
-  // Автоматический режим - зависит от времени
-  const hour = gameTime.hours;
-  // Ночь с 20:00 до 06:00
-  return hour >= 20 || hour < 6;
+  const gameTime = timeManager.getGameTime();
+  return dayNightManager.isNightTime(gameTime);
 }
 
 
 // Новая функция для создания оверлея только для городских слоев
 function createCityNightOverlay () {
-  if (cityNightOverlay) return cityNightOverlay;
-
-  cityNightOverlay = new PIXI.Container();
-
-  // Основной темно-синий оверлей
-  const overlay = new PIXI.Graphics();
-  overlay.beginFill(0x0d1b69, 0.8); // более темный синий
-  overlay.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
-  overlay.endFill();
-  cityNightOverlay.addChild(overlay);
-
-  // Добавляем градиент от темного к светлому снизу (имитация городского освещения)
-  const gradient = new PIXI.Graphics();
-  for (let i = 0; i < 20; i++) {
-    const alpha = (1 - i / 20) * 0.3;
-    gradient.beginFill(0x2c3e50, alpha);
-    gradient.drawRect(0, CONFIG.WORLD_HEIGHT - i * 10, CONFIG.WORLD_WIDTH, 10);
-    gradient.endFill();
+  if (!dayNightManager) {
+    console.warn('⚠️ dayNightManager не инициализирован');
+    return null;
   }
-  cityNightOverlay.addChild(gradient);
-
-  cityNightOverlay.alpha = 0;
-  cityNightOverlay.zIndex = 400; // поверх городских слоев, но под машиной и светофорами
-
-  return cityNightOverlay;
+  return dayNightManager.createCityNightOverlay();
 }
 
 function updateNightMode () {
-  const shouldBeNight = isNightTime();
-
-  if (shouldBeNight !== isNightMode) {
-    isNightMode = shouldBeNight;
-    console.log(`🌙 ${isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
+  if (!dayNightManager) {
+    console.warn('⚠️ dayNightManager не инициализирован');
+    return;
   }
+  const gameTime = timeManager.getGameTime();
+  dayNightManager.updateNightMode(gameTime);
+}
 
-  // Создаем городской оверлей если его нет
-  if (!cityNightOverlay) {
-    createCityNightOverlay();
-  }
+// Обновление таймера пребывания в здании
+let lastStayTimerUpdate = 0;
+let lastStayTimerDay = 0;
 
-  // Плавно изменяем прозрачность городского оверлея
-  const targetAlpha = isNightMode ? 0.7 : 0;
-  const alphaDiff = targetAlpha - currentCityNightAlpha;
-
-  if (Math.abs(alphaDiff) > 0.001) {
-    currentCityNightAlpha += alphaDiff * nightTransitionSpeed;
-    currentCityNightAlpha = Math.max(0, Math.min(1, currentCityNightAlpha));
-    cityNightOverlay.alpha = currentCityNightAlpha;
+function updateStayTimer() {
+  if (!isAtDestination) return;
+  
+  // Получаем игровое время из timeManager
+  const gameTime = timeManager.getGameTime();
+  const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
+  const currentDay = gameTime.day; // день месяца
+  
+  // Обновляем таймер только при изменении времени
+  if (currentTime !== lastStayTimerUpdate || currentDay !== lastStayTimerDay) {
+    let timeDiff;
+    
+    // Если день изменился, это переход через полночь
+    if (currentDay !== lastStayTimerDay) {
+      // Время с последнего обновления до полуночи + время с полуночи до текущего момента
+      timeDiff = (24 * 60 - lastStayTimerUpdate) + currentTime;
+      console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
+    } else {
+      timeDiff = currentTime - lastStayTimerUpdate;
+    }
+    
+    stayTimer -= timeDiff / 60; // переводим в игровые часы
+    lastStayTimerUpdate = currentTime;
+    lastStayTimerDay = currentDay;
+    
+    console.log(`⏰ Таймер пребывания: ${stayTimer.toFixed(2)} часов`);
+    
+    if (stayTimer <= 0) {
+      // Время пребывания закончилось, едем к следующему пункту
+      console.log('🚗 Время пребывания закончилось, продолжаем движение');
+      nextDestination();
+    }
   }
 }
 
@@ -258,16 +200,11 @@ function updateNightMode () {
 
 // Функция для переключения режимов дня/ночи
 function toggleDayNightMode () {
-  const modes = ['auto', 'day', 'night'];
-  const currentIndex = modes.indexOf(dayNightMode);
-  const nextIndex = (currentIndex + 1) % modes.length;
-  dayNightMode = modes[nextIndex];
-
-  // Сохраняем в localStorage
-  localStorage.setItem('shina-game-daynight-mode', dayNightMode);
-
-  // Принудительно обновляем ночной режим
-  updateNightMode();
+  if (!dayNightManager) {
+    console.warn('⚠️ dayNightManager не инициализирован');
+    return;
+  }
+  dayNightManager.toggleDayNightMode();
 
   // Обновляем текст в меню
   updateDayNightModeText();
@@ -284,16 +221,11 @@ function toggleDayNightMode () {
 
 // Функция для обновления текста режима дня/ночи в меню
 function updateDayNightModeText () {
-  const modeTextElement = document.getElementById('daynight-mode-text');
-  if (!modeTextElement) return;
-
-  const modeNames = {
-    'auto': 'Автоматический',
-    'day': 'Только день',
-    'night': 'Только ночь'
-  };
-
-  modeTextElement.textContent = modeNames[dayNightMode] || 'Автоматический';
+  if (!dayNightManager) {
+    console.warn('⚠️ dayNightManager не инициализирован');
+    return;
+  }
+  dayNightManager.updateDayNightModeText();
 }
 
 // Функция для добавления источника света в слой освещения
@@ -514,10 +446,22 @@ setTimeout(() => {
 
 setupApp();
 
+// Инициализируем менеджеры
+timeManager = new TimeManager();
+pauseManager = new PauseManager();
+
+// Синхронизируем менеджеры
+timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
+timeManager.setPaused(pauseManager.isPaused());
+
 // Создаем panningController раньше, чтобы он был доступен в setupWorld
 let panningController;
 
 setupWorld();
+
+// Инициализируем dayNightManager после создания PIXI приложения
+dayNightManager = new DayNightManager(PIXI, CONFIG);
+
 createCar();
 layout();
 window.addEventListener('resize', () => {
@@ -567,7 +511,7 @@ function setupApp () {
 function setupWorld () {
   world = new PIXI.Container();
   app.stage.addChild(world);
-
+  
   gridLayer = new PIXI.Container();
   roadsLayer = new PIXI.Container();
   lotsLayer = new PIXI.Container();
@@ -579,7 +523,19 @@ function setupWorld () {
   borderLayer = new PIXI.Container();
   lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
 
-  world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, borderLayer);
+  // Делаем world и слои глобально доступными для dayNightManager
+  window.world = world;
+  window.decorLayer = decorLayer;
+  window.trafficLightsLayer = trafficLightsLayer;
+
+  // Добавляем слои в правильном порядке (снизу вверх)
+  world.addChild(gridLayer);
+  world.addChild(roadsLayer);
+  world.addChild(intersectionsLayer);
+  world.addChild(lotsLayer);
+  world.addChild(zonesLayer);
+  world.addChild(labelsLayer);
+  world.addChild(borderLayer);
 
   drawGrid(gridLayer);
   drawRoads(roadsLayer);
@@ -591,13 +547,13 @@ function setupWorld () {
   createTrafficLightsForAllIntersections(trafficLightsLayer);
 
   // Создаем и добавляем городской ночной оверлей (ПЕРЕД машиной)
-  createCityNightOverlay();
-  world.addChild(cityNightOverlay);
+  // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
+  // Оверлей будет создан позже в updateNightMode
 
-  // Добавляем decorLayer (машина) ПОСЛЕ ночного оверлея
+  // Добавляем decorLayer (машина) - будет добавлен поверх оверлея
   world.addChild(decorLayer);
 
-  // Добавляем светофоры поверх ночного оверлея, но внутри world для правильного панорамирования
+  // Добавляем светофоры - будут добавлены поверх оверлея
   world.addChild(trafficLightsLayer);
   // drawAlina(decorLayer);
   drawWorldBorder(borderLayer);
@@ -622,32 +578,32 @@ function setupWorld () {
 
   // Настраиваем кнопку паузы
   pauseButton.addEventListener('click', () => {
-    togglePause();
-    showSpeedNotification(isGamePaused ? 'ПАУЗА' : 'ВОЗОБНОВЛЕНО');
+    pauseManager.togglePause();
+    timeManager.setPaused(pauseManager.isPaused());
+    pauseManager.showSpeedNotification(pauseManager.isPaused() ? 'ПАУЗА' : 'ВОЗОБНОВЛЕНО');
   });
 
   // Настраиваем кнопку скорости
   speedButton.addEventListener('click', () => {
-    isSpeedBoosted = !isSpeedBoosted;
-    SPEED_MULTIPLIER = isSpeedBoosted ? 5 : 1;
-
-    // Сохраняем настройки в localStorage
-    saveSpeedSettings();
+    const newBoosted = !pauseManager.isSpeedBoostedEnabled();
+    pauseManager.setSpeedBoosted(newBoosted);
+    pauseManager.setSpeedMultiplier(newBoosted ? 5 : 1);
+    timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
 
     // Обновляем внешний вид кнопки
-    speedButton.textContent = isSpeedBoosted ? 'x5' : 'x1';
-    speedButton.classList.toggle('boosted', isSpeedBoosted);
+    speedButton.textContent = newBoosted ? 'x5' : 'x1';
+    speedButton.classList.toggle('boosted', newBoosted);
 
     // Логируем изменение
-    console.log(`⚡ СКОРОСТЬ ИГРЫ: ${isSpeedBoosted ? 'x5 УСКОРЕНО' : 'x1 НОРМАЛЬНАЯ'}`);
+    console.log(`⚡ СКОРОСТЬ ИГРЫ: ${newBoosted ? 'x5 УСКОРЕНО' : 'x1 НОРМАЛЬНАЯ'}`);
 
     // Показываем уведомление
-    showSpeedNotification(isSpeedBoosted ? 'СКОРОСТЬ x5' : 'СКОРОСТЬ x1');
+    pauseManager.showSpeedNotification(newBoosted ? 'СКОРОСТЬ x5' : 'СКОРОСТЬ x1');
   });
 
   // Инициализируем кнопку
-  speedButton.textContent = isSpeedBoosted ? 'x5' : 'x1';
-  speedButton.classList.toggle('boosted', isSpeedBoosted);
+  speedButton.textContent = pauseManager.isSpeedBoostedEnabled() ? 'x5' : 'x1';
+  speedButton.classList.toggle('boosted', pauseManager.isSpeedBoostedEnabled());
 
   // Настраиваем кнопку масштабирования
   zoomButton.addEventListener('click', () => {
@@ -717,7 +673,7 @@ function setupWorld () {
   updateRouteDisplay();
   // Инициализируем дисплей даты и времени
   if (datetimeDisplay) {
-    datetimeDisplay.innerHTML = formatGameDateTime();
+    datetimeDisplay.innerHTML = timeManager.formatDateTime();
   }
   // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
   setTimeout(() => {
@@ -784,7 +740,8 @@ function initMenu () {
       switch (itemId) {
         case 'menu-pause':
           // Переключаем паузу
-          togglePause();
+          pauseManager.togglePause();
+          timeManager.setPaused(pauseManager.isPaused());
           break;
         case 'menu-speed':
           // Переключаем скорость
@@ -1709,15 +1666,27 @@ function createCar () {
 
   decorLayer.addChild(car);
   app.ticker.add(updateCar);
-  app.ticker.add(updateGameTime);
+  app.ticker.add(() => {
+    timeManager.update();
+    updateDateTimeDisplay();
+    updateNightMode();
+    updateStayTimer();
+  });
 
   updateRouteDisplay();
+}
+
+// Обновление отображения времени
+function updateDateTimeDisplay() {
+  if (datetimeDisplay) {
+    datetimeDisplay.innerHTML = timeManager.formatDateTime();
+  }
 }
 
 // Обновление игрового времени
 function updateGameTime () {
   // Если игра на паузе, не обновляем время
-  if (isGamePaused) {
+  if (pauseManager.isPaused()) {
     return;
   }
 
@@ -1872,6 +1841,11 @@ function checkArrival () {
 
     isAtDestination = true;
     stayTimer = currentDest.stayHours;
+    
+    // Получаем текущее игровое время
+    const gameTime = timeManager.getGameTime();
+    lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
+    lastStayTimerDay = gameTime.day; // инициализируем день
     updateRouteDisplay();
     // Показываем маленькую аватарку в здании
     showBuildingAvatar(currentDest.location);
@@ -1972,7 +1946,7 @@ function updateCar (delta) {
     return;
   }
 
-  const speed = BASE_CAR_SPEED * SPEED_MULTIPLIER * delta;
+  const speed = BASE_CAR_SPEED * pauseManager.getSpeedMultiplier() * delta;
   debugLog('🚗 Состояние машины', {
     speed: speed.toFixed(2),
     delta: delta.toFixed(3),
