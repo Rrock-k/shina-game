@@ -27,36 +27,13 @@ let debugInfo = {
   logInterval: 1000 // логировать каждую секунду
 };
 
-// УПРАВЛЕНИЕ СКОРОСТЬЮ
-let SPEED_MULTIPLIER = 1; // множитель скорости (1 = нормальная, 5 = ускоренная)
-let isSpeedBoosted = false; // включено ли ускорение по умолчанию
-
-// УПРАВЛЕНИЕ ПАУЗОЙ
-let isGamePaused = false; // состояние паузы игры
-window.isGamePaused = isGamePaused; // делаем глобальной для доступа из модулей
+// УПРАВЛЕНИЕ СКОРОСТЬЮ И ПАУЗОЙ (перенесено в PauseManager)
 
 
 // УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ
 let dayNightMode = 'auto'; // 'auto', 'day', 'night'
 
-// Функции для работы с localStorage
-function saveSpeedSettings () {
-  localStorage.setItem('shina-game-speed-boosted', isSpeedBoosted.toString());
-  localStorage.setItem('shina-game-speed-multiplier', SPEED_MULTIPLIER.toString());
-}
-
-function loadSpeedSettings () {
-  const savedBoosted = localStorage.getItem('shina-game-speed-boosted');
-  const savedMultiplier = localStorage.getItem('shina-game-speed-multiplier');
-
-  if (savedBoosted !== null) {
-    isSpeedBoosted = savedBoosted === 'true';
-  }
-
-  if (savedMultiplier !== null) {
-    SPEED_MULTIPLIER = parseInt(savedMultiplier);
-  }
-}
+// Функции для работы с localStorage (перенесены в PauseManager)
 
 function loadDayNightSettings () {
   const savedMode = localStorage.getItem('shina-game-daynight-mode');
@@ -66,46 +43,7 @@ function loadDayNightSettings () {
   }
 }
 
-// Функции для управления паузой
-function pauseGame () {
-  isGamePaused = true;
-  window.isGamePaused = true; // обновляем глобальную переменную
-  console.log('⏸️ Игра поставлена на паузу');
-  updatePauseButton();
-  updatePauseModeText();
-}
-
-function resumeGame () {
-  isGamePaused = false;
-  window.isGamePaused = false; // обновляем глобальную переменную
-  console.log('▶️ Игра возобновлена');
-  updatePauseButton();
-  updatePauseModeText();
-}
-
-function togglePause () {
-  if (isGamePaused) {
-    resumeGame();
-  } else {
-    pauseGame();
-  }
-}
-
-function updatePauseButton () {
-  const pauseButton = document.getElementById('pause-button');
-  if (pauseButton) {
-    pauseButton.textContent = isGamePaused ? '▶️' : '⏸️';
-    pauseButton.classList.toggle('paused', isGamePaused);
-  }
-}
-
-// Функция для обновления текста паузы в меню
-function updatePauseModeText () {
-  const pauseTextElement = document.getElementById('pause-mode-text');
-  if (pauseTextElement) {
-    pauseTextElement.textContent = isGamePaused ? 'Включена' : 'Выключена';
-  }
-}
+// Функции для управления паузой (перенесены в PauseManager)
 
 // Дебаг-функция для логирования
 function debugLog (message, data = null) {
@@ -124,13 +62,7 @@ function debugLogAlways (message, data = null) {
 }
 
 // Функции для работы с датами
-function getMonthName (monthIndex) {
-  const months = [
-    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-  ];
-  return months[monthIndex];
-}
+// getMonthName перенесена в TimeManager
 
 // Функции для ночного режима
 function isNightTime () {
@@ -185,8 +117,6 @@ function updateStayTimer() {
     stayTimer -= timeDiff / 60; // переводим в игровые часы
     lastStayTimerUpdate = currentTime;
     lastStayTimerDay = currentDay;
-    
-    console.log(`⏰ Таймер пребывания: ${stayTimer.toFixed(2)} часов`);
     
     if (stayTimer <= 0) {
       // Время пребывания закончилось, едем к следующему пункту
@@ -292,101 +222,17 @@ function resetDayColorFilter () {
   }
 }
 
-function getDayOfWeekShort (dayOfWeek) {
-  const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  return days[dayOfWeek];
-}
-
-function getDayOfWeek (year, month, day) {
-  const date = new Date(year, month, day);
-  return date.getDay();
-}
-
-function getDaysInMonth (year, month) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function formatGameDateTime () {
-  const dayOfWeek = getDayOfWeek(gameTime.year, gameTime.month, gameTime.day);
-  const dayShort = getDayOfWeekShort(dayOfWeek);
-  const day = gameTime.day.toString().padStart(2, '0');
-  const monthShort = getMonthName(gameTime.month).substring(0, 3);
-  const hours = Math.floor(gameTime.hours).toString().padStart(2, '0');
-  const minutes = Math.floor(gameTime.minutes).toString().padStart(2, '0');
-  return `<span class="date-part">${dayShort} ${day} ${monthShort} - </span>${hours}:${minutes}`;
-}
+// Функции работы с датами перенесены в TimeManager
+// getDayOfWeekShort, getDayOfWeek, getDaysInMonth, formatGameDateTime
 
 
 // Показать уведомление о скорости
-function showSpeedNotification (message) {
-  // Создаем HTML уведомление
-  const notification = document.createElement('div');
-  notification.textContent = message;
-  notification.style.cssText = `
-    position: fixed;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #e74c3c, #c0392b);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 25px;
-    font-size: 16px;
-    font-weight: bold;
-    z-index: 1001;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    animation: slideDown 0.3s ease-out;
-  `;
-
-  // Добавляем CSS анимацию
-  if (!document.getElementById('notification-styles')) {
-    const style = document.createElement('style');
-    style.id = 'notification-styles';
-    style.textContent = `
-      @keyframes slideDown {
-        from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  document.body.appendChild(notification);
-
-  // Убираем уведомление через 2 секунды
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.style.animation = 'slideDown 0.3s ease-out reverse';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }
-  }, 2000);
-}
+// showSpeedNotification перенесена в PauseManager
 
 // Геометрия зон, вычисленная при отрисовке
 const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
 
-// Система маршрутов и времени
-let gameTime = {
-  year: 2025,
-  month: 8, // сентябрь (0-индексированный)
-  day: 7,
-  hours: 6, // начинаем с 06:00 утра
-  minutes: 0
-}; // начинаем с 7 сентября 2025, 06:00
-let BASE_TIME_SPEED = 60; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
-let lastTimeUpdate = Date.now();
+// Система маршрутов и времени (перенесено в TimeManager)
 let datetimeDisplay;
 let routeDisplay;
 let currentRouteIndex = 0;
@@ -432,8 +278,7 @@ const ROUTE_SCHEDULE = [
 // Определяем мобильное устройство в начале
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-// Загружаем сохраненные настройки скорости
-loadSpeedSettings();
+// Настройки скорости загружаются в PauseManager
 
 // Загружаем сохраненные настройки режима дня/ночи
 loadDayNightSettings();
@@ -441,7 +286,7 @@ loadDayNightSettings();
 // Обновляем текст режима дня/ночи и паузы в меню после загрузки
 setTimeout(() => {
   updateDayNightModeText();
-  updatePauseModeText();
+  pauseManager.updatePauseModeText();
 }, 100);
 
 setupApp();
@@ -1683,46 +1528,15 @@ function updateDateTimeDisplay() {
   }
 }
 
-// Обновление игрового времени
+// Обновление игрового времени (перенесено в TimeManager)
 function updateGameTime () {
-  // Если игра на паузе, не обновляем время
-  if (pauseManager.isPaused()) {
-    return;
-  }
-
-  const now = Date.now();
-  const deltaMs = now - lastTimeUpdate;
-  lastTimeUpdate = now;
-
-  // Ускоряем время: 1 реальная секунда = timeSpeed игровых минут
-  const gameMinutes = (deltaMs / 1000) * BASE_TIME_SPEED * SPEED_MULTIPLIER;
-
-  gameTime.minutes += gameMinutes;
-  let hourGuard = 0; // защита от бесконечного цикла
-  while (gameTime.minutes >= 60 && hourGuard < 100) {
-    hourGuard++;
-    gameTime.minutes -= 60;
-    gameTime.hours += 1;
-    if (gameTime.hours >= 24) {
-      gameTime.hours = 0;
-      // Переходим к следующему дню
-      gameTime.day += 1;
-      const daysInMonth = getDaysInMonth(gameTime.year, gameTime.month);
-      if (gameTime.day > daysInMonth) {
-        gameTime.day = 1;
-        gameTime.month += 1;
-        if (gameTime.month >= 12) {
-          gameTime.month = 0;
-          gameTime.year += 1;
-        }
-      }
-    }
-  }
+  // Обновляем время через TimeManager
+  timeManager.setPaused(pauseManager.isPaused());
+  timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
+  timeManager.update();
 
   // Обновляем дисплей даты и времени
-  if (datetimeDisplay) {
-    datetimeDisplay.innerHTML = formatGameDateTime();
-  }
+  updateDateTimeDisplay();
 
   // Обновляем ночной режим
   updateNightMode();
@@ -1736,11 +1550,13 @@ function updateGameTime () {
 
   // Если находимся в пункте назначения, уменьшаем таймер ожидания
   if (isAtDestination) {
-    stayTimer -= gameMinutes / 60; // переводим в игровые часы
-    if (stayTimer <= 0) {
-      // Время пребывания закончилось, едем к следующему пункту
-      nextDestination();
-    }
+    // Получаем время из TimeManager для расчета таймера
+    const gameTime = timeManager.getGameTime();
+    const currentTime = gameTime.hours * 60 + gameTime.minutes;
+    const currentDay = gameTime.day;
+    
+    // Обновляем таймер пребывания
+    updateStayTimer();
   }
 }
 
@@ -1934,7 +1750,7 @@ function updateCar (delta) {
   debugInfo.frameCount++;
 
   // Если игра на паузе, не обновляем машину
-  if (isGamePaused) {
+  if (pauseManager.isPaused()) {
     debugLog('🚗 Игра на паузе, машина не двигается');
     return;
   }
