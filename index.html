@@ -1076,7 +1076,7 @@
       borderLayer = new PIXI.Container();
       lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
 
-      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, trafficLightsLayer, borderLayer);
+      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, borderLayer);
 
       drawGrid(gridLayer);
       drawRoads(roadsLayer);
@@ -1094,17 +1094,8 @@
       // Добавляем decorLayer (машина) ПОСЛЕ ночного оверлея
       world.addChild(decorLayer);
 
-      // Перемещаем светофоры в слой освещения (поверх ночного оверлея)
-      if (lightingLayer && trafficLightsLayer.children.length > 0) {
-        // Клонируем все светофоры в слой освещения
-        const trafficLights = [...trafficLightsLayer.children];
-        trafficLights.forEach(trafficLight => {
-          lightingLayer.addChild(trafficLight);
-        });
-        // Очищаем старый слой
-        trafficLightsLayer.removeChildren();
-        console.log('🚦 Светофоры перемещены в слой освещения');
-      }
+      // Добавляем светофоры поверх ночного оверлея, но внутри world для правильного панорамирования
+      world.addChild(trafficLightsLayer);
       // drawAlina(decorLayer);
       drawWorldBorder(borderLayer);
 
@@ -1909,11 +1900,7 @@
         label.scale.set(1 / scale);
       });
 
-      // Обновляем позицию и масштаб слоя освещения
-      if (lightingLayer && world) {
-        lightingLayer.scale.set(world.scale.x, world.scale.y);
-        lightingLayer.position.set(world.position.x, world.position.y);
-      }
+      // Светофоры теперь внутри world, поэтому синхронизация не нужна
     }
 
     // ======= Новая логика движения по графу перекрёстков и зданий =======
