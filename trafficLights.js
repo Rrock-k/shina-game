@@ -4,8 +4,56 @@
 // - initTrafficLightsForIntersection({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle })
 // - keyForIntersection(x, y)
 // - getDirectionForSegment(dx, dy)
+// - TrafficLightCoordinator - координатор зеленой волны
 
 export const Direction = { EW: 'EW', NS: 'NS' };
+
+// Глобальный координатор зеленой волны
+export class TrafficLightCoordinator {
+  constructor(averageCarSpeed = 60) { // км/ч
+    this.lights = new Map(); // ключ перекрестка -> светофор
+    // Преобразуем км/ч в пиксели/мс (предполагаем, что 100 пикселей = ~100 метров)
+    this.carSpeedPixelsPerMs = (averageCarSpeed * 1000 / 3600) / 1000; // пиксели за миллисекунду
+    this.waveOrigin = { x: 0, y: 0 }; // точка начала зеленой волны
+    this.cycleStartTime = Date.now();
+  }
+
+  setWaveOrigin(x, y) {
+    this.waveOrigin = { x, y };
+    this.restartWave();
+  }
+
+  addTrafficLight(key, trafficLight, x, y) {
+    this.lights.set(key, { trafficLight, x, y });
+  }
+
+  removeTrafficLight(key) {
+    this.lights.delete(key);
+  }
+
+  // Рассчитать задержку для перекрестка на основе расстояния от источника волны
+  calculateDelayForIntersection(x, y) {
+    const dx = x - this.waveOrigin.x;
+    const dy = y - this.waveOrigin.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    return distance / this.carSpeedPixelsPerMs; // задержка в миллисекундах
+  }
+
+  // Перезапустить волну
+  restartWave() {
+    const now = Date.now();
+    this.cycleStartTime = now;
+    
+    for (const [key, { trafficLight, x, y }] of this.lights) {
+      const delay = this.calculateDelayForIntersection(x, y);
+      trafficLight.setStartDelay(delay);
+    }
+  }
+
+  destroy() {
+    this.lights.clear();
+  }
+}
 
 export function keyForIntersection (x, y) {
   return `${x},${y}`;
@@ -34,6 +82,11 @@ class IntersectionTrafficLight {
     this.phase = 'NS_GREEN';
     this.elapsedMs = 0;
     this.phaseDurationMs = this.cycle.green;
+    
+    // Поддержка задержки запуска для зеленой волны
+    this.startDelayMs = 0; // задержка перед началом работы
+    this.delayElapsedMs = 0; // сколько времени прошло с момента создания
+    this.isDelayActive = false; // активна ли сейчас задержка
 
     this.root = new PIXI.Container();
     this.root.position.set(x, y);
@@ -51,6 +104,19 @@ class IntersectionTrafficLight {
     if (this.root && this.root.parent) this.root.parent.removeChild(this.root);
   }
 
+  // Установить задержку запуска для зеленой волны
+  setStartDelay(delayMs) {
+    this.startDelayMs = delayMs;
+    this.delayElapsedMs = 0;
+    this.isDelayActive = delayMs > 0;
+    
+    // Сброс светофора в начальное состояние
+    this.phase = 'NS_GREEN';
+    this.elapsedMs = 0;
+    this.phaseDurationMs = this.cycle.green;
+    this.#updateVisuals();
+  }
+
   isPassAllowed (direction) {
     // Разрешено ехать при зелёном и жёлтом. Запрещено только на красный.
     if (direction === Direction.NS) return this.phase.startsWith('NS_');
@@ -59,6 +125,18 @@ class IntersectionTrafficLight {
   }
 
   _onTick () {
+    // Если активна задержка запуска, ждем ее завершения
+    if (this.isDelayActive) {
+      this.delayElapsedMs += this.app.ticker.deltaMS;
+      if (this.delayElapsedMs >= this.startDelayMs) {
+        this.isDelayActive = false;
+        // Начинаем нормальную работу светофора
+        this.elapsedMs = 0;
+        this.#updateVisuals();
+      }
+      return; // не обновляем фазы во время задержки
+    }
+
     this.elapsedMs += this.app.ticker.deltaMS;
     if (this.elapsedMs >= this.phaseDurationMs) {
       this.elapsedMs = 0;
@@ -154,16 +232,25 @@ class IntersectionTrafficLight {
   }
 
   #updateVisuals () {
-    const isNS = this.phase.startsWith('NS_');
-    const isEW = this.phase.startsWith('EW_');
-    const isGreen = this.phase.endsWith('_GREEN');
-    const isYellow = this.phase.endsWith('_YELLOW');
-
     const setHead = (head, state /* 'red'|'yellow'|'green' */) => {
       head.red.alpha = state === 'red' ? 1 : 0.2;
       head.yellow.alpha = state === 'yellow' ? 1 : 0.2;
       head.green.alpha = state === 'green' ? 1 : 0.2;
     };
+
+    // Во время задержки все светофоры показывают красный
+    if (this.isDelayActive) {
+      if (this.heads.N) setHead(this.heads.N, 'red');
+      if (this.heads.S) setHead(this.heads.S, 'red');
+      if (this.heads.W) setHead(this.heads.W, 'red');
+      if (this.heads.E) setHead(this.heads.E, 'red');
+      return;
+    }
+
+    const isNS = this.phase.startsWith('NS_');
+    const isEW = this.phase.startsWith('EW_');
+    const isGreen = this.phase.endsWith('_GREEN');
+    const isYellow = this.phase.endsWith('_YELLOW');
 
     // NS группа (головы N,S)
     if (this.heads.N) {
