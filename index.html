@@ -102,6 +102,7 @@
     let horizontalRoadYs = [], verticalRoadXs = [];
     let hoverLabel;
     let carTrafficController;
+    let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
     // Геометрия зон, вычисленная при отрисовке
     const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
@@ -995,6 +996,9 @@
 
     // Переход к следующему пункту маршрута
     function nextDestination () {
+      // Скрываем аватарку в текущем здании
+      hideBuildingAvatar();
+
       currentRouteIndex = (currentRouteIndex + 1) % ROUTE_SCHEDULE.length;
       isAtDestination = false;
       stayTimer = 0;
@@ -1015,6 +1019,65 @@
         isAtDestination = true;
         stayTimer = currentDest.stayHours;
         updateRouteDisplay();
+
+        // Показываем маленькую аватарку в здании
+        showBuildingAvatar(currentDest.location);
+      }
+    }
+
+    // Показать маленькую аватарку в здании
+    function showBuildingAvatar (locationKey) {
+      const buildingCenter = getDestinationCenter(locationKey);
+      if (!buildingCenter) return;
+
+      // Создаем маленькую аватарку в уголке здания
+      const avatarContainer = new PIXI.Container();
+
+      // Кружок-фон
+      const circle = new PIXI.Graphics();
+      circle.beginFill(0xffffff, 0.9);
+      circle.lineStyle(2, 0x333333);
+      circle.drawCircle(0, 0, 20);
+      circle.endFill();
+      avatarContainer.addChild(circle);
+
+      // Маленькая шина
+      const smallAvatar = PIXI.Sprite.from('shina.jpeg');
+      smallAvatar.anchor.set(0.5);
+      smallAvatar.width = 30;
+      smallAvatar.height = 30;
+      avatarContainer.addChild(smallAvatar);
+
+      // Позиционируем в правом нижнем углу здания
+      const zone = zoneGeometry.get(locationKey);
+      if (zone && zone.bounds) {
+        // Для прямоугольных зон
+        avatarContainer.position.set(
+          zone.bounds.x + zone.bounds.w - 30,
+          zone.bounds.y + zone.bounds.h - 30
+        );
+      } else {
+        // Для круглых зон (институт)
+        avatarContainer.position.set(
+          buildingCenter.x + 150,
+          buildingCenter.y + 150
+        );
+      }
+
+      decorLayer.addChild(avatarContainer);
+      buildingAvatars.set(locationKey, avatarContainer);
+
+      console.log(`🏠 Показана аватарка в здании ${locationKey}`);
+    }
+
+    // Скрыть аватарку в здании
+    function hideBuildingAvatar () {
+      const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+      const avatarContainer = buildingAvatars.get(currentDest.location);
+      if (avatarContainer && avatarContainer.parent) {
+        avatarContainer.parent.removeChild(avatarContainer);
+        buildingAvatars.delete(currentDest.location);
+        console.log(`🏠 Скрыта аватарка в здании ${currentDest.location}`);
       }
     }
 
