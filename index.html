@@ -14,6 +14,115 @@
       overflow: auto;
       touch-action: pan-x pan-y;
       -webkit-overflow-scrolling: touch;
+      font-family: 'Arial', sans-serif;
+    }
+
+    /* Панель управления */
+    .control-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      border-bottom: 3px solid #3498db;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      box-sizing: border-box;
+    }
+
+    .control-panel .info-section {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      flex: 1;
+    }
+
+    .control-panel .controls-section {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .control-panel .info-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .control-panel .info-label {
+      font-size: 12px;
+      color: #bdc3c7;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-panel .info-value {
+      font-size: 18px;
+      color: #ecf0f1;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .control-panel .clock {
+      font-size: 24px;
+      color: #f39c12;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+    }
+
+    .control-panel .route-info {
+      color: #e74c3c;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .control-panel .speed-button {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-panel .speed-button:hover {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .control-panel .speed-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .control-panel .speed-button.boosted {
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+    }
+
+    .control-panel .speed-button.boosted:hover {
+      background: linear-gradient(135deg, #e67e22, #d35400);
+    }
+
+    /* Игровая область */
+    .game-container {
+      margin-top: 80px;
+      position: relative;
+      width: 1200px;
+      height: 800px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     canvas {
@@ -21,12 +130,11 @@
       width: 1200px;
       height: 800px;
       border: 2px solid #444;
-      margin: 0 auto;
       touch-action: none;
     }
 
     /* Стили для панорамирования */
-    body {
+    .game-container {
       overflow: auto;
       position: relative;
     }
@@ -39,11 +147,74 @@
       top: 0;
       left: 0;
     }
+
+    /* Адаптивность */
+    @media (max-width: 1300px) {
+      .control-panel {
+        padding: 0 10px;
+      }
+      
+      .control-panel .info-section {
+        gap: 20px;
+      }
+      
+      .control-panel .info-value {
+        font-size: 16px;
+      }
+      
+      .control-panel .clock {
+        font-size: 20px;
+      }
+    }
+
+    @media (max-width: 1000px) {
+      .control-panel {
+        height: 100px;
+        flex-direction: column;
+        padding: 10px;
+      }
+      
+      .control-panel .info-section {
+        gap: 15px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      
+      .control-panel .controls-section {
+        margin-top: 10px;
+      }
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
 </head>
 
 <body>
+  <!-- Панель управления -->
+  <div class="control-panel">
+    <div class="info-section">
+      <div class="info-item">
+        <div class="info-label">Время</div>
+        <div class="info-value clock" id="game-clock">08:00</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Маршрут</div>
+        <div class="info-value route-info" id="route-info">Дом (2ч)</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Статус</div>
+        <div class="info-value" id="game-status">В пути</div>
+      </div>
+    </div>
+    <div class="controls-section">
+      <button class="speed-button" id="speed-button">Скорость x1</button>
+    </div>
+  </div>
+
+  <!-- Игровая область -->
+  <div class="game-container">
+    <!-- Canvas будет добавлен сюда через JavaScript -->
+  </div>
+
   <script type="module">
     import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './trafficLights.js';
     import { CarTrafficController } from './carTrafficControl.js';
@@ -149,85 +320,60 @@
       console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
     }
 
-    // Создание кнопки переключения скорости
-    function createSpeedToggleButton () {
-      // Создаем контейнер для кнопки
-      const buttonContainer = new PIXI.Container();
-
-      // Фон кнопки
-      const buttonBackground = new PIXI.Graphics();
-      buttonBackground.beginFill(isSpeedBoosted ? 0xff6600 : 0x0066ff, 0.8);
-      buttonBackground.lineStyle(2, 0xffffff);
-      buttonBackground.drawRoundedRect(0, 0, 120, 30, 5);
-      buttonBackground.endFill();
-      buttonContainer.addChild(buttonBackground);
-
-      // Текст кнопки
-      const buttonText = new PIXI.Text(isSpeedBoosted ? 'SPEED x5' : 'SPEED x1', {
-        fontFamily: 'sans-serif',
-        fontSize: 12,
-        fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 2
-      });
-      buttonText.anchor.set(0.5);
-      buttonText.position.set(60, 15);
-      buttonContainer.addChild(buttonText);
-
-      // Позиционируем кнопку в правом верхнем углу
-      buttonContainer.position.set(1200 - 130, 10);
-
-      // Делаем кнопку интерактивной
-      buttonContainer.eventMode = 'static';
-      buttonContainer.cursor = 'pointer';
-      buttonContainer.hitArea = new PIXI.Rectangle(0, 0, 120, 30);
-
-      // Обработчик клика
-      buttonContainer.on('pointerdown', () => {
-        isSpeedBoosted = !isSpeedBoosted;
-        SPEED_MULTIPLIER = isSpeedBoosted ? 5 : 1;
-
-        // Обновляем внешний вид кнопки
-        buttonBackground.clear();
-        buttonBackground.beginFill(isSpeedBoosted ? 0xff6600 : 0x0066ff, 0.8);
-        buttonBackground.lineStyle(2, 0xffffff);
-        buttonBackground.drawRoundedRect(0, 0, 120, 30, 5);
-        buttonBackground.endFill();
-
-        // Обновляем текст
-        buttonText.text = isSpeedBoosted ? 'SPEED x5' : 'SPEED x1';
-
-        // Логируем изменение
-        console.log(`⚡ СКОРОСТЬ ИГРЫ: ${isSpeedBoosted ? 'x5 УСКОРЕНО' : 'x1 НОРМАЛЬНАЯ'}`);
-
-        // Показываем уведомление
-        showSpeedNotification(isSpeedBoosted ? 'СКОРОСТЬ x5' : 'СКОРОСТЬ x1');
-      });
-
-      // Добавляем кнопку в UI слой
-      uiLayer.addChild(buttonContainer);
-
-      // Сохраняем ссылку для обновления
-      window.speedButton = buttonContainer;
-    }
 
     // Показать уведомление о скорости
     function showSpeedNotification (message) {
-      const notification = new PIXI.Text(message, {
-        fontFamily: 'sans-serif',
-        fontSize: 16,
-        fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 3
-      });
-      notification.anchor.set(0.5);
-      notification.position.set(600, 50);
-      uiLayer.addChild(notification);
+      // Создаем HTML уведомление
+      const notification = document.createElement('div');
+      notification.textContent = message;
+      notification.style.cssText = `
+        position: fixed;
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: bold;
+        z-index: 1001;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        animation: slideDown 0.3s ease-out;
+      `;
+
+      // Добавляем CSS анимацию
+      if (!document.getElementById('notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+          @keyframes slideDown {
+            from {
+              opacity: 0;
+              transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(-50%) translateY(0);
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      document.body.appendChild(notification);
 
       // Убираем уведомление через 2 секунды
       setTimeout(() => {
-        if (notification.parent) {
-          notification.parent.removeChild(notification);
+        if (notification.parentNode) {
+          notification.style.animation = 'slideDown 0.3s ease-out reverse';
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 300);
         }
       }, 2000);
     }
@@ -309,7 +455,9 @@
         resolution: window.devicePixelRatio || 1,
         backgroundColor: 0x3a6f3e
       });
-      document.body.appendChild(app.view);
+      // Добавляем canvas в игровую область
+      const gameContainer = document.querySelector('.game-container');
+      gameContainer.appendChild(app.view);
       // Включаем систему событий для всей сцены
       app.stage.eventMode = 'static';
       app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
@@ -344,40 +492,32 @@
 
       uiLayer = new PIXI.Container();
       app.stage.addChild(uiLayer);
-      const title = new PIXI.Text('Карта города (наблюдатель)', {
-        fontFamily: 'sans-serif',
-        fontSize: 20,
-        fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 3
-      });
-      title.position.set(10, 10);
-      uiLayer.addChild(title);
 
-      // Игровые часы
-      clockDisplay = new PIXI.Text('08:00', {
-        fontFamily: 'sans-serif',
-        fontSize: 32,
-        fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 4
-      });
-      clockDisplay.position.set(10, 45);
-      uiLayer.addChild(clockDisplay);
+      // Получаем ссылки на HTML элементы панели управления
+      clockDisplay = document.getElementById('game-clock');
+      routeDisplay = document.getElementById('route-info');
+      const statusDisplay = document.getElementById('game-status');
+      const speedButton = document.getElementById('speed-button');
 
-      // Дисплей текущего маршрута
-      routeDisplay = new PIXI.Text('Маршрут: Дом (2ч)', {
-        fontFamily: 'sans-serif',
-        fontSize: 18,
-        fill: 0xffff00,
-        stroke: 0x000000,
-        strokeThickness: 3
-      });
-      routeDisplay.position.set(10, 85);
-      uiLayer.addChild(routeDisplay);
+      // Настраиваем кнопку скорости
+      speedButton.addEventListener('click', () => {
+        isSpeedBoosted = !isSpeedBoosted;
+        SPEED_MULTIPLIER = isSpeedBoosted ? 5 : 1;
 
-      // Кнопка переключения скорости
-      createSpeedToggleButton();
+        // Обновляем внешний вид кнопки
+        speedButton.textContent = isSpeedBoosted ? 'Скорость x5' : 'Скорость x1';
+        speedButton.classList.toggle('boosted', isSpeedBoosted);
+
+        // Логируем изменение
+        console.log(`⚡ СКОРОСТЬ ИГРЫ: ${isSpeedBoosted ? 'x5 УСКОРЕНО' : 'x1 НОРМАЛЬНАЯ'}`);
+
+        // Показываем уведомление
+        showSpeedNotification(isSpeedBoosted ? 'СКОРОСТЬ x5' : 'СКОРОСТЬ x1');
+      });
+
+      // Инициализируем кнопку
+      speedButton.textContent = isSpeedBoosted ? 'Скорость x5' : 'Скорость x1';
+      speedButton.classList.toggle('boosted', isSpeedBoosted);
 
       // Инициализируем дисплей маршрута
       updateRouteDisplay();
@@ -394,11 +534,15 @@
     function updateRouteDisplay () {
       if (!routeDisplay) return; // защита от вызова до инициализации
       const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+      const statusDisplay = document.getElementById('game-status');
+      
       if (isAtDestination) {
         const remainingHours = Math.max(0, stayTimer).toFixed(1);
-        routeDisplay.text = `В пункте: ${currentDest.name} (${remainingHours}ч)`;
+        routeDisplay.textContent = `${currentDest.name} (${remainingHours}ч)`;
+        if (statusDisplay) statusDisplay.textContent = 'В пункте';
       } else {
-        routeDisplay.text = `Едем в: ${currentDest.name} (${currentDest.stayHours}ч)`;
+        routeDisplay.textContent = `${currentDest.name} (${currentDest.stayHours}ч)`;
+        if (statusDisplay) statusDisplay.textContent = 'В пути';
       }
     }
 
@@ -1230,7 +1374,9 @@
       // Обновляем дисплей часов
       const hours = Math.floor(gameTime.hours).toString().padStart(2, '0');
       const minutes = Math.floor(gameTime.minutes).toString().padStart(2, '0');
-      clockDisplay.text = `${hours}:${minutes}`;
+      if (clockDisplay) {
+        clockDisplay.textContent = `${hours}:${minutes}`;
+      }
 
       // Если находимся в пункте назначения, уменьшаем таймер ожидания
       if (isAtDestination) {
@@ -1615,10 +1761,11 @@
     // Инициализируем панорамирование
     const panningController = new PanningController();
 
-    // Настраиваем body для панорамирования
-    document.body.style.width = '1200px';
-    document.body.style.height = '800px';
-    document.body.style.overflow = 'auto';
+    // Настраиваем игровую область для панорамирования
+    const gameContainer = document.querySelector('.game-container');
+    gameContainer.style.width = '1200px';
+    gameContainer.style.height = '800px';
+    gameContainer.style.overflow = 'auto';
 
     // Добавляем подсказку для мобильных устройств
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
