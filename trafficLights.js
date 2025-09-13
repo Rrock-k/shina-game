@@ -64,7 +64,7 @@ export function getDirectionForSegment (dx, dy) {
   return Math.abs(dx) >= Math.abs(dy) ? Direction.EW : Direction.NS;
 }
 
-export function initTrafficLightsForIntersection ({ PIXI, app, layer, x, y, roadWidth = 48, lampRadius = 8, cycle = { green: 4000, yellow: 1200 }, roadConnections = { north: true, south: true, east: true, west: true } }) {
+export function initTrafficLightsForIntersection ({ PIXI, app, layer, x, y, roadWidth = 48, lampRadius = 8, cycle = { green: 667, yellow: 200 }, roadConnections = { north: true, south: true, east: true, west: true } }) {
   const tl = new IntersectionTrafficLight({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections });
   return tl;
 }

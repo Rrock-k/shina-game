@@ -93,7 +93,7 @@
       BASE_FONT: 32
     };
 
-    const CAR_SPEED = 9;
+    const CAR_SPEED = 11.7;
 
     // globals
     let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, car;
@@ -656,7 +656,7 @@
             y,
             roadWidth: CONFIG.ROAD_WIDTH,
             lampRadius: 9,
-            cycle: { green: 4500, yellow: 1200 },
+            cycle: { green: 750, yellow: 200 },
             roadConnections
           });
           const key = `${x},${y}`;
