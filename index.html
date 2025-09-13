@@ -905,10 +905,58 @@
     function createCar () {
       car = new PIXI.Container();
 
+      // Кузов машины
       const body = new PIXI.Graphics();
       body.beginFill(0xff8800).drawRect(-60, -30, 120, 60).endFill();
       car.addChild(body);
 
+      // Радиатор (передняя решетка) - ВПЕРЕДИ
+      const radiator = new PIXI.Graphics();
+      radiator.beginFill(0x333333).drawRect(45, -25, 10, 50).endFill();
+      // Горизонтальные полоски радиатора
+      for (let i = 0; i < 5; i++) {
+        const line = new PIXI.Graphics();
+        line.lineStyle(2, 0x666666);
+        line.moveTo(45, -20 + i * 10);
+        line.lineTo(55, -20 + i * 10);
+        radiator.addChild(line);
+      }
+      car.addChild(radiator);
+
+      // Передние фары - ВПЕРЕДИ
+      const leftHeadlight = new PIXI.Graphics();
+      leftHeadlight.beginFill(0xffffaa).drawCircle(50, -20, 8).endFill();
+      leftHeadlight.lineStyle(1, 0x333333);
+      leftHeadlight.drawCircle(50, -20, 8);
+      car.addChild(leftHeadlight);
+
+      const rightHeadlight = new PIXI.Graphics();
+      rightHeadlight.beginFill(0xffffaa).drawCircle(50, 20, 8).endFill();
+      rightHeadlight.lineStyle(1, 0x333333);
+      rightHeadlight.drawCircle(50, 20, 8);
+      car.addChild(rightHeadlight);
+
+      // Задние фары - СЗАДИ
+      const leftTailLight = new PIXI.Graphics();
+      leftTailLight.beginFill(0xff0000).drawCircle(-50, -20, 6).endFill();
+      leftTailLight.lineStyle(1, 0x333333);
+      leftTailLight.drawCircle(-50, -20, 6);
+      car.addChild(leftTailLight);
+
+      const rightTailLight = new PIXI.Graphics();
+      rightTailLight.beginFill(0xff0000).drawCircle(-50, 20, 6).endFill();
+      rightTailLight.lineStyle(1, 0x333333);
+      rightTailLight.drawCircle(-50, 20, 6);
+      car.addChild(rightTailLight);
+
+      // Крыша машинки (квадратик по размеру аватарки)
+      const roof = new PIXI.Graphics();
+      roof.beginFill(0xcc6600).drawRect(-30, -30, 60, 60).endFill();
+      roof.lineStyle(2, 0x333333);
+      roof.drawRect(-30, -30, 60, 60);
+      car.addChild(roof);
+
+      // Аватарка Шины (исходный размер без скругления)
       avatar = PIXI.Sprite.from('shina.jpeg');
       avatar.anchor.set(0.5);
       avatar.width = 60;
@@ -1030,23 +1078,28 @@
       const buildingCenter = getDestinationCenter(locationKey);
       if (!buildingCenter) return;
 
-      // Создаем маленькую аватарку в уголке здания
+      // Скрываем аватарку из машинки
+      if (avatar) {
+        avatar.visible = false;
+      }
+
+      // Создаем аватарку в здании (такого же размера как в машинке)
       const avatarContainer = new PIXI.Container();
 
-      // Кружок-фон
-      const circle = new PIXI.Graphics();
-      circle.beginFill(0xffffff, 0.9);
-      circle.lineStyle(2, 0x333333);
-      circle.drawCircle(0, 0, 20);
-      circle.endFill();
-      avatarContainer.addChild(circle);
+      // Квадратный фон (исходный размер без скругления)
+      const background = new PIXI.Graphics();
+      background.beginFill(0xffffff, 0.9);
+      background.lineStyle(2, 0x333333);
+      background.drawRect(-30, -30, 60, 60);
+      background.endFill();
+      avatarContainer.addChild(background);
 
-      // Маленькая шина
-      const smallAvatar = PIXI.Sprite.from('shina.jpeg');
-      smallAvatar.anchor.set(0.5);
-      smallAvatar.width = 30;
-      smallAvatar.height = 30;
-      avatarContainer.addChild(smallAvatar);
+      // Аватарка Шины (исходный размер без скругления)
+      const buildingAvatar = PIXI.Sprite.from('shina.jpeg');
+      buildingAvatar.anchor.set(0.5);
+      buildingAvatar.width = 60;
+      buildingAvatar.height = 60;
+      avatarContainer.addChild(buildingAvatar);
 
       // Позиционируем в правом нижнем углу здания
       const zone = zoneGeometry.get(locationKey);
@@ -1078,6 +1131,11 @@
         avatarContainer.parent.removeChild(avatarContainer);
         buildingAvatars.delete(currentDest.location);
         console.log(`🏠 Скрыта аватарка в здании ${currentDest.location}`);
+      }
+
+      // Показываем аватарку обратно в машинке
+      if (avatar) {
+        avatar.visible = true;
       }
     }
 
