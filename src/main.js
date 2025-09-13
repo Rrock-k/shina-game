@@ -6,6 +6,7 @@ import { CONFIG, BASE_CAR_SPEED } from './config/gameConfig.js';
 import { TimeManager } from './game/TimeManager.js';
 import { PauseManager } from './game/PauseManager.js';
 import { DayNightManager } from './game/DayNightManager.js';
+import { WorldRenderer } from './rendering/WorldRenderer.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -17,7 +18,7 @@ let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let timeManager, pauseManager, dayNightManager;
+let timeManager, pauseManager, dayNightManager, worldRenderer;
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -258,6 +259,13 @@ function setupWorld () {
   window.decorLayer = decorLayer;
   window.trafficLightsLayer = trafficLightsLayer;
 
+  // Инициализируем WorldRenderer
+  worldRenderer = new WorldRenderer(CONFIG, app);
+  worldRenderer.init(world, {
+    grid: gridLayer,
+    border: borderLayer
+  });
+
   // Добавляем слои в правильном порядке (снизу вверх)
   world.addChild(gridLayer);
   world.addChild(roadsLayer);
@@ -267,7 +275,9 @@ function setupWorld () {
   world.addChild(labelsLayer);
   world.addChild(borderLayer);
 
-  drawGrid(gridLayer);
+  // Используем WorldRenderer для отрисовки базовых элементов
+  worldRenderer.render();
+  
   drawRoads(roadsLayer);
   createIntersections(intersectionsLayer);
   drawLots(lotsLayer);
@@ -286,7 +296,6 @@ function setupWorld () {
   // Добавляем светофоры - будут добавлены поверх оверлея
   world.addChild(trafficLightsLayer);
   // drawAlina(decorLayer);
-  drawWorldBorder(borderLayer);
 
   uiLayer = new PIXI.Container();
 
@@ -591,24 +600,7 @@ function getRoadPositions () {
   return { horizontalPositions, verticalPositions, maxVerticalPos };
 }
 
-function drawGrid (layer) {
-  const g = new PIXI.Graphics();
-  g.lineStyle(1, CONFIG.COLORS.grid, 0.15);
-  for (let i = 0; i <= CONFIG.WORLD_WIDTH; i += CONFIG.GRID_STEP) {
-    g.moveTo(i, 0); g.lineTo(i, CONFIG.WORLD_HEIGHT);
-  }
-  for (let i = 0; i <= CONFIG.WORLD_HEIGHT; i += CONFIG.GRID_STEP) {
-    g.moveTo(0, i); g.lineTo(CONFIG.WORLD_WIDTH, i);
-  }
-  layer.addChild(g);
-}
-
-function drawWorldBorder (layer) {
-  const g = new PIXI.Graphics();
-  g.lineStyle(8, CONFIG.COLORS.border, 1.0, 0);
-  g.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
-  layer.addChild(g);
-}
+// Функции drawGrid и drawWorldBorder перенесены в WorldRenderer
 
 function randInt (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
