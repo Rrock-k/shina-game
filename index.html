@@ -562,80 +562,9 @@
   <script type="module">
     import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './trafficLights.js';
     import { CarTrafficController } from './carTrafficControl.js';
-    import { PanningController } from './panning.js';
-    const CONFIG = {
-      WORLD_WIDTH: 3000,
-      WORLD_HEIGHT: 2000,
-      GRID_STEP: 100,
-      ROAD_SPACING_H: 450,  // шаг между вертикальными дорогами (7 дорог)
-      ROAD_SPACING_V: 567,  // шаг между горизонтальными дорогами (4 дороги)
-      ROAD_MARGIN: 150,
-      ROAD_WIDTH: 48,
-      ROAD_LINE_WIDTH: 12,
-      DASH_LENGTH: 60,
-      DASH_GAP: 60,
-      COLORS: {
-        grid: 0xffffff,
-        border: 0xff0000,
-        road: 0x666666,
-        roadLine: 0xffffff,
-        house: 0xffe0e0,
-        work: 0xe0e8ff,
-        box: 0xfff2cc,
-        relatives: 0xe0ffe0,
-        institute: 0xd0f0ff,
-        lotFill: 0xf1e9d2,
-        lotBorder: 0x777777,
-      },
-      LOTS: {
-        SLOTS_PER_BLOCK: 6,
-        GAP: 10,
-        PADDING: 20,
-        MAX_MULTI_SLOT: 3,
-        MIN_LOT_HEIGHT: 60,
-        FILL_ALPHA: 0.9
-      },
-      ZONE_LAYOUT: {
-        // индексы блоков: 0..(кол-во-1) слева-направо и сверху-вниз
-        house: { block: { i: 0, j: 0 }, cells: [[0, 0]] },           // 1x1
-        relatives: { block: { i: 5, j: 0 }, cells: [[1, 0]] },       // 1x1
-        work: { block: { i: 3, j: 1 }, cells: [[0, 1], [1, 1]] },    // 2x1 (две колонки в одном ряду)
-        box: { block: { i: 1, j: 2 }, cells: [[0, 1], [0, 2]] },     // 1x2 (две строки в одном столбце)
-        institute: { block: { i: 5, j: 2 }, cells: [[0, 0], [1, 0], [1, 1]] } // Г-образно 3 ячейки
-      },
-      ZONES: {
-        house: { type: 'rect', x: 200, y: 200, w: 440, h: 750, label: 'Дом Шины' },
-        relatives: { type: 'rect', x: 1300, y: 200, w: 440, h: 750, label: 'Родственники' },
-        work: { type: 'rect', x: 1840, y: 1100, w: 440, h: 700, label: 'Работа' },
-        box: { type: 'rect', x: 200, y: 1100, w: 440, h: 700, label: 'Бокс' },
-        institute: { type: 'circle', x: 2550, y: 1425, r: 200, label: 'Институт', alpha: 0.6 },
-      },
-      TRAFFIC_LIGHTS: [
-        { x: 600, y: 1283 },
-        { x: 1050, y: 1283 },
-        { x: 1500, y: 1283 },
-        { x: 1950, y: 1283 }
-      ],
-      CAR_PATH: [
-        { x: 600, y: 1283 },
-        { x: 1050, y: 1283 },
-        { x: 1500, y: 1283 },
-        { x: 1950, y: 1283 }
-      ],
-      BASE_FONT: 32
-    };
-
-    const BASE_CAR_SPEED = 11.7; // Базовая скорость машины
-
-    // globals
-    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
-    let carPath = [], carSegment = 0, carProgress = 0;
-    let avatar;
-    let horizontalRoadYs = [], verticalRoadXs = [];
-    let hoverLabel;
-    let carTrafficController;
-    let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
-
+    import { CONFIG, ROUTE_SCHEDULE, BASE_CAR_SPEED, BASE_TIME_SPEED } from './config.js';
+    import { globals } from './globals.js';
+    const G = globals;
     // ДЕБАГ МОД
     let DEBUG_MODE = true; // теперь можно изменять
     let debugInfo = {
@@ -859,15 +788,15 @@
 
     // Функция для добавления источника света в слой освещения
     function addLightSource (lightObject) {
-      if (lightingLayer) {
-        lightingLayer.addChild(lightObject);
+      if (G.lightingLayer) {
+        G.lightingLayer.addChild(lightObject);
         console.log('💡 Источник света добавлен в слой освещения');
       }
     }
 
     // Функция для удаления источника света из слоя освещения
     function removeLightSource (lightObject) {
-      if (lightingLayer && lightObject.parent) {
+      if (G.lightingLayer && lightObject.parent) {
         lightObject.parent.removeChild(lightObject);
         console.log('💡 Источник света удален из слоя освещения');
       }
@@ -883,41 +812,41 @@
       const nightAlpha = 0.3; // степень приглушения
 
       // Применяем фильтр к основным слоям
-      if (roadsLayer) {
-        roadsLayer.tint = nightTint;
-        roadsLayer.alpha = 1 - nightAlpha;
+      if (G.roadsLayer) {
+        G.roadsLayer.tint = nightTint;
+        G.roadsLayer.alpha = 1 - nightAlpha;
       }
-      if (lotsLayer) {
-        lotsLayer.tint = nightTint;
-        lotsLayer.alpha = 1 - nightAlpha;
+      if (G.lotsLayer) {
+        G.lotsLayer.tint = nightTint;
+        G.lotsLayer.alpha = 1 - nightAlpha;
       }
-      if (zonesLayer) {
-        zonesLayer.tint = nightTint;
-        zonesLayer.alpha = 1 - nightAlpha;
+      if (G.zonesLayer) {
+        G.zonesLayer.tint = nightTint;
+        G.zonesLayer.alpha = 1 - nightAlpha;
       }
-      if (labelsLayer) {
-        labelsLayer.tint = nightTint;
-        labelsLayer.alpha = 1 - nightAlpha;
+      if (G.labelsLayer) {
+        G.labelsLayer.tint = nightTint;
+        G.labelsLayer.alpha = 1 - nightAlpha;
       }
     }
 
     function resetDayColorFilter () {
       // Сбрасываем фильтры для дневного режима
-      if (roadsLayer) {
-        roadsLayer.tint = 0xffffff;
-        roadsLayer.alpha = 1;
+      if (G.roadsLayer) {
+        G.roadsLayer.tint = 0xffffff;
+        G.roadsLayer.alpha = 1;
       }
-      if (lotsLayer) {
-        lotsLayer.tint = 0xffffff;
-        lotsLayer.alpha = 1;
+      if (G.lotsLayer) {
+        G.lotsLayer.tint = 0xffffff;
+        G.lotsLayer.alpha = 1;
       }
-      if (zonesLayer) {
-        zonesLayer.tint = 0xffffff;
-        zonesLayer.alpha = 1;
+      if (G.zonesLayer) {
+        G.zonesLayer.tint = 0xffffff;
+        G.zonesLayer.alpha = 1;
       }
-      if (labelsLayer) {
-        labelsLayer.tint = 0xffffff;
-        labelsLayer.alpha = 1;
+      if (G.labelsLayer) {
+        G.labelsLayer.tint = 0xffffff;
+        G.labelsLayer.alpha = 1;
       }
     }
 
@@ -1013,9 +942,7 @@
       day: 7,
       hours: 6, // начинаем с 06:00 утра
       minutes: 0
-    }; // начинаем с 7 сентября 2025, 06:00
-    let BASE_TIME_SPEED = 60; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
-    let lastTimeUpdate = Date.now();
+    }; // начинаем с 7 сентября 2025, 06:00    let lastTimeUpdate = Date.now();
     let datetimeDisplay;
     let routeDisplay;
     let currentRouteIndex = 0;
@@ -1045,17 +972,6 @@
       'E1', 'E3',        // пятый столбец
       'F2', 'F4',        // шестой столбец
       'G1', 'G2', 'G3', 'G4' // правый столбец (выезд из города) - все перекрестки
-    ];
-
-    // 🚛 МАРШРУТ ШИНЫ 🚛
-    // Массив с маршрутом: место назначения и время пребывания (в игровых часах)
-    // Позиции вычисляются динамически из геометрии зон, а НЕ захардкожены
-    const ROUTE_SCHEDULE = [
-      { location: 'house', name: 'Дом', stayHours: 2 },
-      { location: 'institute', name: 'Институт', stayHours: 2 },
-      { location: 'work', name: 'Работа', stayHours: 5 },
-      { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
-      { location: 'box', name: 'Бокс', stayHours: 1 },
     ];
 
     // Определяем мобильное устройство в начале
@@ -1110,7 +1026,7 @@
     }
 
     function setupApp () {
-      app = new PIXI.Application({
+      G.app = new PIXI.Application({
         width: 1200,
         height: 800,
         autoDensity: true,
@@ -1119,58 +1035,58 @@
       });
       // Добавляем canvas в игровую область
       const gameContainer = document.querySelector('.game-container');
-      gameContainer.appendChild(app.view);
+      gameContainer.appendChild(G.app.view);
       // Включаем систему событий для всей сцены
-      app.stage.eventMode = 'static';
-      app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
+      G.app.stage.eventMode = 'static';
+      G.app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
     }
 
     function setupWorld () {
-      world = new PIXI.Container();
-      app.stage.addChild(world);
+      G.world = new PIXI.Container();
+      G.app.stage.addChild(G.world);
 
-      gridLayer = new PIXI.Container();
-      roadsLayer = new PIXI.Container();
-      lotsLayer = new PIXI.Container();
-      zonesLayer = new PIXI.Container();
-      labelsLayer = new PIXI.Container();
-      intersectionsLayer = new PIXI.Container();
-      decorLayer = new PIXI.Container();
-      trafficLightsLayer = new PIXI.Container(); // слой для светофоров (поверх машин)
-      borderLayer = new PIXI.Container();
-      lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
+      G.gridLayer = new PIXI.Container();
+      G.roadsLayer = new PIXI.Container();
+      G.lotsLayer = new PIXI.Container();
+      G.zonesLayer = new PIXI.Container();
+      G.labelsLayer = new PIXI.Container();
+      G.intersectionsLayer = new PIXI.Container();
+      G.decorLayer = new PIXI.Container();
+      G.trafficLightsLayer = new PIXI.Container(); // слой для светофоров (поверх машин)
+      G.borderLayer = new PIXI.Container();
+      G.lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
 
-      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, borderLayer);
+      G.world.addChild(G.gridLayer, G.roadsLayer, G.intersectionsLayer, G.lotsLayer, G.zonesLayer, G.labelsLayer, G.borderLayer);
 
-      drawGrid(gridLayer);
-      drawRoads(roadsLayer);
-      createIntersections(intersectionsLayer);
-      drawLots(lotsLayer);
-      drawZones(zonesLayer);
-      // placeLabels(labelsLayer);
-      // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
-      createTrafficLightsForAllIntersections(trafficLightsLayer);
+      drawGrid(G.gridLayer);
+      drawRoads(G.roadsLayer);
+      createIntersections(G.intersectionsLayer);
+      drawLots(G.lotsLayer);
+      drawZones(G.zonesLayer);
+      // placeLabels(G.labelsLayer);
+      // Светофоры создаются в отдельном слое (пока что в G.trafficLightsLayer)
+      createTrafficLightsForAllIntersections(G.trafficLightsLayer);
 
       // Создаем и добавляем городской ночной оверлей (ПЕРЕД машиной)
       createCityNightOverlay();
-      world.addChild(cityNightOverlay);
+      G.world.addChild(cityNightOverlay);
 
-      // Добавляем decorLayer (машина) ПОСЛЕ ночного оверлея
-      world.addChild(decorLayer);
+      // Добавляем G.decorLayer (машина) ПОСЛЕ ночного оверлея
+      G.world.addChild(G.decorLayer);
 
-      // Добавляем светофоры поверх ночного оверлея, но внутри world для правильного панорамирования
-      world.addChild(trafficLightsLayer);
-      // drawAlina(decorLayer);
-      drawWorldBorder(borderLayer);
+      // Добавляем светофоры поверх ночного оверлея, но внутри G.world для правильного панорамирования
+      G.world.addChild(G.trafficLightsLayer);
+      // drawAlina(G.decorLayer);
+      drawWorldBorder(G.borderLayer);
 
-      uiLayer = new PIXI.Container();
+      G.uiLayer = new PIXI.Container();
 
       // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
-      lightingLayer.zIndex = 1000; // поверх ночного оверлея
-      app.stage.addChild(lightingLayer);
+      G.lightingLayer.zIndex = 1000; // поверх ночного оверлея
+      G.app.stage.addChild(G.lightingLayer);
 
-      uiLayer.zIndex = 2000; // поверх всего
-      app.stage.addChild(uiLayer);
+      G.uiLayer.zIndex = 2000; // поверх всего
+      G.app.stage.addChild(G.uiLayer);
 
       // Получаем ссылки на HTML элементы панели управления
       datetimeDisplay = document.getElementById('game-datetime');
@@ -1257,7 +1173,7 @@
 
       // Инициализируем panningController
       panningController = new PanningController();
-      panningController.setWorld(world);
+      panningController.setWorld(G.world);
       panningController.setOnZoomChange((scale) => {
         if (typeof updateZoomButton === 'function') {
           updateZoomButton();
@@ -1283,8 +1199,8 @@
       // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
       setTimeout(() => {
         // перестроим путь, когда геометрия зон уже известна
-        if (car) {
-          carPath = buildCarPath();
+        if (G.car) {
+          G.carPath = buildCarPath();
         }
       }, 0);
     }
@@ -1506,25 +1422,25 @@
     }
 
     function drawLots (layer) {
-      if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
+      if (!G.horizontalRoadYs.length || !G.verticalRoadXs.length) return;
       const roadHalf = CONFIG.ROAD_WIDTH / 2;
       const cols = 2; // по горизонтали
       const rows = 3; // по вертикали
       const gap = CONFIG.LOTS.GAP;
       const padding = CONFIG.LOTS.PADDING;
 
-      for (let j = 0; j < horizontalRoadYs.length - 1; j++) {
-        const yTop = horizontalRoadYs[j] + roadHalf;
-        const yBottom = horizontalRoadYs[j + 1] - roadHalf;
+      for (let j = 0; j < G.horizontalRoadYs.length - 1; j++) {
+        const yTop = G.horizontalRoadYs[j] + roadHalf;
+        const yBottom = G.horizontalRoadYs[j + 1] - roadHalf;
         const blockHeight = Math.max(0, yBottom - yTop);
         const innerHeight = Math.max(0, blockHeight - padding * 2);
         if (innerHeight <= 0) continue;
         const totalGapsV = gap * (rows - 1);
         const lotHeight = (innerHeight - totalGapsV) / rows;
 
-        for (let i = 0; i < verticalRoadXs.length - 1; i++) {
-          const xLeft = verticalRoadXs[i] + roadHalf;
-          const xRight = verticalRoadXs[i + 1] - roadHalf;
+        for (let i = 0; i < G.verticalRoadXs.length - 1; i++) {
+          const xLeft = G.verticalRoadXs[i] + roadHalf;
+          const xRight = G.verticalRoadXs[i + 1] - roadHalf;
           const blockWidth = Math.max(0, xRight - xLeft);
           const innerWidth = Math.max(0, blockWidth - padding * 2);
           if (innerWidth <= 0) continue;
@@ -1551,7 +1467,7 @@
     }
 
     function drawZones (layer) {
-      if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
+      if (!G.horizontalRoadYs.length || !G.verticalRoadXs.length) return;
       const roadHalf = CONFIG.ROAD_WIDTH / 2;
       const cols = 2;
       const rows = 3;
@@ -1559,14 +1475,14 @@
       const padding = CONFIG.LOTS.PADDING;
 
       const zoneLayout = CONFIG.ZONE_LAYOUT;
-      const blocksAcross = verticalRoadXs.length - 1;
-      const blocksDown = horizontalRoadYs.length - 1;
+      const blocksAcross = G.verticalRoadXs.length - 1;
+      const blocksDown = G.horizontalRoadYs.length - 1;
 
       function getBlockRect (bi, bj) {
-        const yTop = horizontalRoadYs[bj] + roadHalf;
-        const yBottom = horizontalRoadYs[bj + 1] - roadHalf;
-        const xLeft = verticalRoadXs[bi] + roadHalf;
-        const xRight = verticalRoadXs[bi + 1] - roadHalf;
+        const yTop = G.horizontalRoadYs[bj] + roadHalf;
+        const yBottom = G.horizontalRoadYs[bj + 1] - roadHalf;
+        const xLeft = G.verticalRoadXs[bi] + roadHalf;
+        const xRight = G.verticalRoadXs[bi + 1] - roadHalf;
         const blockWidth = Math.max(0, xRight - xLeft);
         const blockHeight = Math.max(0, yBottom - yTop);
         const innerWidth = Math.max(0, blockWidth - padding * 2);
@@ -1729,12 +1645,12 @@
 
     function drawRoads (layer) {
       const { horizontalPositions, verticalPositions, maxVerticalPos } = getRoadPositions();
-      horizontalRoadYs = horizontalPositions;
-      verticalRoadXs = verticalPositions;
+      G.horizontalRoadYs = horizontalPositions;
+      G.verticalRoadXs = verticalPositions;
 
       // Рисуем горизонтальные дороги
-      horizontalRoadYs.forEach(y => {
-        const h = [{ x: verticalRoadXs[0], y: y }, { x: maxVerticalPos, y: y }];
+      G.horizontalRoadYs.forEach(y => {
+        const h = [{ x: G.verticalRoadXs[0], y: y }, { x: maxVerticalPos, y: y }];
         const roadH = new PIXI.Graphics();
         roadH.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
         roadH.moveTo(h[0].x, h[0].y);
@@ -1747,12 +1663,12 @@
       });
 
       // Рисуем вертикальные дороги
-      verticalRoadXs.forEach(x => {
+      G.verticalRoadXs.forEach(x => {
         let v;
         if (x === maxVerticalPos) {
           v = [{ x: x, y: 0 }, { x: x, y: CONFIG.WORLD_HEIGHT }];
         } else {
-          v = [{ x: x, y: horizontalRoadYs[0] }, { x: x, y: horizontalRoadYs[horizontalRoadYs.length - 1] }];
+          v = [{ x: x, y: G.horizontalRoadYs[0] }, { x: x, y: G.horizontalRoadYs[G.horizontalRoadYs.length - 1] }];
         }
         const roadV = new PIXI.Graphics();
         roadV.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
@@ -1768,26 +1684,26 @@
 
     function createIntersections (layer) {
       // Подпись при наведении
-      if (!hoverLabel) {
-        hoverLabel = new PIXI.Text('', {
+      if (!G.hoverLabel) {
+        G.hoverLabel = new PIXI.Text('', {
           fontFamily: 'sans-serif',
           fontSize: CONFIG.BASE_FONT,
           fill: 0xffff66,
           stroke: 0x000000,
           strokeThickness: 4
         });
-        hoverLabel.anchor.set(0.5, 1);
-        hoverLabel.visible = false;
-        labelsLayer.addChild(hoverLabel);
+        G.hoverLabel.anchor.set(0.5, 1);
+        G.hoverLabel.visible = false;
+        G.labelsLayer.addChild(G.hoverLabel);
       }
 
       const hitRadius = 60;
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-      for (let j = 0; j < horizontalRoadYs.length; j++) {
-        for (let i = 0; i < verticalRoadXs.length; i++) {
-          const x = verticalRoadXs[i];
-          const y = horizontalRoadYs[j];
+      for (let j = 0; j < G.horizontalRoadYs.length; j++) {
+        for (let i = 0; i < G.verticalRoadXs.length; i++) {
+          const x = G.verticalRoadXs[i];
+          const y = G.horizontalRoadYs[j];
           const labelText = String.fromCharCode(65 + i) + (j + 1);
           const g = new PIXI.Graphics();
           // Прозрачный круг-хитбокс + явная hitArea для стабильного хит-теста
@@ -1798,12 +1714,12 @@
           g.hitArea = new PIXI.Circle(0, 0, hitRadius);
 
           const show = () => {
-            hoverLabel.text = labelText;
-            hoverLabel.position.set(x, y - 16);
-            hoverLabel.visible = true;
+            G.hoverLabel.text = labelText;
+            G.hoverLabel.position.set(x, y - 16);
+            G.hoverLabel.visible = true;
           };
           const hide = () => {
-            hoverLabel.visible = false;
+            G.hoverLabel.visible = false;
           };
 
           if (isMobile) {
@@ -1835,10 +1751,10 @@
       intersectionKeyToTL.clear();
       const { maxVerticalPos } = getRoadPositions();
 
-      for (let j = 0; j < horizontalRoadYs.length; j++) {
-        for (let i = 0; i < verticalRoadXs.length; i++) {
-          const x = verticalRoadXs[i];
-          const y = horizontalRoadYs[j];
+      for (let j = 0; j < G.horizontalRoadYs.length; j++) {
+        for (let i = 0; i < G.verticalRoadXs.length; i++) {
+          const x = G.verticalRoadXs[i];
+          const y = G.horizontalRoadYs[j];
 
           // Проверяем, должен ли быть светофор на этом перекрестке
           if (!shouldHaveTrafficLight(i, j)) {
@@ -1848,14 +1764,14 @@
           // Определяем, какие дороги есть в каждом направлении
           const roadConnections = {
             north: j > 0 || (x === maxVerticalPos), // дорога на север: внутренний ряд ИЛИ правая дорога (выезд за город)
-            south: j < horizontalRoadYs.length - 1 || (x === maxVerticalPos), // дорога на юг: внутренний ряд ИЛИ правая дорога (выезд за город)
+            south: j < G.horizontalRoadYs.length - 1 || (x === maxVerticalPos), // дорога на юг: внутренний ряд ИЛИ правая дорога (выезд за город)
             west: i > 0, // есть дорога на запад, если не крайний левый столбец
-            east: i < verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
+            east: i < G.verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
           };
 
           const tl = initTrafficLightsForIntersection({
             PIXI,
-            app,
+            G.app,
             layer,
             x,
             y,
@@ -1873,8 +1789,8 @@
       }
 
       // Устанавливаем точку начала зеленой волны в левом верхнем углу
-      if (verticalRoadXs.length > 0 && horizontalRoadYs.length > 0) {
-        trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
+      if (G.verticalRoadXs.length > 0 && G.horizontalRoadYs.length > 0) {
+        trafficCoordinator.setWaveOrigin(G.verticalRoadXs[0], G.horizontalRoadYs[0]);
       }
     }
 
@@ -1963,19 +1879,19 @@
 
       // Только устанавливаем базовый масштаб, если panningController не активен
       if (!panningController || panningController.getCurrentScale() === 1) {
-        world.scale.set(scale);
-        world.pivot.set(0, 0);
-        world.position.set(
+        G.world.scale.set(scale);
+        G.world.pivot.set(0, 0);
+        G.world.position.set(
           (w - CONFIG.WORLD_WIDTH * scale) / 2,
           (h - CONFIG.WORLD_HEIGHT * scale) / 2
         );
       }
 
-      labelsLayer.children.forEach(label => {
+      G.labelsLayer.children.forEach(label => {
         label.scale.set(1 / scale);
       });
 
-      // Светофоры теперь внутри world, поэтому синхронизация не нужна
+      // Светофоры теперь внутри G.world, поэтому синхронизация не нужна
     }
 
     // ======= Новая логика движения по графу перекрёстков и зданий =======
@@ -1991,42 +1907,42 @@
     }
 
     function getIntersectionCoord (i, j) {
-      return { x: verticalRoadXs[i], y: horizontalRoadYs[j] };
+      return { x: G.verticalRoadXs[i], y: G.horizontalRoadYs[j] };
     }
 
     function getNearestIntersectionIJ (x, y) {
-      return { i: indexOfClosest(verticalRoadXs, x), j: indexOfClosest(horizontalRoadYs, y) };
+      return { i: indexOfClosest(G.verticalRoadXs, x), j: indexOfClosest(G.horizontalRoadYs, y) };
     }
 
     // Рассчитать точку остановки у здания: на ближайшей дороге, рядом с центром зоны
     // Возвращает { stop: {x,y}, nearestIJ: {i,j}, orientation: 'vertical'|'horizontal' }
     function computeBuildingStop (buildingPos) {
-      const nearestVXIndex = indexOfClosest(verticalRoadXs, buildingPos.x);
-      const nearestVx = verticalRoadXs[nearestVXIndex];
+      const nearestVXIndex = indexOfClosest(G.verticalRoadXs, buildingPos.x);
+      const nearestVx = G.verticalRoadXs[nearestVXIndex];
       const distToV = Math.abs(buildingPos.x - nearestVx);
 
-      const nearestHYIndex = indexOfClosest(horizontalRoadYs, buildingPos.y);
-      const nearestHy = horizontalRoadYs[nearestHYIndex];
+      const nearestHYIndex = indexOfClosest(G.horizontalRoadYs, buildingPos.y);
+      const nearestHy = G.horizontalRoadYs[nearestHYIndex];
       const distToH = Math.abs(buildingPos.y - nearestHy);
 
       // Выбираем более близкую дорогу
       if (distToV <= distToH) {
         // Остановка на вертикальной дороге: X фиксирован, Y — проекция центра здания
-        const stopY = Math.max(horizontalRoadYs[0], Math.min(horizontalRoadYs[horizontalRoadYs.length - 1], buildingPos.y));
-        const j = indexOfClosest(horizontalRoadYs, stopY);
+        const stopY = Math.max(G.horizontalRoadYs[0], Math.min(G.horizontalRoadYs[G.horizontalRoadYs.length - 1], buildingPos.y));
+        const j = indexOfClosest(G.horizontalRoadYs, stopY);
         return { stop: { x: nearestVx, y: stopY }, nearestIJ: { i: nearestVXIndex, j }, orientation: 'vertical' };
       } else {
         // Остановка на горизонтальной дороге: Y фиксирован, X — проекция центра здания
-        const stopX = Math.max(verticalRoadXs[0], Math.min(verticalRoadXs[verticalRoadXs.length - 1], buildingPos.x));
-        const i = indexOfClosest(verticalRoadXs, stopX);
+        const stopX = Math.max(G.verticalRoadXs[0], Math.min(G.verticalRoadXs[G.verticalRoadXs.length - 1], buildingPos.x));
+        const i = indexOfClosest(G.verticalRoadXs, stopX);
         return { stop: { x: stopX, y: nearestHy }, nearestIJ: { i, j: nearestHYIndex }, orientation: 'horizontal' };
       }
     }
 
     // Поиск пути по сетке перекрёстков (BFS) от (i0,j0) к (i1,j1). Возвращает массив координат перекрёстков
     function buildIntersectionPath (fromIJ, toIJ) {
-      const cols = verticalRoadXs.length;
-      const rows = horizontalRoadYs.length;
+      const cols = G.verticalRoadXs.length;
+      const rows = G.horizontalRoadYs.length;
       const key = (i, j) => `${i},${j}`;
       const queue = [];
       const visited = new Set();
@@ -2080,10 +1996,10 @@
       if (z && z.center) return z.center;
       // fallback: из статического конфига
       const def = CONFIG.ZONES[locationKey];
-      if (!def) return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+      if (!def) return { x: G.verticalRoadXs[0], y: G.horizontalRoadYs[0] };
       if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
       if (def.type === 'circle') return { x: def.x, y: def.y };
-      return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+      return { x: G.verticalRoadXs[0], y: G.horizontalRoadYs[0] };
     }
 
     // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
@@ -2093,8 +2009,8 @@
 
       // Определяем стартовый перекрёсток
       let startIJ;
-      if (car && car.position && (car.position.x !== 0 || car.position.y !== 0)) {
-        startIJ = getNearestIntersectionIJ(car.position.x, car.position.y);
+      if (G.car && G.car.position && (G.car.position.x !== 0 || G.car.position.y !== 0)) {
+        startIJ = getNearestIntersectionIJ(G.car.position.x, G.car.position.y);
       } else {
         const housePos = getDestinationCenter('house');
         startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
@@ -2105,8 +2021,8 @@
 
       // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
       const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
-      const needsPrefix = car && (Math.abs(car.position.x - startIntersection.x) > 1 || Math.abs(car.position.y - startIntersection.y) > 1);
-      const path = needsPrefix ? [{ x: car.position.x, y: car.position.y }, startIntersection, ...graphPath] : graphPath;
+      const needsPrefix = G.car && (Math.abs(G.car.position.x - startIntersection.x) > 1 || Math.abs(G.car.position.y - startIntersection.y) > 1);
+      const path = needsPrefix ? [{ x: G.car.position.x, y: G.car.position.y }, startIntersection, ...graphPath] : graphPath;
 
       // Если у нас есть сохраненное состояние и мы начинаем с текущей позиции машины,
       // добавляем промежуточную точку в направлении движения для плавного старта
@@ -2157,12 +2073,12 @@
     }
 
     function createCar () {
-      car = new PIXI.Container();
+      G.car = new PIXI.Container();
 
       // Кузов машины
       const body = new PIXI.Graphics();
       body.beginFill(0xff8800).drawRect(-60, -30, 120, 60).endFill();
-      car.addChild(body);
+      G.car.addChild(body);
 
       // Радиатор (передняя решетка) - ВПЕРЕДИ
       const radiator = new PIXI.Graphics();
@@ -2175,20 +2091,20 @@
         line.lineTo(55, -20 + i * 10);
         radiator.addChild(line);
       }
-      car.addChild(radiator);
+      G.car.addChild(radiator);
 
       // Передние фары - ВПЕРЕДИ
       const leftHeadlight = new PIXI.Graphics();
       leftHeadlight.beginFill(0xffffaa).drawCircle(50, -20, 8).endFill();
       leftHeadlight.lineStyle(1, 0x333333);
       leftHeadlight.drawCircle(50, -20, 8);
-      car.addChild(leftHeadlight);
+      G.car.addChild(leftHeadlight);
 
       const rightHeadlight = new PIXI.Graphics();
       rightHeadlight.beginFill(0xffffaa).drawCircle(50, 20, 8).endFill();
       rightHeadlight.lineStyle(1, 0x333333);
       rightHeadlight.drawCircle(50, 20, 8);
-      car.addChild(rightHeadlight);
+      G.car.addChild(rightHeadlight);
 
 
       // Задние фары - СЗАДИ
@@ -2196,35 +2112,35 @@
       leftTailLight.beginFill(0xff0000).drawCircle(-50, -20, 6).endFill();
       leftTailLight.lineStyle(1, 0x333333);
       leftTailLight.drawCircle(-50, -20, 6);
-      car.addChild(leftTailLight);
+      G.car.addChild(leftTailLight);
 
       const rightTailLight = new PIXI.Graphics();
       rightTailLight.beginFill(0xff0000).drawCircle(-50, 20, 6).endFill();
       rightTailLight.lineStyle(1, 0x333333);
       rightTailLight.drawCircle(-50, 20, 6);
-      car.addChild(rightTailLight);
+      G.car.addChild(rightTailLight);
 
       // Крыша машинки (квадратик по размеру аватарки)
       const roof = new PIXI.Graphics();
       roof.beginFill(0xcc6600).drawRect(-30, -30, 60, 60).endFill();
       roof.lineStyle(2, 0x333333);
       roof.drawRect(-30, -30, 60, 60);
-      car.addChild(roof);
+      G.car.addChild(roof);
 
       // Аватарка Шины (исходный размер без скругления)
-      avatar = PIXI.Sprite.from('shina.jpeg');
-      avatar.anchor.set(0.5);
-      avatar.width = 60;
-      avatar.height = 60;
-      car.addChild(avatar);
+      G.avatar = PIXI.Sprite.from('shina.jpeg');
+      G.avatar.anchor.set(0.5);
+      G.avatar.width = 60;
+      G.avatar.height = 60;
+      G.car.addChild(G.avatar);
 
       // Устанавливаем пивот машины в центр для упрощения расчетов
-      // car.position будет указывать на центр машины
-      car.pivot.set(0, 0); // пивот в центре
-      car.position.set(0, 0); // начальная позиция
+      // G.car.position будет указывать на центр машины
+      G.car.pivot.set(0, 0); // пивот в центре
+      G.car.position.set(0, 0); // начальная позиция
 
       // Инициализируем контроллер светофоров
-      carTrafficController = new CarTrafficController();
+      G.carTrafficController = new CarTrafficController();
 
       // Начинаем с первого пункта назначения (работа)
       currentRouteIndex = 1; // работа, а не дом
@@ -2232,45 +2148,45 @@
       stayTimer = 0;
 
       // Строим путь сначала, чтобы определить стартовую позицию
-      carPath = buildCarPath();
-      carSegment = 0;
-      carProgress = 0;
+      G.carPath = buildCarPath();
+      G.carSegment = 0;
+      G.carProgress = 0;
 
       // Устанавливаем машину на первую точку пути (которая должна быть на дороге)
-      if (carPath.length > 0) {
+      if (G.carPath.length > 0) {
         // Используем сохраненное направление, если оно есть, иначе 0
         const initialRotation = (savedCarState && savedCarState.direction) || 0;
-        car.rotation = initialRotation;
-        if (avatar) {
-          avatar.rotation = -initialRotation;
+        G.car.rotation = initialRotation;
+        if (G.avatar) {
+          G.avatar.rotation = -initialRotation;
         }
 
         // Устанавливаем машину так, чтобы передняя часть была в точке пути
         const carLength = 120;
         const offsetX = -carLength / 2 * Math.cos(initialRotation);
         const offsetY = -carLength / 2 * Math.sin(initialRotation);
-        car.position.set(carPath[0].x + offsetX, carPath[0].y + offsetY);
-        console.log('Car starts at:', carPath[0], 'with rotation:', initialRotation);
+        G.car.position.set(G.carPath[0].x + offsetX, G.carPath[0].y + offsetY);
+        console.log('Car starts at:', G.carPath[0], 'with rotation:', initialRotation);
       } else {
         // Fallback: устанавливаем на ближайшую дорогу к дому
         const housePos = getDestinationCenter('house');
         const houseIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
         const roadPos = getIntersectionCoord(houseIJ.i, houseIJ.j);
         const initialRotation = (savedCarState && savedCarState.direction) || 0;
-        car.rotation = initialRotation;
-        if (avatar) {
-          avatar.rotation = -initialRotation;
+        G.car.rotation = initialRotation;
+        if (G.avatar) {
+          G.avatar.rotation = -initialRotation;
         }
         const carLength = 120;
         const offsetX = -carLength / 2 * Math.cos(initialRotation);
         const offsetY = -carLength / 2 * Math.sin(initialRotation);
-        car.position.set(roadPos.x + offsetX, roadPos.y + offsetY);
+        G.car.position.set(roadPos.x + offsetX, roadPos.y + offsetY);
         console.log('Car fallback position:', roadPos, 'with rotation:', initialRotation);
       }
 
-      decorLayer.addChild(car);
-      app.ticker.add(updateCar);
-      app.ticker.add(updateGameTime);
+      G.decorLayer.addChild(G.car);
+      G.app.ticker.add(updateCar);
+      G.app.ticker.add(updateGameTime);
 
       updateRouteDisplay();
     }
@@ -2349,9 +2265,9 @@
 
       // Восстанавливаем сохраненное состояние машины
       if (savedCarState) {
-        car.rotation = savedCarState.direction;
-        if (avatar) {
-          avatar.rotation = -savedCarState.direction;
+        G.car.rotation = savedCarState.direction;
+        if (G.avatar) {
+          G.avatar.rotation = -savedCarState.direction;
         }
 
         if (savedCarState.nextIntersection) {
@@ -2365,9 +2281,9 @@
       }
 
       // Обновляем путь к новому пункту назначения
-      carPath = buildCarPath();
-      carSegment = 0;
-      carProgress = 0;
+      G.carPath = buildCarPath();
+      G.carSegment = 0;
+      G.carProgress = 0;
 
       updateRouteDisplay();
     }
@@ -2384,7 +2300,7 @@
       const nextDestCenter = getDestinationCenter(nextDestination.location);
 
       // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
-      const currentPos = car.position;
+      const currentPos = G.car.position;
       const currentIJ = getNearestIntersectionIJ(currentPos.x, currentPos.y);
       const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter);
 
@@ -2417,7 +2333,7 @@
         nextDestCenter: nextDestCenter,
         nextIntersection: nextIntersection,
         direction: direction,
-        currentPosition: { x: car.position.x, y: car.position.y }
+        currentPosition: { x: G.car.position.x, y: G.car.position.y }
       };
     }
 
@@ -2445,8 +2361,8 @@
       if (!buildingCenter) return;
 
       // Скрываем аватарку из машинки
-      if (avatar) {
-        avatar.visible = false;
+      if (G.avatar) {
+        G.avatar.visible = false;
       }
 
       // Создаем аватарку в здании (такого же размера как в машинке)
@@ -2491,8 +2407,8 @@
         );
       }
 
-      decorLayer.addChild(avatarContainer);
-      buildingAvatars.set(locationKey, avatarContainer);
+      G.decorLayer.addChild(avatarContainer);
+      G.buildingAvatars.set(locationKey, avatarContainer);
 
       console.log(`🏠 Показана аватарка в здании ${locationKey}`, {
         zone: zone,
@@ -2504,16 +2420,16 @@
     // Скрыть аватарку в здании
     function hideBuildingAvatar () {
       const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
-      const avatarContainer = buildingAvatars.get(currentDest.location);
+      const avatarContainer = G.buildingAvatars.get(currentDest.location);
       if (avatarContainer && avatarContainer.parent) {
         avatarContainer.parent.removeChild(avatarContainer);
-        buildingAvatars.delete(currentDest.location);
+        G.buildingAvatars.delete(currentDest.location);
         console.log(`🏠 Скрыта аватарка в здании ${currentDest.location}`);
       }
 
       // Показываем аватарку обратно в машинке
-      if (avatar) {
-        avatar.visible = true;
+      if (G.avatar) {
+        G.avatar.visible = true;
       }
     }
 
@@ -2537,46 +2453,46 @@
       debugLog('🚗 Состояние машины', {
         speed: speed.toFixed(2),
         delta: delta.toFixed(3),
-        position: `(${car.position.x.toFixed(1)}, ${car.position.y.toFixed(1)})`,
-        rotation: `${(car.rotation * 180 / Math.PI).toFixed(1)}°`,
-        segment: `${carSegment}/${carPath.length - 1}`,
+        position: `(${G.car.position.x.toFixed(1)}, ${G.car.position.y.toFixed(1)})`,
+        rotation: `${(G.car.rotation * 180 / Math.PI).toFixed(1)}°`,
+        segment: `${G.carSegment}/${G.carPath.length - 1}`,
         isAtDestination: isAtDestination
       });
 
       // Проверяем, есть ли у нас путь
-      if (carPath.length < 2) {
+      if (G.carPath.length < 2) {
         console.log('No valid path, rebuilding...');
-        carPath = buildCarPath();
-        carSegment = 0;
-        carProgress = 0;
+        G.carPath = buildCarPath();
+        G.carSegment = 0;
+        G.carProgress = 0;
         return;
       }
 
       // Проверяем, что текущий сегмент существует
-      if (carSegment >= carPath.length) {
+      if (G.carSegment >= G.carPath.length) {
         console.log('Invalid segment, rebuilding path...');
-        carPath = buildCarPath();
-        carSegment = 0;
-        carProgress = 0;
+        G.carPath = buildCarPath();
+        G.carSegment = 0;
+        G.carProgress = 0;
         return;
       }
 
-      // Убеждаемся, что carSegment находится в допустимых пределах
-      if (carSegment >= carPath.length - 1) {
+      // Убеждаемся, что G.carSegment находится в допустимых пределах
+      if (G.carSegment >= G.carPath.length - 1) {
         // Достигли конца пути
         // console.log('Reached end of path');
-        const finalX = carPath[carPath.length - 1].x;
-        const finalY = carPath[carPath.length - 1].y;
+        const finalX = G.carPath[G.carPath.length - 1].x;
+        const finalY = G.carPath[G.carPath.length - 1].y;
         const carLength = 120;
-        const offsetX = -carLength / 2 * Math.cos(car.rotation);
-        const offsetY = -carLength / 2 * Math.sin(car.rotation);
-        car.position.set(finalX + offsetX, finalY + offsetY);
+        const offsetX = -carLength / 2 * Math.cos(G.car.rotation);
+        const offsetY = -carLength / 2 * Math.sin(G.car.rotation);
+        G.car.position.set(finalX + offsetX, finalY + offsetY);
         checkArrival();
         return;
       }
 
-      let p1 = carPath[carSegment];
-      let p2 = carPath[carSegment + 1];
+      let p1 = G.carPath[G.carSegment];
+      let p2 = G.carPath[G.carSegment + 1];
       let dx = p2.x - p1.x;
       let dy = p2.y - p1.y;
       let segLen = Math.hypot(dx, dy);
@@ -2584,37 +2500,37 @@
       // Если текущий сегмент имеет нулевую длину, переходим к следующему
       if (segLen < 0.1) {
         // console.log('Zero-length segment, skipping to next');
-        carSegment++;
-        carProgress = 0;
+        G.carSegment++;
+        G.carProgress = 0;
         return;
       }
 
       // 🚦 ПРОВЕРКА СВЕТОФОРА ПЕРЕД ПРИБЛИЖЕНИЕМ К ПЕРЕКРЕСТКУ 🚦
-      if (carTrafficController) {
+      if (G.carTrafficController) {
         // Вычисляем реальную позицию передней части машины
         const carLength = 120;
-        const offsetX = carLength / 2 * Math.cos(car.rotation);
-        const offsetY = carLength / 2 * Math.sin(car.rotation);
+        const offsetX = carLength / 2 * Math.cos(G.car.rotation);
+        const offsetY = carLength / 2 * Math.sin(G.car.rotation);
         const currentPos = {
-          x: car.position.x + offsetX,
-          y: car.position.y + offsetY
+          x: G.car.position.x + offsetX,
+          y: G.car.position.y + offsetY
         };
         const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
-        const roadPositions = { verticalRoadXs, horizontalRoadYs };
+        const roadPositions = { G.verticalRoadXs, G.horizontalRoadYs };
 
         // Проверяем расстояние до целевого перекрестка
         const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
 
         // ОТЛАДКА: показываем информацию о движении (только первые секунды)
-        if (carSegment === 0 && carProgress < 20) {
-          console.log(`🚗 DEBUG: segment=${carSegment}, progress=${carProgress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${car.position.x.toFixed(0)},${car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
+        if (G.carSegment === 0 && G.carProgress < 20) {
+          console.log(`🚗 DEBUG: segment=${G.carSegment}, progress=${G.carProgress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${G.car.position.x.toFixed(0)},${G.car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
         }
 
         // Проверяем светофор только если:
         // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
         // 2. И НЕ стоим прямо на перекрестке старта 
         if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора
-          const trafficCheck = carTrafficController.checkTrafficLights(
+          const trafficCheck = G.carTrafficController.checkTrafficLights(
             currentPos,
             targetIntersection,
             intersectionKeyToTL,
@@ -2624,69 +2540,69 @@
           if (!trafficCheck.canMove) {
             // Красный свет - останавливаемся
             debugLogAlways(`🚦 Остановка перед красным светом на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
-            return; // не обновляем carProgress - машина стоит
+            return; // не обновляем G.carProgress - машина стоит
           }
         }
       }
 
       // Обновляем прогресс по текущему сегменту
-      carProgress += speed;
+      G.carProgress += speed;
       debugLog('🚗 Движение по сегменту', {
-        segment: carSegment,
-        progress: carProgress.toFixed(1),
+        segment: G.carSegment,
+        progress: G.carProgress.toFixed(1),
         segLen: segLen.toFixed(1),
         speed: speed.toFixed(2)
       });
 
       // Проверяем, завершили ли мы текущий сегмент
-      if (carProgress >= segLen) {
+      if (G.carProgress >= segLen) {
         debugLogAlways('🚗 Завершен сегмент', {
-          segment: carSegment,
-          progress: carProgress.toFixed(1),
+          segment: G.carSegment,
+          progress: G.carProgress.toFixed(1),
           segLen: segLen.toFixed(1)
         });
 
         // Переходим к следующему сегменту
-        carProgress = carProgress - segLen; // остаток переносим
-        carSegment++;
+        G.carProgress = G.carProgress - segLen; // остаток переносим
+        G.carSegment++;
 
         // Проверяем, не достигли ли мы конца пути
-        if (carSegment >= carPath.length - 1) {
+        if (G.carSegment >= G.carPath.length - 1) {
           // console.log('Reached final destination');
-          const finalX = carPath[carPath.length - 1].x;
-          const finalY = carPath[carPath.length - 1].y;
+          const finalX = G.carPath[G.carPath.length - 1].x;
+          const finalY = G.carPath[G.carPath.length - 1].y;
           const carLength = 120;
-          const offsetX = -carLength / 2 * Math.cos(car.rotation);
-          const offsetY = -carLength / 2 * Math.sin(car.rotation);
-          car.position.set(finalX + offsetX, finalY + offsetY);
+          const offsetX = -carLength / 2 * Math.cos(G.car.rotation);
+          const offsetY = -carLength / 2 * Math.sin(G.car.rotation);
+          G.car.position.set(finalX + offsetX, finalY + offsetY);
           checkArrival();
           return;
         }
 
         // Обновляем данные для нового сегмента
-        p1 = carPath[carSegment];
-        p2 = carPath[carSegment + 1];
+        p1 = G.carPath[G.carSegment];
+        p2 = G.carPath[G.carSegment + 1];
         dx = p2.x - p1.x;
         dy = p2.y - p1.y;
         segLen = Math.hypot(dx, dy);
       }
 
       // Вычисляем текущую позицию на сегменте
-      const t = segLen > 0 ? Math.min(1, carProgress / segLen) : 0;
+      const t = segLen > 0 ? Math.min(1, G.carProgress / segLen) : 0;
       const newX = p1.x + dx * t;
       const newY = p1.y + dy * t;
 
       // Обновляем поворот машинки в направлении движения
       if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
         const targetRotation = Math.atan2(dy, dx);
-        const oldRotation = car.rotation;
-        car.rotation = targetRotation;
-        if (avatar) {
-          avatar.rotation = -targetRotation;
+        const oldRotation = G.car.rotation;
+        G.car.rotation = targetRotation;
+        if (G.avatar) {
+          G.avatar.rotation = -targetRotation;
         }
 
         // Обновляем лучи света при повороте
-        if (car.leftLightBeam && car.rightLightBeam) {
+        if (G.car.leftLightBeam && G.car.rightLightBeam) {
           updateLightBeams();
         }
 
@@ -2703,16 +2619,16 @@
 
       // Устанавливаем машину так, чтобы передняя часть была в точке пути
       const carLength = 120;
-      const offsetX = -carLength / 2 * Math.cos(car.rotation);
-      const offsetY = -carLength / 2 * Math.sin(car.rotation);
-      car.position.set(newX + offsetX, newY + offsetY);
+      const offsetX = -carLength / 2 * Math.cos(G.car.rotation);
+      const offsetY = -carLength / 2 * Math.sin(G.car.rotation);
+      G.car.position.set(newX + offsetX, newY + offsetY);
 
 
-      // console.log(`Car at segment ${carSegment}/${carPath.length - 1}, progress: ${carProgress.toFixed(1)}/${segLen.toFixed(1)}, pos: (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
+      // console.log(`Car at segment ${G.carSegment}/${G.carPath.length - 1}, progress: ${G.carProgress.toFixed(1)}/${segLen.toFixed(1)}, pos: (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
 
       // Проверяем прибытие в пункт назначения: до последней точки пути
-      const lastPoint = carPath[carPath.length - 1];
-      const distToLast = Math.hypot(car.position.x - lastPoint.x, car.position.y - lastPoint.y);
+      const lastPoint = G.carPath[G.carPath.length - 1];
+      const distToLast = Math.hypot(G.car.position.x - lastPoint.x, G.car.position.y - lastPoint.y);
       if (distToLast < 20) {
         checkArrival();
       }
