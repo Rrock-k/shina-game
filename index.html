@@ -698,18 +698,19 @@
       return hour >= 20 || hour < 6;
     }
 
-    function createNightOverlay () {
-      if (nightOverlay) return nightOverlay;
 
-      nightOverlay = new PIXI.Container();
+    // Новая функция для создания оверлея только для городских слоев
+    function createCityNightOverlay () {
+      if (cityNightOverlay) return cityNightOverlay;
+
+      cityNightOverlay = new PIXI.Container();
 
       // Основной темно-синий оверлей
       const overlay = new PIXI.Graphics();
       overlay.beginFill(0x0d1b69, 0.8); // более темный синий
       overlay.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
       overlay.endFill();
-      nightOverlay.addChild(overlay);
-
+      cityNightOverlay.addChild(overlay);
 
       // Добавляем градиент от темного к светлому снизу (имитация городского освещения)
       const gradient = new PIXI.Graphics();
@@ -719,15 +720,12 @@
         gradient.drawRect(0, CONFIG.WORLD_HEIGHT - i * 10, CONFIG.WORLD_WIDTH, 10);
         gradient.endFill();
       }
-      nightOverlay.addChild(gradient);
+      cityNightOverlay.addChild(gradient);
 
-      nightOverlay.alpha = 0;
-      nightOverlay.zIndex = 500; // поверх мира, но под источниками света
+      cityNightOverlay.alpha = 0;
+      cityNightOverlay.zIndex = 400; // поверх городских слоев, но под машиной и светофорами
 
-      // Добавляем оверлей в сцену
-      app.stage.addChild(nightOverlay);
-
-      return nightOverlay;
+      return cityNightOverlay;
     }
 
     function updateNightMode () {
@@ -738,21 +736,20 @@
         console.log(`🌙 ${isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
       }
 
-      // Создаем оверлей если его нет
-      if (!nightOverlay) {
-        createNightOverlay();
+      // Создаем городской оверлей если его нет
+      if (!cityNightOverlay) {
+        createCityNightOverlay();
       }
 
-      // Плавно изменяем прозрачность оверлея
+      // Плавно изменяем прозрачность городского оверлея
       const targetAlpha = isNightMode ? 0.7 : 0;
-      const alphaDiff = targetAlpha - currentNightAlpha;
+      const alphaDiff = targetAlpha - currentCityNightAlpha;
 
       if (Math.abs(alphaDiff) > 0.001) {
-        currentNightAlpha += alphaDiff * nightTransitionSpeed;
-        currentNightAlpha = Math.max(0, Math.min(1, currentNightAlpha));
-        nightOverlay.alpha = currentNightAlpha;
+        currentCityNightAlpha += alphaDiff * nightTransitionSpeed;
+        currentCityNightAlpha = Math.max(0, Math.min(1, currentCityNightAlpha));
+        cityNightOverlay.alpha = currentCityNightAlpha;
       }
-
     }
 
 
@@ -965,9 +962,9 @@
 
     // Система ночного режима
     let isNightMode = false;
-    let nightOverlay = null;
+    let cityNightOverlay = null; // оверлей только для городских слоев
     let nightTransitionSpeed = 0.02; // скорость перехода между днем и ночью
-    let currentNightAlpha = 0; // текущая прозрачность ночного оверлея (0-1)
+    let currentCityNightAlpha = 0; // текущая прозрачность городского оверлея (0-1)
     // Хранилище светофоров по ключу перекрёстка
     const intersectionKeyToTL = new Map();
     // Координатор зеленой волны светофоров
@@ -1079,7 +1076,7 @@
       borderLayer = new PIXI.Container();
       lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
 
-      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, decorLayer, trafficLightsLayer, borderLayer);
+      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, trafficLightsLayer, borderLayer);
 
       drawGrid(gridLayer);
       drawRoads(roadsLayer);
@@ -1089,6 +1086,13 @@
       // placeLabels(labelsLayer);
       // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
       createTrafficLightsForAllIntersections(trafficLightsLayer);
+
+      // Создаем и добавляем городской ночной оверлей (ПЕРЕД машиной)
+      createCityNightOverlay();
+      world.addChild(cityNightOverlay);
+
+      // Добавляем decorLayer (машина) ПОСЛЕ ночного оверлея
+      world.addChild(decorLayer);
 
       // Перемещаем светофоры в слой освещения (поверх ночного оверлея)
       if (lightingLayer && trafficLightsLayer.children.length > 0) {
