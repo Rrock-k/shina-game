@@ -30,18 +30,11 @@ let debugInfo = {
 // УПРАВЛЕНИЕ СКОРОСТЬЮ И ПАУЗОЙ (перенесено в PauseManager)
 
 
-// УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ
-let dayNightMode = 'auto'; // 'auto', 'day', 'night'
+// УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ (перенесено в DayNightManager)
 
 // Функции для работы с localStorage (перенесены в PauseManager)
 
-function loadDayNightSettings () {
-  const savedMode = localStorage.getItem('shina-game-daynight-mode');
-  if (savedMode && ['auto', 'day', 'night'].includes(savedMode)) {
-    dayNightMode = savedMode;
-    console.log(`🌅 Загружен режим дня/ночи: ${dayNightMode}`);
-  }
-}
+// loadDayNightSettings перенесена в DayNightManager
 
 // Функции для управления паузой (перенесены в PauseManager)
 
@@ -64,30 +57,8 @@ function debugLogAlways (message, data = null) {
 // Функции для работы с датами
 // getMonthName перенесена в TimeManager
 
-// Функции для ночного режима
-function isNightTime () {
-  const gameTime = timeManager.getGameTime();
-  return dayNightManager.isNightTime(gameTime);
-}
-
-
-// Новая функция для создания оверлея только для городских слоев
-function createCityNightOverlay () {
-  if (!dayNightManager) {
-    console.warn('⚠️ dayNightManager не инициализирован');
-    return null;
-  }
-  return dayNightManager.createCityNightOverlay();
-}
-
-function updateNightMode () {
-  if (!dayNightManager) {
-    console.warn('⚠️ dayNightManager не инициализирован');
-    return;
-  }
-  const gameTime = timeManager.getGameTime();
-  dayNightManager.updateNightMode(gameTime);
-}
+// Функции для ночного режима (перенесены в DayNightManager)
+// isNightTime, createCityNightOverlay, updateNightMode
 
 // Обновление таймера пребывания в здании
 let lastStayTimerUpdate = 0;
@@ -129,98 +100,16 @@ function updateStayTimer() {
 
 
 // Функция для переключения режимов дня/ночи
-function toggleDayNightMode () {
-  if (!dayNightManager) {
-    console.warn('⚠️ dayNightManager не инициализирован');
-    return;
-  }
-  dayNightManager.toggleDayNightMode();
+// Функции переключения режимов дня/ночи (перенесены в DayNightManager)
+// toggleDayNightMode, updateDayNightModeText
 
-  // Обновляем текст в меню
-  updateDayNightModeText();
-
-  const modeNames = {
-    'auto': 'Автоматический (день/ночь меняются)',
-    'day': 'Только день',
-    'night': 'Только ночь'
-  };
-
-  console.log(`🌅 Режим дня/ночи изменен: ${modeNames[dayNightMode]}`);
-  return modeNames[dayNightMode];
-}
-
-// Функция для обновления текста режима дня/ночи в меню
-function updateDayNightModeText () {
-  if (!dayNightManager) {
-    console.warn('⚠️ dayNightManager не инициализирован');
-    return;
-  }
-  dayNightManager.updateDayNightModeText();
-}
-
-// Функция для добавления источника света в слой освещения
-function addLightSource (lightObject) {
-  if (lightingLayer) {
-    lightingLayer.addChild(lightObject);
-    console.log('💡 Источник света добавлен в слой освещения');
-  }
-}
-
-// Функция для удаления источника света из слоя освещения
-function removeLightSource (lightObject) {
-  if (lightingLayer && lightObject.parent) {
-    lightObject.parent.removeChild(lightObject);
-    console.log('💡 Источник света удален из слоя освещения');
-  }
-}
+// Функции работы с источниками света (перенесены в DayNightManager)
+// addLightSource, removeLightSource
 
 
 
-function applyNightColorFilter () {
-  if (!isNightMode) return;
-
-  // Применяем приглушение цветов ко всем слоям
-  const nightTint = 0x4a4a6a; // приглушенный синеватый оттенок
-  const nightAlpha = 0.3; // степень приглушения
-
-  // Применяем фильтр к основным слоям
-  if (roadsLayer) {
-    roadsLayer.tint = nightTint;
-    roadsLayer.alpha = 1 - nightAlpha;
-  }
-  if (lotsLayer) {
-    lotsLayer.tint = nightTint;
-    lotsLayer.alpha = 1 - nightAlpha;
-  }
-  if (zonesLayer) {
-    zonesLayer.tint = nightTint;
-    zonesLayer.alpha = 1 - nightAlpha;
-  }
-  if (labelsLayer) {
-    labelsLayer.tint = nightTint;
-    labelsLayer.alpha = 1 - nightAlpha;
-  }
-}
-
-function resetDayColorFilter () {
-  // Сбрасываем фильтры для дневного режима
-  if (roadsLayer) {
-    roadsLayer.tint = 0xffffff;
-    roadsLayer.alpha = 1;
-  }
-  if (lotsLayer) {
-    lotsLayer.tint = 0xffffff;
-    lotsLayer.alpha = 1;
-  }
-  if (zonesLayer) {
-    zonesLayer.tint = 0xffffff;
-    zonesLayer.alpha = 1;
-  }
-  if (labelsLayer) {
-    labelsLayer.tint = 0xffffff;
-    labelsLayer.alpha = 1;
-  }
-}
+// Функции цветовых фильтров (перенесены в DayNightManager)
+// applyNightColorFilter, resetDayColorFilter
 
 // Функции работы с датами перенесены в TimeManager
 // getDayOfWeekShort, getDayOfWeek, getDaysInMonth, formatGameDateTime
@@ -240,11 +129,8 @@ let stayTimer = 0; // таймер пребывания в текущем мес
 let isAtDestination = false; // находится ли машина в пункте назначения
 let savedCarState = null; // сохраненное состояние машины при входе в здание: {nextIntersection: {x,y}, direction: number, currentPosition: {x,y}}
 
-// Система ночного режима
-let isNightMode = false;
-let cityNightOverlay = null; // оверлей только для городских слоев
-let nightTransitionSpeed = 0.02; // скорость перехода между днем и ночью
-let currentCityNightAlpha = 0; // текущая прозрачность городского оверлея (0-1)
+// Система ночного режима (перенесена в DayNightManager)
+// isNightMode, cityNightOverlay, nightTransitionSpeed, currentCityNightAlpha
 // Хранилище светофоров по ключу перекрёстка
 const intersectionKeyToTL = new Map();
 // Координатор зеленой волны светофоров
@@ -280,12 +166,11 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 
 // Настройки скорости загружаются в PauseManager
 
-// Загружаем сохраненные настройки режима дня/ночи
-loadDayNightSettings();
+// Настройки режима дня/ночи загружаются в DayNightManager
 
 // Обновляем текст режима дня/ночи и паузы в меню после загрузки
 setTimeout(() => {
-  updateDayNightModeText();
+  dayNightManager.updateDayNightModeText();
   pauseManager.updatePauseModeText();
 }, 100);
 
@@ -595,7 +480,7 @@ function initMenu () {
           break;
         case 'menu-daynight':
           // Переключаем режим дня/ночи (не закрываем меню)
-          toggleDayNightMode();
+          dayNightManager.toggleDayNightMode();
           break;
         case 'menu-route':
           showMenuNotification('🗺️ Информация о маршруте', 'Текущий маршрут: ' + ROUTE_SCHEDULE[currentRouteIndex].name);
@@ -1514,7 +1399,8 @@ function createCar () {
   app.ticker.add(() => {
     timeManager.update();
     updateDateTimeDisplay();
-    updateNightMode();
+    const gameTime = timeManager.getGameTime();
+    dayNightManager.updateNightMode(gameTime);
     updateStayTimer();
   });
 
@@ -1539,13 +1425,14 @@ function updateGameTime () {
   updateDateTimeDisplay();
 
   // Обновляем ночной режим
-  updateNightMode();
+  const gameTime = timeManager.getGameTime();
+  dayNightManager.updateNightMode(gameTime);
 
   // Применяем или сбрасываем цветовые фильтры
-  if (isNightMode) {
-    applyNightColorFilter();
+  if (dayNightManager.isNightModeActive()) {
+    dayNightManager.applyNightColorFilter();
   } else {
-    resetDayColorFilter();
+    dayNightManager.resetDayColorFilter();
   }
 
   // Если находимся в пункте назначения, уменьшаем таймер ожидания

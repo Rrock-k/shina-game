@@ -171,4 +171,72 @@ export class DayNightManager {
   setTransitionSpeed(speed) {
     this.nightTransitionSpeed = speed;
   }
+
+  // Применить ночной цветовой фильтр
+  applyNightColorFilter() {
+    if (!this.isNightMode) return;
+
+    // Применяем приглушение цветов ко всем слоям
+    const nightTint = 0x4a4a6a; // приглушенный синеватый оттенок
+    const nightAlpha = 0.3; // степень приглушения
+
+    // Применяем фильтр к основным слоям
+    if (typeof window !== 'undefined') {
+      if (window.roadsLayer) {
+        window.roadsLayer.tint = nightTint;
+        window.roadsLayer.alpha = 1 - nightAlpha;
+      }
+      if (window.lotsLayer) {
+        window.lotsLayer.tint = nightTint;
+        window.lotsLayer.alpha = 1 - nightAlpha;
+      }
+      if (window.zonesLayer) {
+        window.zonesLayer.tint = nightTint;
+        window.zonesLayer.alpha = 1 - nightAlpha;
+      }
+      if (window.labelsLayer) {
+        window.labelsLayer.tint = nightTint;
+        window.labelsLayer.alpha = 1 - nightAlpha;
+      }
+    }
+  }
+
+  // Сбросить дневной цветовой фильтр
+  resetDayColorFilter() {
+    // Сбрасываем фильтры для дневного режима
+    if (typeof window !== 'undefined') {
+      if (window.roadsLayer) {
+        window.roadsLayer.tint = 0xffffff;
+        window.roadsLayer.alpha = 1;
+      }
+      if (window.lotsLayer) {
+        window.lotsLayer.tint = 0xffffff;
+        window.lotsLayer.alpha = 1;
+      }
+      if (window.zonesLayer) {
+        window.zonesLayer.tint = 0xffffff;
+        window.zonesLayer.alpha = 1;
+      }
+      if (window.labelsLayer) {
+        window.labelsLayer.tint = 0xffffff;
+        window.labelsLayer.alpha = 1;
+      }
+    }
+  }
+
+  // Добавить источник света в слой освещения
+  addLightSource(lightObject) {
+    if (typeof window !== 'undefined' && window.lightingLayer) {
+      window.lightingLayer.addChild(lightObject);
+      console.log('💡 Источник света добавлен в слой освещения');
+    }
+  }
+
+  // Удалить источник света из слоя освещения
+  removeLightSource(lightObject) {
+    if (typeof window !== 'undefined' && window.lightingLayer && lightObject.parent) {
+      lightObject.parent.removeChild(lightObject);
+      console.log('💡 Источник света удален из слоя освещения');
+    }
+  }
 }
