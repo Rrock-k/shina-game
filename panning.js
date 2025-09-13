@@ -34,6 +34,9 @@ class PanningController {
     this.panSmoothing = 0.2;   // Скорость приближения к целевой позиции
     this.isAnimating = false;   // Флаг анимации
     
+    // Состояние меню
+    this.isMenuOpen = false;
+    
     // Callbacks
     this.onZoomChange = null;
     this.onFullscreenChange = null;
@@ -51,6 +54,20 @@ class PanningController {
 
   setOnFullscreenChange(callback) {
     this.onFullscreenChange = callback;
+  }
+
+  // Методы для управления состоянием меню
+  setMenuOpen(isOpen) {
+    this.isMenuOpen = isOpen;
+    if (isOpen) {
+      // При открытии меню останавливаем все жесты
+      this.isPanning = false;
+      this.isZooming = false;
+    }
+  }
+
+  isMenuOpen() {
+    return this.isMenuOpen;
   }
 
   // Запуск системы анимации
@@ -103,7 +120,7 @@ class PanningController {
   init() {
     // Обработчики мыши
     document.addEventListener('mousedown', (e) => {
-      if (e.target.tagName === 'CANVAS') {
+      if (e.target.tagName === 'CANVAS' && !this.isMenuOpen) {
         this.isPanning = true;
         this.lastX = e.clientX;
         this.lastY = e.clientY;
@@ -112,7 +129,7 @@ class PanningController {
     });
 
     document.addEventListener('mousemove', (e) => {
-      if (this.isPanning && this.world) {
+      if (this.isPanning && this.world && !this.isMenuOpen) {
         const deltaX = e.clientX - this.lastX;
         const deltaY = e.clientY - this.lastY;
         
@@ -133,7 +150,7 @@ class PanningController {
 
     // Обработчики touch
     document.addEventListener('touchstart', (e) => {
-      if (e.target.tagName === 'CANVAS') {
+      if (e.target.tagName === 'CANVAS' && !this.isMenuOpen) {
         if (e.touches.length === 1) {
           // Одиночное касание - панорамирование
           this.isPanning = true;
@@ -172,7 +189,7 @@ class PanningController {
     });
 
     document.addEventListener('touchmove', (e) => {
-      if (e.target.tagName === 'CANVAS') {
+      if (e.target.tagName === 'CANVAS' && !this.isMenuOpen) {
         if (this.isPanning && e.touches.length === 1) {
           // Панорамирование одним пальцем
           const deltaX = e.touches[0].clientX - this.lastX;
@@ -229,7 +246,7 @@ class PanningController {
         this.isPanning = false;
         this.isZooming = false;
         // Анимация продолжит работать, пока не достигнет целевых значений
-      } else if (e.touches.length === 1 && this.isZooming) {
+      } else if (e.touches.length === 1 && this.isZooming && !this.isMenuOpen) {
         // Переключаемся с зума на панорамирование
         this.isZooming = false;
         this.isPanning = true;
@@ -241,7 +258,7 @@ class PanningController {
     // Обработчик для отмены масштабирования (двойной тап)
     let lastTap = 0;
     document.addEventListener('touchend', (e) => {
-      if (e.touches.length === 0) {
+      if (e.touches.length === 0 && !this.isMenuOpen) {
         const now = Date.now();
         if (now - lastTap < 300) {
           // Двойной тап - сбрасываем масштаб

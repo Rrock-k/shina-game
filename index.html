@@ -1007,16 +1007,26 @@
       const modalClose = document.getElementById('modal-close');
       const menuItems = document.querySelectorAll('.menu-item');
 
+      // Функция для обновления состояния панорамирования
+      function updatePanningState () {
+        const isMenuOpen = menuModal.classList.contains('active');
+        if (panningController) {
+          panningController.setMenuOpen(isMenuOpen);
+        }
+      }
+
       // Открытие/закрытие меню по клику на бургер
       burgerButton.addEventListener('click', () => {
         menuModal.classList.toggle('active');
         burgerButton.classList.toggle('active');
+        updatePanningState();
       });
 
       // Закрытие меню по клику на крестик
       modalClose.addEventListener('click', () => {
         menuModal.classList.remove('active');
         burgerButton.classList.remove('active');
+        updatePanningState();
       });
 
       // Закрытие меню по клику на фон
@@ -1024,6 +1034,7 @@
         if (e.target === menuModal) {
           menuModal.classList.remove('active');
           burgerButton.classList.remove('active');
+          updatePanningState();
         }
       });
 
@@ -1032,6 +1043,7 @@
         if (e.key === 'Escape' && menuModal.classList.contains('active')) {
           menuModal.classList.remove('active');
           burgerButton.classList.remove('active');
+          updatePanningState();
         }
       });
 
@@ -1043,6 +1055,7 @@
           // Закрываем меню
           menuModal.classList.remove('active');
           burgerButton.classList.remove('active');
+          updatePanningState();
 
           // Выполняем действие в зависимости от выбранного пункта
           switch (itemId) {
