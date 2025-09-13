@@ -530,6 +530,9 @@
       </div>
       <div class="menu-items">
         <div class="menu-item" id="menu-speed">⚡ Управление скоростью</div>
+        <div class="menu-item" id="menu-daynight">🌅 Режим дня/ночи: <span id="daynight-mode-text">Автоматический</span>
+        </div>
+        <div class="menu-item" id="menu-car-lights">🚗 Фары машины</div>
         <div class="menu-item" id="menu-route">🗺️ Маршрут</div>
         <div class="menu-item" id="menu-settings">⚙️ Настройки</div>
         <div class="menu-item" id="menu-help">❓ Помощь</div>
@@ -607,7 +610,7 @@
     const BASE_CAR_SPEED = 11.7; // Базовая скорость машины
 
     // globals
-    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, car;
+    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
     let carPath = [], carSegment = 0, carProgress = 0;
     let avatar;
     let horizontalRoadYs = [], verticalRoadXs = [];
@@ -627,6 +630,10 @@
     let SPEED_MULTIPLIER = 1; // множитель скорости (1 = нормальная, 5 = ускоренная)
     let isSpeedBoosted = false; // включено ли ускорение по умолчанию
 
+
+    // УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ
+    let dayNightMode = 'auto'; // 'auto', 'day', 'night'
+
     // Функции для работы с localStorage
     function saveSpeedSettings () {
       localStorage.setItem('shina-game-speed-boosted', isSpeedBoosted.toString());
@@ -643,6 +650,14 @@
 
       if (savedMultiplier !== null) {
         SPEED_MULTIPLIER = parseInt(savedMultiplier);
+      }
+    }
+
+    function loadDayNightSettings () {
+      const savedMode = localStorage.getItem('shina-game-daynight-mode');
+      if (savedMode && ['auto', 'day', 'night'].includes(savedMode)) {
+        dayNightMode = savedMode;
+        console.log(`🌅 Загружен режим дня/ночи: ${dayNightMode}`);
       }
     }
 
@@ -669,6 +684,181 @@
         'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
       ];
       return months[monthIndex];
+    }
+
+    // Функции для ночного режима
+    function isNightTime () {
+      // Если режим принудительно установлен
+      if (dayNightMode === 'night') return true;
+      if (dayNightMode === 'day') return false;
+
+      // Автоматический режим - зависит от времени
+      const hour = gameTime.hours;
+      // Ночь с 20:00 до 06:00
+      return hour >= 20 || hour < 6;
+    }
+
+    function createNightOverlay () {
+      if (nightOverlay) return nightOverlay;
+
+      nightOverlay = new PIXI.Container();
+
+      // Основной темно-синий оверлей
+      const overlay = new PIXI.Graphics();
+      overlay.beginFill(0x0d1b69, 0.8); // более темный синий
+      overlay.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
+      overlay.endFill();
+      nightOverlay.addChild(overlay);
+
+
+      // Добавляем градиент от темного к светлому снизу (имитация городского освещения)
+      const gradient = new PIXI.Graphics();
+      for (let i = 0; i < 20; i++) {
+        const alpha = (1 - i / 20) * 0.3;
+        gradient.beginFill(0x2c3e50, alpha);
+        gradient.drawRect(0, CONFIG.WORLD_HEIGHT - i * 10, CONFIG.WORLD_WIDTH, 10);
+        gradient.endFill();
+      }
+      nightOverlay.addChild(gradient);
+
+      nightOverlay.alpha = 0;
+      nightOverlay.zIndex = 500; // поверх мира, но под источниками света
+
+      // Добавляем оверлей в сцену
+      app.stage.addChild(nightOverlay);
+
+      return nightOverlay;
+    }
+
+    function updateNightMode () {
+      const shouldBeNight = isNightTime();
+
+      if (shouldBeNight !== isNightMode) {
+        isNightMode = shouldBeNight;
+        console.log(`🌙 ${isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
+      }
+
+      // Создаем оверлей если его нет
+      if (!nightOverlay) {
+        createNightOverlay();
+      }
+
+      // Плавно изменяем прозрачность оверлея
+      const targetAlpha = isNightMode ? 0.7 : 0;
+      const alphaDiff = targetAlpha - currentNightAlpha;
+
+      if (Math.abs(alphaDiff) > 0.001) {
+        currentNightAlpha += alphaDiff * nightTransitionSpeed;
+        currentNightAlpha = Math.max(0, Math.min(1, currentNightAlpha));
+        nightOverlay.alpha = currentNightAlpha;
+      }
+
+    }
+
+
+
+    // Функция для переключения режимов дня/ночи
+    function toggleDayNightMode () {
+      const modes = ['auto', 'day', 'night'];
+      const currentIndex = modes.indexOf(dayNightMode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      dayNightMode = modes[nextIndex];
+
+      // Сохраняем в localStorage
+      localStorage.setItem('shina-game-daynight-mode', dayNightMode);
+
+      // Принудительно обновляем ночной режим
+      updateNightMode();
+
+      // Обновляем текст в меню
+      updateDayNightModeText();
+
+      const modeNames = {
+        'auto': 'Автоматический (день/ночь меняются)',
+        'day': 'Только день',
+        'night': 'Только ночь'
+      };
+
+      console.log(`🌅 Режим дня/ночи изменен: ${modeNames[dayNightMode]}`);
+      return modeNames[dayNightMode];
+    }
+
+    // Функция для обновления текста режима дня/ночи в меню
+    function updateDayNightModeText () {
+      const modeTextElement = document.getElementById('daynight-mode-text');
+      if (!modeTextElement) return;
+
+      const modeNames = {
+        'auto': 'Автоматический',
+        'day': 'Только день',
+        'night': 'Только ночь'
+      };
+
+      modeTextElement.textContent = modeNames[dayNightMode] || 'Автоматический';
+    }
+
+    // Функция для добавления источника света в слой освещения
+    function addLightSource (lightObject) {
+      if (lightingLayer) {
+        lightingLayer.addChild(lightObject);
+        console.log('💡 Источник света добавлен в слой освещения');
+      }
+    }
+
+    // Функция для удаления источника света из слоя освещения
+    function removeLightSource (lightObject) {
+      if (lightingLayer && lightObject.parent) {
+        lightObject.parent.removeChild(lightObject);
+        console.log('💡 Источник света удален из слоя освещения');
+      }
+    }
+
+
+
+    function applyNightColorFilter () {
+      if (!isNightMode) return;
+
+      // Применяем приглушение цветов ко всем слоям
+      const nightTint = 0x4a4a6a; // приглушенный синеватый оттенок
+      const nightAlpha = 0.3; // степень приглушения
+
+      // Применяем фильтр к основным слоям
+      if (roadsLayer) {
+        roadsLayer.tint = nightTint;
+        roadsLayer.alpha = 1 - nightAlpha;
+      }
+      if (lotsLayer) {
+        lotsLayer.tint = nightTint;
+        lotsLayer.alpha = 1 - nightAlpha;
+      }
+      if (zonesLayer) {
+        zonesLayer.tint = nightTint;
+        zonesLayer.alpha = 1 - nightAlpha;
+      }
+      if (labelsLayer) {
+        labelsLayer.tint = nightTint;
+        labelsLayer.alpha = 1 - nightAlpha;
+      }
+    }
+
+    function resetDayColorFilter () {
+      // Сбрасываем фильтры для дневного режима
+      if (roadsLayer) {
+        roadsLayer.tint = 0xffffff;
+        roadsLayer.alpha = 1;
+      }
+      if (lotsLayer) {
+        lotsLayer.tint = 0xffffff;
+        lotsLayer.alpha = 1;
+      }
+      if (zonesLayer) {
+        zonesLayer.tint = 0xffffff;
+        zonesLayer.alpha = 1;
+      }
+      if (labelsLayer) {
+        labelsLayer.tint = 0xffffff;
+        labelsLayer.alpha = 1;
+      }
     }
 
     function getDayOfWeekShort (dayOfWeek) {
@@ -761,9 +951,9 @@
       year: 2025,
       month: 8, // сентябрь (0-индексированный)
       day: 7,
-      hours: 8,
+      hours: 6, // начинаем с 06:00 утра
       minutes: 0
-    }; // начинаем с 7 сентября 2025, 8:00
+    }; // начинаем с 7 сентября 2025, 06:00
     let BASE_TIME_SPEED = 60; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
     let lastTimeUpdate = Date.now();
     let datetimeDisplay;
@@ -772,6 +962,12 @@
     let stayTimer = 0; // таймер пребывания в текущем месте
     let isAtDestination = false; // находится ли машина в пункте назначения
     let savedCarState = null; // сохраненное состояние машины при входе в здание: {nextIntersection: {x,y}, direction: number, currentPosition: {x,y}}
+
+    // Система ночного режима
+    let isNightMode = false;
+    let nightOverlay = null;
+    let nightTransitionSpeed = 0.02; // скорость перехода между днем и ночью
+    let currentNightAlpha = 0; // текущая прозрачность ночного оверлея (0-1)
     // Хранилище светофоров по ключу перекрёстка
     const intersectionKeyToTL = new Map();
     // Координатор зеленой волны светофоров
@@ -807,6 +1003,14 @@
 
     // Загружаем сохраненные настройки скорости
     loadSpeedSettings();
+
+    // Загружаем сохраненные настройки режима дня/ночи
+    loadDayNightSettings();
+
+    // Обновляем текст режима дня/ночи в меню после загрузки
+    setTimeout(() => {
+      updateDayNightModeText();
+    }, 100);
 
     setupApp();
 
@@ -873,6 +1077,7 @@
       decorLayer = new PIXI.Container();
       trafficLightsLayer = new PIXI.Container(); // слой для светофоров (поверх машин)
       borderLayer = new PIXI.Container();
+      lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
 
       world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, decorLayer, trafficLightsLayer, borderLayer);
 
@@ -882,12 +1087,30 @@
       drawLots(lotsLayer);
       drawZones(zonesLayer);
       // placeLabels(labelsLayer);
-      // Светофоры теперь создаются на каждом перекрёстке (в отдельном слое поверх машин)
+      // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
       createTrafficLightsForAllIntersections(trafficLightsLayer);
+
+      // Перемещаем светофоры в слой освещения (поверх ночного оверлея)
+      if (lightingLayer && trafficLightsLayer.children.length > 0) {
+        // Клонируем все светофоры в слой освещения
+        const trafficLights = [...trafficLightsLayer.children];
+        trafficLights.forEach(trafficLight => {
+          lightingLayer.addChild(trafficLight);
+        });
+        // Очищаем старый слой
+        trafficLightsLayer.removeChildren();
+        console.log('🚦 Светофоры перемещены в слой освещения');
+      }
       // drawAlina(decorLayer);
       drawWorldBorder(borderLayer);
 
       uiLayer = new PIXI.Container();
+
+      // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
+      lightingLayer.zIndex = 1000; // поверх ночного оверлея
+      app.stage.addChild(lightingLayer);
+
+      uiLayer.zIndex = 2000; // поверх всего
       app.stage.addChild(uiLayer);
 
       // Получаем ссылки на HTML элементы панели управления
@@ -1052,11 +1275,6 @@
         item.addEventListener('click', () => {
           const itemId = item.id;
 
-          // Закрываем меню
-          menuModal.classList.remove('active');
-          burgerButton.classList.remove('active');
-          updatePanningState();
-
           // Выполняем действие в зависимости от выбранного пункта
           switch (itemId) {
             case 'menu-speed':
@@ -1064,17 +1282,37 @@
               speedButton.click();
               showMenuNotification('⚡ Скорость переключена');
               break;
+            case 'menu-daynight':
+              // Переключаем режим дня/ночи (не закрываем меню)
+              toggleDayNightMode();
+              break;
             case 'menu-route':
               showMenuNotification('🗺️ Информация о маршруте', 'Текущий маршрут: ' + ROUTE_SCHEDULE[currentRouteIndex].name);
+              // Закрываем меню
+              menuModal.classList.remove('active');
+              burgerButton.classList.remove('active');
+              updatePanningState();
               break;
             case 'menu-settings':
               showMenuNotification('⚙️ Настройки', 'Настройки игры будут добавлены в следующих версиях');
+              // Закрываем меню
+              menuModal.classList.remove('active');
+              burgerButton.classList.remove('active');
+              updatePanningState();
               break;
             case 'menu-help':
-              showMenuNotification('❓ Помощь', 'Используйте мышь для панорамирования, колесо мыши для масштабирования. На мобильных: касание для панорамирования, два пальца для масштабирования.');
+              showMenuNotification('❓ Помощь', 'Используйте мышь для панорамирования, колесо мыши для масштабирования. На мобильных: касание для панорамирования, два пальца для масштабирования. Режим дня/ночи можно переключать: автоматический, только день, только ночь. Все источники света отображаются поверх ночного режима.');
+              // Закрываем меню
+              menuModal.classList.remove('active');
+              burgerButton.classList.remove('active');
+              updatePanningState();
               break;
             case 'menu-about':
               showMenuNotification('ℹ️ О игре', 'Карта Шины - симулятор движения по городу с системой светофоров и маршрутизацией.');
+              // Закрываем меню
+              menuModal.classList.remove('active');
+              burgerButton.classList.remove('active');
+              updatePanningState();
               break;
           }
         });
@@ -1666,6 +1904,12 @@
       labelsLayer.children.forEach(label => {
         label.scale.set(1 / scale);
       });
+
+      // Обновляем позицию и масштаб слоя освещения
+      if (lightingLayer && world) {
+        lightingLayer.scale.set(world.scale.x, world.scale.y);
+        lightingLayer.position.set(world.position.x, world.position.y);
+      }
     }
 
     // ======= Новая логика движения по графу перекрёстков и зданий =======
@@ -1880,6 +2124,7 @@
       rightHeadlight.drawCircle(50, 20, 8);
       car.addChild(rightHeadlight);
 
+
       // Задние фары - СЗАДИ
       const leftTailLight = new PIXI.Graphics();
       leftTailLight.beginFill(0xff0000).drawCircle(-50, -20, 6).endFill();
@@ -1998,6 +2243,16 @@
       // Обновляем дисплей даты и времени
       if (datetimeDisplay) {
         datetimeDisplay.innerHTML = formatGameDateTime();
+      }
+
+      // Обновляем ночной режим
+      updateNightMode();
+
+      // Применяем или сбрасываем цветовые фильтры
+      if (isNightMode) {
+        applyNightColorFilter();
+      } else {
+        resetDayColorFilter();
       }
 
       // Если находимся в пункте назначения, уменьшаем таймер ожидания
@@ -2353,6 +2608,11 @@
           avatar.rotation = -targetRotation;
         }
 
+        // Обновляем лучи света при повороте
+        if (car.leftLightBeam && car.rightLightBeam) {
+          updateLightBeams();
+        }
+
         // Логируем поворот только если он значительный
         const rotationDiff = Math.abs(targetRotation - oldRotation);
         if (rotationDiff > 0.1) {
@@ -2369,6 +2629,7 @@
       const offsetX = -carLength / 2 * Math.cos(car.rotation);
       const offsetY = -carLength / 2 * Math.sin(car.rotation);
       car.position.set(newX + offsetX, newY + offsetY);
+
 
       // console.log(`Car at segment ${carSegment}/${carPath.length - 1}, progress: ${carProgress.toFixed(1)}/${segLen.toFixed(1)}, pos: (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
 
