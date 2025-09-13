@@ -1331,6 +1331,15 @@
     document.body.style.width = '1200px';
     document.body.style.height = '800px';
     document.body.style.overflow = 'auto';
+
+    // Добавляем подсказку для мобильных устройств
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log('📱 Мобильное устройство обнаружено!');
+      console.log('👆 Одиночное касание - панорамирование');
+      console.log('🤏 Двойное касание - масштабирование');
+      console.log('👆👆 Двойной тап - сброс масштаба');
+    }
   </script>
 </body>
 
