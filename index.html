@@ -140,10 +140,10 @@
     // Позиции вычисляются динамически из геометрии зон, а НЕ захардкожены
     const ROUTE_SCHEDULE = [
       { location: 'house', name: 'Дом', stayHours: 2 },
+      { location: 'institute', name: 'Институт', stayHours: 2 },
       { location: 'work', name: 'Работа', stayHours: 5 },
       { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
       { location: 'box', name: 'Бокс', stayHours: 1 },
-      { location: 'institute', name: 'Институт', stayHours: 2 }
     ];
 
     setupApp();
@@ -495,6 +495,12 @@
             });
           });
 
+          // Вычисляем границы Г-образной зоны
+          const minX = Math.min(...cells.map(({ c }) => startX + c * (lotWidth + gap)));
+          const maxX = Math.max(...cells.map(({ c }) => startX + c * (lotWidth + gap) + lotWidth));
+          const minY = Math.min(...cells.map(({ r }) => startY + r * (lotHeight + gap)));
+          const maxY = Math.max(...cells.map(({ r }) => startY + r * (lotHeight + gap) + lotHeight));
+
           // Подпись в центре тяжести фигуры (среднее центров занятых ячеек)
           const centers = cells.map(({ c, r }) => ({
             cx: startX + c * (lotWidth + gap) + lotWidth / 2,
@@ -503,11 +509,16 @@
           const cgx = centers.reduce((s, p) => s + p.cx, 0) / centers.length;
           const cgy = centers.reduce((s, p) => s + p.cy, 0) / centers.length;
           // Ширина для переноса: охватывающая ширина фигуры
-          const minX = Math.min(...cells.map(({ c }) => startX + c * (lotWidth + gap)));
-          const maxX = Math.max(...cells.map(({ c }) => startX + c * (lotWidth + gap) + lotWidth));
           drawLabel(CONFIG.ZONES[name].label, cgx, cgy, maxX - minX);
+
           // Сохраняем геометрию зоны (центр и bbox)
-          zoneGeometry.set(name, { type: 'composite', center: { x: cgx, y: cgy } });
+          const zoneData = {
+            type: 'composite',
+            center: { x: cgx, y: cgy },
+            bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+          };
+          zoneGeometry.set(name, zoneData);
+          console.log(`🏛️ Сохранена геометрия зоны ${name}:`, zoneData);
           return;
         }
 
@@ -536,9 +547,9 @@
       drawZoneFromCells('work', 'work');
       drawZoneFromCells('box', 'box');
       drawZoneFromCells('institute', 'institute');
-      // Для круга сохранить центр и радиус
+      // Для круга сохранить центр и радиус (только если не была установлена Г-образная зона)
       const inst = CONFIG.ZONES.institute;
-      if (inst?.type === 'circle') {
+      if (inst?.type === 'circle' && !zoneGeometry.has('institute')) {
         zoneGeometry.set('institute', { type: 'circle', center: { x: inst.x, y: inst.y }, bounds: { x: inst.x, y: inst.y, r: inst.r } });
       }
     }
@@ -1104,13 +1115,21 @@
       // Позиционируем в правом нижнем углу здания
       const zone = zoneGeometry.get(locationKey);
       if (zone && zone.bounds) {
-        // Для прямоугольных зон
-        avatarContainer.position.set(
-          zone.bounds.x + zone.bounds.w - 30,
-          zone.bounds.y + zone.bounds.h - 30
-        );
+        if (zone.type === 'circle') {
+          // Для круглых зон (институт) - позиционируем справа от центра
+          avatarContainer.position.set(
+            zone.bounds.x + zone.bounds.r - 30,
+            zone.bounds.y + zone.bounds.r - 30
+          );
+        } else {
+          // Для прямоугольных зон
+          avatarContainer.position.set(
+            zone.bounds.x + zone.bounds.w - 30,
+            zone.bounds.y + zone.bounds.h - 30
+          );
+        }
       } else {
-        // Для круглых зон (институт)
+        // Fallback: используем центр здания
         avatarContainer.position.set(
           buildingCenter.x + 150,
           buildingCenter.y + 150
@@ -1120,7 +1139,11 @@
       decorLayer.addChild(avatarContainer);
       buildingAvatars.set(locationKey, avatarContainer);
 
-      console.log(`🏠 Показана аватарка в здании ${locationKey}`);
+      console.log(`🏠 Показана аватарка в здании ${locationKey}`, {
+        zone: zone,
+        buildingCenter: buildingCenter,
+        position: avatarContainer.position
+      });
     }
 
     // Скрыть аватарку в здании
