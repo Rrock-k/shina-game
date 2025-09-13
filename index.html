@@ -92,7 +92,7 @@
       BASE_FONT: 32
     };
 
-    const CAR_SPEED = 2;
+    const CAR_SPEED = 9;
 
     // globals
     let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, borderLayer, uiLayer, car;
@@ -100,6 +100,16 @@
     let avatar;
     let horizontalRoadYs = [], verticalRoadXs = [];
     let hoverLabel;
+
+    // Система маршрутов и времени
+    let gameTime = { hours: 8, minutes: 0 }; // начинаем с 8:00
+    let timeSpeed = 60; // 1 реальная секунда = 1 игровая минута
+    let lastTimeUpdate = Date.now();
+    let clockDisplay;
+    let routeDisplay;
+    let currentRouteIndex = 0;
+    let stayTimer = 0; // таймер пребывания в текущем месте
+    let isAtDestination = false; // находится ли машина в пункте назначения
     // Хранилище светофоров по ключу перекрёстка
     const intersectionKeyToTL = new Map();
     // Координатор зеленой волны светофоров
@@ -117,6 +127,42 @@
       'E1', 'E3',        // пятый столбец
       'F2', 'F4',        // шестой столбец
       'G1', 'G2', 'G3', 'G4' // правый столбец (выезд из города) - все перекрестки
+    ];
+
+    // 🚛 МАРШРУТ ШИНЫ 🚛
+    // Массив с маршрутом: место назначения и время пребывания (в игровых часах)
+    // Координаты исправлены для соответствия реальным центрам зон
+    const ROUTE_SCHEDULE = [
+      {
+        location: 'house',
+        name: 'Дом',
+        stayHours: 2,
+        position: { x: 420, y: 575 } // центр дома (CONFIG.ZONES.house x+w/2, y+h/2)
+      },
+      {
+        location: 'work',
+        name: 'Работа',
+        stayHours: 5,
+        position: { x: 2060, y: 1450 } // центр работы (CONFIG.ZONES.work x+w/2, y+h/2)
+      },
+      {
+        location: 'relatives',
+        name: 'Родственники',
+        stayHours: 1.5,
+        position: { x: 1520, y: 575 } // центр родственников (CONFIG.ZONES.relatives x+w/2, y+h/2)
+      },
+      {
+        location: 'box',
+        name: 'Бокс',
+        stayHours: 1,
+        position: { x: 420, y: 1450 } // центр бокса (CONFIG.ZONES.box x+w/2, y+h/2)
+      },
+      {
+        location: 'institute',
+        name: 'Институт',
+        stayHours: 2,
+        position: { x: 2550, y: 1425 } // центр института (CONFIG.ZONES.institute x, y)
+      }
     ];
 
     setupApp();
@@ -195,6 +241,43 @@
       });
       title.position.set(10, 10);
       uiLayer.addChild(title);
+
+      // Игровые часы
+      clockDisplay = new PIXI.Text('08:00', {
+        fontFamily: 'sans-serif',
+        fontSize: 32,
+        fill: 0xffffff,
+        stroke: 0x000000,
+        strokeThickness: 4
+      });
+      clockDisplay.position.set(10, 45);
+      uiLayer.addChild(clockDisplay);
+
+      // Дисплей текущего маршрута
+      routeDisplay = new PIXI.Text('Маршрут: Дом (2ч)', {
+        fontFamily: 'sans-serif',
+        fontSize: 18,
+        fill: 0xffff00,
+        stroke: 0x000000,
+        strokeThickness: 3
+      });
+      routeDisplay.position.set(10, 85);
+      uiLayer.addChild(routeDisplay);
+
+      // Инициализируем дисплей маршрута
+      updateRouteDisplay();
+    }
+
+    // Обновление дисплея маршрута
+    function updateRouteDisplay () {
+      if (!routeDisplay) return; // защита от вызова до инициализации
+      const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+      if (isAtDestination) {
+        const remainingHours = Math.max(0, stayTimer).toFixed(1);
+        routeDisplay.text = `В пункте: ${currentDest.name} (${remainingHours}ч)`;
+      } else {
+        routeDisplay.text = `Едем в: ${currentDest.name} (${currentDest.stayHours}ч)`;
+      }
     }
 
     function getRoadPositions () {
@@ -212,6 +295,11 @@
         verticalPositions.push(x);
       }
       const maxVerticalPos = verticalPositions[verticalPositions.length - 1];
+
+      // Отладочная информация о позициях дорог
+      console.log('Horizontal roads (Y coordinates):', horizontalPositions);
+      console.log('Vertical roads (X coordinates):', verticalPositions);
+
       return { horizontalPositions, verticalPositions, maxVerticalPos };
     }
 
@@ -679,12 +767,129 @@
       });
     }
 
+    // ======= Новая логика движения по графу перекрёстков и зданий =======
+    // Вспомогательные функции индексации и координат перекрёстков
+    function indexOfClosest (arr, value) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < arr.length; i++) {
+        const d = Math.abs(arr[i] - value);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      return bestIdx;
+    }
+
+    function getIntersectionCoord (i, j) {
+      return { x: verticalRoadXs[i], y: horizontalRoadYs[j] };
+    }
+
+    function getNearestIntersectionIJ (x, y) {
+      return { i: indexOfClosest(verticalRoadXs, x), j: indexOfClosest(horizontalRoadYs, y) };
+    }
+
+    // Рассчитать точку остановки у здания: на ближайшей дороге, рядом с центром зоны
+    // Возвращает { stop: {x,y}, nearestIJ: {i,j}, orientation: 'vertical'|'horizontal' }
+    function computeBuildingStop (buildingPos) {
+      const nearestVXIndex = indexOfClosest(verticalRoadXs, buildingPos.x);
+      const nearestVx = verticalRoadXs[nearestVXIndex];
+      const distToV = Math.abs(buildingPos.x - nearestVx);
+
+      const nearestHYIndex = indexOfClosest(horizontalRoadYs, buildingPos.y);
+      const nearestHy = horizontalRoadYs[nearestHYIndex];
+      const distToH = Math.abs(buildingPos.y - nearestHy);
+
+      // Выбираем более близкую дорогу
+      if (distToV <= distToH) {
+        // Остановка на вертикальной дороге: X фиксирован, Y — проекция центра здания
+        const stopY = Math.max(horizontalRoadYs[0], Math.min(horizontalRoadYs[horizontalRoadYs.length - 1], buildingPos.y));
+        const j = indexOfClosest(horizontalRoadYs, stopY);
+        return { stop: { x: nearestVx, y: stopY }, nearestIJ: { i: nearestVXIndex, j }, orientation: 'vertical' };
+      } else {
+        // Остановка на горизонтальной дороге: Y фиксирован, X — проекция центра здания
+        const stopX = Math.max(verticalRoadXs[0], Math.min(verticalRoadXs[verticalRoadXs.length - 1], buildingPos.x));
+        const i = indexOfClosest(verticalRoadXs, stopX);
+        return { stop: { x: stopX, y: nearestHy }, nearestIJ: { i, j: nearestHYIndex }, orientation: 'horizontal' };
+      }
+    }
+
+    // Поиск пути по сетке перекрёстков (BFS) от (i0,j0) к (i1,j1). Возвращает массив координат перекрёстков
+    function buildIntersectionPath (fromIJ, toIJ) {
+      const cols = verticalRoadXs.length;
+      const rows = horizontalRoadYs.length;
+      const key = (i, j) => `${i},${j}`;
+      const queue = [];
+      const visited = new Set();
+      const parent = new Map();
+      queue.push(fromIJ);
+      visited.add(key(fromIJ.i, fromIJ.j));
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      while (queue.length) {
+        const cur = queue.shift();
+        if (cur.i === toIJ.i && cur.j === toIJ.j) break;
+        for (const [dx, dy] of dirs) {
+          const ni = cur.i + dx;
+          const nj = cur.j + dy;
+          if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
+          const k = key(ni, nj);
+          if (visited.has(k)) continue;
+          visited.add(k);
+          parent.set(k, key(cur.i, cur.j));
+          queue.push({ i: ni, j: nj });
+        }
+      }
+      // Восстановление пути
+      const pathIJ = [];
+      let ck = key(toIJ.i, toIJ.j);
+      if (!visited.has(ck)) {
+        // на всякий случай — если путь не найден, остаёмся на месте
+        return [getIntersectionCoord(fromIJ.i, fromIJ.j)];
+      }
+      while (ck) {
+        const [si, sj] = ck.split(',').map(Number);
+        pathIJ.push({ i: si, j: sj });
+        ck = parent.get(ck) || null;
+      }
+      pathIJ.reverse();
+      // Преобразуем в массив точек ({x,y})
+      return pathIJ.map(({ i, j }) => getIntersectionCoord(i, j));
+    }
+
+    // Построить путь только ИЗ перекрёстка В перекрёсток, затем к зданию (на обочину)
+    // Возвращает массив точек: [intersections..., buildingStop]
+    function buildGraphPathToBuilding (startIJ, buildingPos) {
+      const { stop, nearestIJ } = computeBuildingStop(buildingPos);
+      const nodes = buildIntersectionPath(startIJ, nearestIJ); // только перекрёстки
+      // Добавляем финальную точку остановки у здания
+      nodes.push(stop);
+      return nodes;
+    }
+
+    // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
     function buildCarPath () {
-      return CONFIG.CAR_PATH;
+      const currentDestination = ROUTE_SCHEDULE[currentRouteIndex];
+      if (!currentDestination) return [];
+
+      // Определяем стартовый перекрёсток
+      let startIJ;
+      if (car && car.position && (car.position.x !== 0 || car.position.y !== 0)) {
+        startIJ = getNearestIntersectionIJ(car.position.x, car.position.y);
+      } else {
+        const housePos = ROUTE_SCHEDULE[0].position;
+        startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
+      }
+
+      const graphPath = buildGraphPathToBuilding(startIJ, currentDestination.position);
+
+      // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
+      const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
+      const needsPrefix = car && (Math.abs(car.position.x - startIntersection.x) > 1 || Math.abs(car.position.y - startIntersection.y) > 1);
+      const path = needsPrefix ? [{ x: car.position.x, y: car.position.y }, startIntersection, ...graphPath] : graphPath;
+
+      console.log(`Graph path to ${currentDestination.name}:`, path.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
+      return path;
     }
 
     function createCar () {
-      carPath = buildCarPath();
       car = new PIXI.Container();
 
       const body = new PIXI.Graphics();
@@ -696,68 +901,183 @@
       avatar.width = 60;
       avatar.height = 60;
       car.addChild(avatar);
-      car.position.set(carPath[0].x, carPath[0].y);
+
+      // Начинаем с первого пункта назначения (работа)
+      currentRouteIndex = 1; // работа, а не дом
+      isAtDestination = false;
+      stayTimer = 0;
+
+      // Строим путь сначала, чтобы определить стартовую позицию
+      carPath = buildCarPath();
+      carSegment = 0;
+      carProgress = 0;
+
+      // Устанавливаем машину на первую точку пути (которая должна быть на дороге)
+      if (carPath.length > 0) {
+        car.position.set(carPath[0].x, carPath[0].y);
+        console.log('Car starts at:', carPath[0]);
+      } else {
+        // Fallback: устанавливаем на ближайшую дорогу к дому
+        const housePos = ROUTE_SCHEDULE[0].position;
+        const roadPos = findNearestRoadPoint(housePos.x, housePos.y);
+        car.position.set(roadPos.x, roadPos.y);
+        console.log('Car fallback position:', roadPos);
+      }
+
       decorLayer.addChild(car);
       app.ticker.add(updateCar);
+      app.ticker.add(updateGameTime);
+
+      updateRouteDisplay();
+    }
+
+    // Обновление игрового времени
+    function updateGameTime () {
+      const now = Date.now();
+      const deltaMs = now - lastTimeUpdate;
+      lastTimeUpdate = now;
+
+      // Ускоряем время: 1 реальная секунда = timeSpeed игровых минут
+      const gameMinutes = (deltaMs / 1000) * timeSpeed;
+
+      gameTime.minutes += gameMinutes;
+      let hourGuard = 0; // защита от бесконечного цикла
+      while (gameTime.minutes >= 60 && hourGuard < 100) {
+        hourGuard++;
+        gameTime.minutes -= 60;
+        gameTime.hours += 1;
+        if (gameTime.hours >= 24) {
+          gameTime.hours = 0;
+        }
+      }
+
+      // Обновляем дисплей часов
+      const hours = Math.floor(gameTime.hours).toString().padStart(2, '0');
+      const minutes = Math.floor(gameTime.minutes).toString().padStart(2, '0');
+      clockDisplay.text = `${hours}:${minutes}`;
+
+      // Если находимся в пункте назначения, уменьшаем таймер ожидания
+      if (isAtDestination) {
+        stayTimer -= gameMinutes / 60; // переводим в игровые часы
+        if (stayTimer <= 0) {
+          // Время пребывания закончилось, едем к следующему пункту
+          nextDestination();
+        }
+      }
+    }
+
+    // Переход к следующему пункту маршрута
+    function nextDestination () {
+      currentRouteIndex = (currentRouteIndex + 1) % ROUTE_SCHEDULE.length;
+      isAtDestination = false;
+      stayTimer = 0;
+
+      // Обновляем путь к новому пункту назначения
+      carPath = buildCarPath();
+      carSegment = 0;
+      carProgress = 0;
+
+      updateRouteDisplay();
+    }
+
+    // Фиксируем прибытие: вызывается только при достижении последней точки пути (обочины)
+    function checkArrival () {
+      const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+      if (!isAtDestination) {
+        console.log(`Arrived at ${currentDest.name} (roadside).`);
+        isAtDestination = true;
+        stayTimer = currentDest.stayHours;
+        updateRouteDisplay();
+      }
     }
 
     function updateCar (delta) {
+      // Если находимся в пункте назначения, не двигаемся
+      if (isAtDestination) {
+        checkArrival(); // обновляем статус
+        return;
+      }
+
       const speed = CAR_SPEED * delta;
+
+      // Проверяем, есть ли у нас путь
+      if (carPath.length < 2) {
+        // console.log('No valid path, rebuilding...');
+        carPath = buildCarPath();
+        carSegment = 0;
+        carProgress = 0;
+        return;
+      }
+
+      // Убеждаемся, что carSegment находится в допустимых пределах
+      if (carSegment >= carPath.length - 1) {
+        // Достигли конца пути
+        // console.log('Reached end of path');
+        car.position.set(carPath[carPath.length - 1].x, carPath[carPath.length - 1].y);
+        checkArrival();
+        return;
+      }
+
       let p1 = carPath[carSegment];
-      let p2 = carPath[(carSegment + 1) % carPath.length];
+      let p2 = carPath[carSegment + 1];
       let dx = p2.x - p1.x;
       let dy = p2.y - p1.y;
       let segLen = Math.hypot(dx, dy);
 
-      // Координаты потенциальной новой позиции
-      let nextProgress = carProgress + speed;
-      let tNext = nextProgress / segLen;
-      let nx = p1.x + dx * tNext;
-      let ny = p1.y + dy * tNext;
-
-      // Проверяем, пересекаем ли центр перекрёстка и нужно ли ждать на красный
-      const cx = p2.x; // точки пути совпадают с центрами перекрёстков
-      const cy = p2.y;
-      const approachingIntersection = (Math.sign(dx) !== 0 && Math.sign(dx) === Math.sign(cx - car.position.x)) || (Math.sign(dy) !== 0 && Math.sign(dy) === Math.sign(cy - car.position.y));
-
-      if (approachingIntersection) {
-        const key = `${cx},${cy}`;
-        const tl = intersectionKeyToTL.get(key);
-        if (tl) {
-          const dir = getDirectionForSegment(dx, dy);
-          if (!tl.isPassAllowed(dir)) {
-            // Стоим перед центром перекрёстка на расстоянии стоп-линии
-            const stopDist = CONFIG.ROAD_WIDTH * 0.6;
-            const distToCenter = Math.hypot(cx - car.position.x, cy - car.position.y);
-            if (distToCenter <= stopDist) {
-              // Ждём: не двигаемся дальше и выравниваем на стоп-линии
-              const angle = Math.atan2(dy, dx);
-              const sx = cx - Math.cos(angle) * stopDist;
-              const sy = cy - Math.sin(angle) * stopDist;
-              car.position.set(sx, sy);
-              car.rotation = angle;
-              avatar.rotation = -car.rotation;
-              return; // стоп, пока красный
-            }
-          }
-        }
+      // Если текущий сегмент имеет нулевую длину, переходим к следующему
+      if (segLen < 0.1) {
+        // console.log('Zero-length segment, skipping to next');
+        carSegment++;
+        carProgress = 0;
+        return;
       }
 
-      carProgress = nextProgress;
-      while (carProgress > segLen) {
-        carProgress -= segLen;
-        carSegment = (carSegment + 1) % carPath.length;
+      // Обновляем прогресс по текущему сегменту
+      carProgress += speed;
+
+      // Проверяем, завершили ли мы текущий сегмент
+      if (carProgress >= segLen) {
+        // Переходим к следующему сегменту
+        carProgress = carProgress - segLen; // остаток переносим
+        carSegment++;
+
+        // Проверяем, не достигли ли мы конца пути
+        if (carSegment >= carPath.length - 1) {
+          // console.log('Reached final destination');
+          car.position.set(carPath[carPath.length - 1].x, carPath[carPath.length - 1].y);
+          checkArrival();
+          return;
+        }
+
+        // Обновляем данные для нового сегмента
         p1 = carPath[carSegment];
-        p2 = carPath[(carSegment + 1) % carPath.length];
+        p2 = carPath[carSegment + 1];
         dx = p2.x - p1.x;
         dy = p2.y - p1.y;
         segLen = Math.hypot(dx, dy);
-        tNext = carProgress / segLen;
       }
-      const t = carProgress / segLen;
-      car.position.set(p1.x + dx * t, p1.y + dy * t);
-      car.rotation = Math.atan2(dy, dx);
-      avatar.rotation = -car.rotation;
+
+      // Вычисляем текущую позицию на сегменте
+      const t = segLen > 0 ? Math.min(1, carProgress / segLen) : 0;
+      const newX = p1.x + dx * t;
+      const newY = p1.y + dy * t;
+
+      car.position.set(newX, newY);
+
+      // Обновляем поворот машинки в направлении движения
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        car.rotation = Math.atan2(dy, dx);
+        avatar.rotation = -car.rotation;
+      }
+
+      // console.log(`Car at segment ${carSegment}/${carPath.length - 1}, progress: ${carProgress.toFixed(1)}/${segLen.toFixed(1)}, pos: (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
+
+      // Проверяем прибытие в пункт назначения: до последней точки пути
+      const lastPoint = carPath[carPath.length - 1];
+      const distToLast = Math.hypot(car.position.x - lastPoint.x, car.position.y - lastPoint.y);
+      if (distToLast < 20) {
+        checkArrival();
+      }
     }
   </script>
 </body>
