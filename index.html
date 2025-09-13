@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <title>Карта Шины</title>
   <style>
     html,
@@ -13,6 +13,10 @@
       background: #222;
       overflow: auto;
       /* Разрешаем скролл */
+      touch-action: pan-x pan-y;
+      /* Разрешаем панорамирование на мобильных устройствах */
+      -webkit-overflow-scrolling: touch;
+      /* Плавный скролл на iOS */
     }
 
     canvas {
@@ -22,6 +26,28 @@
       border: 2px solid #444;
       margin: 0 auto;
       /* Центрируем canvas */
+      touch-action: none;
+      /* Отключаем стандартные жесты браузера для canvas */
+    }
+
+    /* Стили для мобильных устройств */
+    @media (max-width: 768px) {
+      body {
+        overflow: auto;
+        /* Разрешаем скролл на мобильных */
+        position: relative;
+      }
+
+      canvas {
+        /* На мобильных устройствах canvas может быть больше экрана */
+        min-width: 1200px;
+        min-height: 800px;
+        /* Убираем центрирование для возможности панорамирования */
+        margin: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
@@ -155,6 +181,71 @@
       layout();
     });
 
+    // Добавляем поддержку панорамирования на мобильных устройствах
+    let isPanning = false;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let startScrollX = 0;
+    let startScrollY = 0;
+
+    // Обработчики touch событий для панорамирования
+    function handleTouchStart (e) {
+      if (e.touches.length === 1) {
+        isPanning = true;
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+        startScrollX = window.scrollX;
+        startScrollY = window.scrollY;
+        e.preventDefault();
+      }
+    }
+
+    function handleTouchMove (e) {
+      if (isPanning && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const deltaX = lastTouchX - touch.clientX;
+        const deltaY = lastTouchY - touch.clientY;
+
+        window.scrollTo(startScrollX + deltaX, startScrollY + deltaY);
+        e.preventDefault();
+      }
+    }
+
+    function handleTouchEnd (e) {
+      isPanning = false;
+    }
+
+    // Добавляем обработчики событий
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    // Дополнительная настройка для мобильных устройств
+    function setupMobilePanning () {
+      // Проверяем, является ли устройство мобильным
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // Устанавливаем размер body для возможности скролла
+        document.body.style.width = '1200px';
+        document.body.style.height = '800px';
+        document.body.style.overflow = 'auto';
+
+        // Убираем масштабирование при двойном тапе
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+          const now = (new Date()).getTime();
+          if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        }, false);
+      }
+    }
+
+    // Инициализируем панорамирование после загрузки
+    setupMobilePanning();
+
     // Функция для парсинга буквенно-цифровых координат в индексы
     function parseIntersectionCoordinate (coord) {
       const letter = coord.charAt(0);
@@ -171,17 +262,28 @@
     }
 
     function setupApp () {
+      // Проверяем, является ли устройство мобильным
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
       app = new PIXI.Application({
-        width: 1200,
-        height: 800,
+        width: isMobile ? CONFIG.WORLD_WIDTH : 1200,
+        height: isMobile ? CONFIG.WORLD_HEIGHT : 800,
         autoDensity: true,
         resolution: window.devicePixelRatio || 1,
         backgroundColor: 0x3a6f3e
       });
       document.body.appendChild(app.view);
+
       // Включаем систему событий для всей сцены
       app.stage.eventMode = 'static';
-      app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
+      app.stage.hitArea = new PIXI.Rectangle(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
+
+      // Настраиваем canvas для мобильных устройств
+      if (isMobile) {
+        app.view.style.touchAction = 'none';
+        app.view.style.userSelect = 'none';
+        app.view.style.webkitUserSelect = 'none';
+      }
     }
 
     function setupWorld () {
@@ -768,10 +870,29 @@
       const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
       world.scale.set(scale);
       world.pivot.set(0, 0);
-      world.position.set(
-        (w - CONFIG.WORLD_WIDTH * scale) / 2,
-        (h - CONFIG.WORLD_HEIGHT * scale) / 2
-      );
+
+      // Проверяем, является ли устройство мобильным
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // На мобильных устройствах не центрируем мир, оставляем возможность панорамирования
+        world.position.set(0, 0);
+
+        // Устанавливаем размер canvas для мобильных устройств
+        app.renderer.resize(CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
+        app.view.style.width = CONFIG.WORLD_WIDTH + 'px';
+        app.view.style.height = CONFIG.WORLD_HEIGHT + 'px';
+      } else {
+        // На десктопе центрируем как раньше
+        world.position.set(
+          (w - CONFIG.WORLD_WIDTH * scale) / 2,
+          (h - CONFIG.WORLD_HEIGHT * scale) / 2
+        );
+        app.renderer.resize(w, h);
+        app.view.style.width = w + 'px';
+        app.view.style.height = h + 'px';
+      }
+
       labelsLayer.children.forEach(label => {
         label.scale.set(1 / scale);
       });
