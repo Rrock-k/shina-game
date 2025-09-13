@@ -222,6 +222,20 @@
       font-weight: bold;
     }
 
+    /* Кнопка паузы */
+    #pause-button {
+      right: 140px;
+      /* позиционируем левее кнопки скорости */
+    }
+
+    #pause-button.paused {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    #pause-button.paused:hover {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+    }
+
     .speed-button-new:hover {
       background: linear-gradient(135deg, #95a5a6, #7f8c8d);
       transform: translateY(-2px);
@@ -505,6 +519,9 @@
       <button class="speed-button" id="zoom-out-button" style="display: none;">🔍-</button>
     </div>
 
+    <!-- Кнопка паузы с фиксированной позицией -->
+    <button class="speed-button-new" id="pause-button">⏸️</button>
+
     <!-- Кнопка скорости с фиксированной позицией -->
     <button class="speed-button-new" id="speed-button">x5</button>
 
@@ -529,6 +546,7 @@
         <button class="modal-close" id="modal-close">&times;</button>
       </div>
       <div class="menu-items">
+        <div class="menu-item" id="menu-pause">⏸️ Пауза: <span id="pause-mode-text">Выключена</span></div>
         <div class="menu-item" id="menu-speed">⚡ Управление скоростью</div>
         <div class="menu-item" id="menu-daynight">🌅 Режим дня/ночи: <span id="daynight-mode-text">Автоматический</span>
         </div>
@@ -630,6 +648,10 @@
     let SPEED_MULTIPLIER = 1; // множитель скорости (1 = нормальная, 5 = ускоренная)
     let isSpeedBoosted = false; // включено ли ускорение по умолчанию
 
+    // УПРАВЛЕНИЕ ПАУЗОЙ
+    let isGamePaused = false; // состояние паузы игры
+    window.isGamePaused = isGamePaused; // делаем глобальной для доступа из модулей
+
 
     // УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ
     let dayNightMode = 'auto'; // 'auto', 'day', 'night'
@@ -658,6 +680,47 @@
       if (savedMode && ['auto', 'day', 'night'].includes(savedMode)) {
         dayNightMode = savedMode;
         console.log(`🌅 Загружен режим дня/ночи: ${dayNightMode}`);
+      }
+    }
+
+    // Функции для управления паузой
+    function pauseGame () {
+      isGamePaused = true;
+      window.isGamePaused = true; // обновляем глобальную переменную
+      console.log('⏸️ Игра поставлена на паузу');
+      updatePauseButton();
+      updatePauseModeText();
+    }
+
+    function resumeGame () {
+      isGamePaused = false;
+      window.isGamePaused = false; // обновляем глобальную переменную
+      console.log('▶️ Игра возобновлена');
+      updatePauseButton();
+      updatePauseModeText();
+    }
+
+    function togglePause () {
+      if (isGamePaused) {
+        resumeGame();
+      } else {
+        pauseGame();
+      }
+    }
+
+    function updatePauseButton () {
+      const pauseButton = document.getElementById('pause-button');
+      if (pauseButton) {
+        pauseButton.textContent = isGamePaused ? '▶️' : '⏸️';
+        pauseButton.classList.toggle('paused', isGamePaused);
+      }
+    }
+
+    // Функция для обновления текста паузы в меню
+    function updatePauseModeText () {
+      const pauseTextElement = document.getElementById('pause-mode-text');
+      if (pauseTextElement) {
+        pauseTextElement.textContent = isGamePaused ? 'Включена' : 'Выключена';
       }
     }
 
@@ -1004,9 +1067,10 @@
     // Загружаем сохраненные настройки режима дня/ночи
     loadDayNightSettings();
 
-    // Обновляем текст режима дня/ночи в меню после загрузки
+    // Обновляем текст режима дня/ночи и паузы в меню после загрузки
     setTimeout(() => {
       updateDayNightModeText();
+      updatePauseModeText();
     }, 100);
 
     setupApp();
@@ -1111,10 +1175,17 @@
       // Получаем ссылки на HTML элементы панели управления
       datetimeDisplay = document.getElementById('game-datetime');
       routeDisplay = document.getElementById('route-info');
+      const pauseButton = document.getElementById('pause-button');
       const speedButton = document.getElementById('speed-button');
       const zoomButton = document.getElementById('zoom-button');
       const zoomInButton = document.getElementById('zoom-in-button');
       const zoomOutButton = document.getElementById('zoom-out-button');
+
+      // Настраиваем кнопку паузы
+      pauseButton.addEventListener('click', () => {
+        togglePause();
+        showSpeedNotification(isGamePaused ? 'ПАУЗА' : 'ВОЗОБНОВЛЕНО');
+      });
 
       // Настраиваем кнопку скорости
       speedButton.addEventListener('click', () => {
@@ -1272,6 +1343,10 @@
 
           // Выполняем действие в зависимости от выбранного пункта
           switch (itemId) {
+            case 'menu-pause':
+              // Переключаем паузу
+              togglePause();
+              break;
             case 'menu-speed':
               // Переключаем скорость
               speedButton.click();
@@ -2202,6 +2277,11 @@
 
     // Обновление игрового времени
     function updateGameTime () {
+      // Если игра на паузе, не обновляем время
+      if (isGamePaused) {
+        return;
+      }
+
       const now = Date.now();
       const deltaMs = now - lastTimeUpdate;
       lastTimeUpdate = now;
@@ -2439,6 +2519,12 @@
 
     function updateCar (delta) {
       debugInfo.frameCount++;
+
+      // Если игра на паузе, не обновляем машину
+      if (isGamePaused) {
+        debugLog('🚗 Игра на паузе, машина не двигается');
+        return;
+      }
 
       // Если находимся в пункте назначения, не двигаемся
       if (isAtDestination) {
