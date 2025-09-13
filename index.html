@@ -3,18 +3,16 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Карта Шины</title>
   <style>
     html,
     body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
       background: #222;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+      overflow: auto;
+      /* Разрешаем скролл */
     }
 
     canvas {
@@ -22,6 +20,8 @@
       width: 1200px;
       height: 800px;
       border: 2px solid #444;
+      margin: 0 auto;
+      /* Центрируем canvas */
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.2.4/pixi.min.js"></script>
@@ -151,8 +151,7 @@
     createCar();
     layout();
     window.addEventListener('resize', () => {
-      app.renderer.resize(1200, 800);
-      app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
+      // Убираем изменение размера canvas - оставляем фиксированный размер
       layout();
     });
 
