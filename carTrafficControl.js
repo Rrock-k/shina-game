@@ -165,24 +165,29 @@ export class CarTrafficController {
    * Рассчитывает позицию остановки перед перекрестком
    */
   calculateStopPosition(carPosition, intersection, direction) {
-    const stopDistance = 35; // увеличили расстояние до линии остановки
+    const stopDistance = 35; // расстояние до линии остановки
+    const carLength = 120; // длина машины
     
     const dx = intersection.x - carPosition.x;
     const dy = intersection.y - carPosition.y;
     const distance = Math.hypot(dx, dy);
     
-    if (distance <= stopDistance) {
+    // Учитываем, что carPosition теперь указывает на переднюю часть машины
+    // Нужно остановиться так, чтобы передняя часть была на расстоянии stopDistance от перекрестка
+    const totalStopDistance = stopDistance;
+    
+    if (distance <= totalStopDistance) {
       // Уже очень близко к перекрестку
       return { x: carPosition.x, y: carPosition.y };
     }
     
-    // Позиция остановки на расстоянии stopDistance от перекрестка
+    // Позиция остановки на расстоянии totalStopDistance от перекрестка
     const normalizedDx = dx / distance;
     const normalizedDy = dy / distance;
     
     return {
-      x: intersection.x - normalizedDx * stopDistance,
-      y: intersection.y - normalizedDy * stopDistance
+      x: intersection.x - normalizedDx * totalStopDistance,
+      y: intersection.y - normalizedDy * totalStopDistance
     };
   }
 
