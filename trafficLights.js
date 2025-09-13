@@ -12,8 +12,9 @@ export const Direction = { EW: 'EW', NS: 'NS' };
 export class TrafficLightCoordinator {
   constructor(averageCarSpeed = 60) { // км/ч
     this.lights = new Map(); // ключ перекрестка -> светофор
-    // Преобразуем км/ч в пиксели/мс (предполагаем, что 100 пикселей = ~100 метров)
-    this.carSpeedPixelsPerMs = (averageCarSpeed * 1000 / 3600) / 1000; // пиксели за миллисекунду
+    // Преобразуем км/ч в пиксели/мс (уменьшенный масштаб для игры)
+    // Делаем скорость больше для более коротких задержек
+    this.carSpeedPixelsPerMs = (averageCarSpeed * 1000 / 3600) / 10; // пиксели за миллисекунду
     this.waveOrigin = { x: 0, y: 0 }; // точка начала зеленой волны
     this.cycleStartTime = Date.now();
   }
