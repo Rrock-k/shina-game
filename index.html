@@ -28,7 +28,8 @@
 </head>
 
 <body>
-  <script>
+  <script type="module">
+    import { initTrafficLightsForIntersection, getDirectionForSegment, Direction } from './trafficLights.js';
     const CONFIG = {
       WORLD_WIDTH: 3000,
       WORLD_HEIGHT: 2000,
@@ -99,12 +100,16 @@
     let avatar;
     let horizontalRoadYs = [], verticalRoadXs = [];
     let hoverLabel;
+    // Хранилище светофоров по ключу перекрёстка
+    const intersectionKeyToTL = new Map();
 
     setupApp();
     setupWorld();
     createCar();
     layout();
     window.addEventListener('resize', () => {
+      app.renderer.resize(1200, 800);
+      app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
       layout();
     });
 
@@ -143,7 +148,8 @@
       drawLots(lotsLayer);
       drawZones(zonesLayer);
       // placeLabels(labelsLayer);
-      drawTrafficLights(decorLayer);
+      // Светофоры теперь создаются на каждом перекрёстке
+      createTrafficLightsForAllIntersections(decorLayer);
       // drawAlina(decorLayer);
       drawWorldBorder(borderLayer);
 
@@ -192,7 +198,7 @@
 
     function drawWorldBorder (layer) {
       const g = new PIXI.Graphics();
-      g.lineStyle(8, CONFIG.COLORS.border, 1.0);
+      g.lineStyle(8, CONFIG.COLORS.border, 1.0, 0);
       g.drawRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
       layer.addChild(g);
     }
@@ -502,6 +508,39 @@
       }
     }
 
+    function createTrafficLightsForAllIntersections (layer) {
+      intersectionKeyToTL.clear();
+      const { maxVerticalPos } = getRoadPositions();
+
+      for (let j = 0; j < horizontalRoadYs.length; j++) {
+        for (let i = 0; i < verticalRoadXs.length; i++) {
+          const x = verticalRoadXs[i];
+          const y = horizontalRoadYs[j];
+
+          // Определяем, какие дороги есть в каждом направлении
+          const roadConnections = {
+            north: j > 0 || (x === maxVerticalPos), // дорога на север: внутренний ряд ИЛИ правая дорога (выезд за город)
+            south: j < horizontalRoadYs.length - 1 || (x === maxVerticalPos), // дорога на юг: внутренний ряд ИЛИ правая дорога (выезд за город)
+            west: i > 0, // есть дорога на запад, если не крайний левый столбец
+            east: i < verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
+          };
+
+          const tl = initTrafficLightsForIntersection({
+            PIXI,
+            app,
+            layer,
+            x,
+            y,
+            roadWidth: CONFIG.ROAD_WIDTH,
+            lampRadius: 9,
+            cycle: { green: 4500, yellow: 1200 },
+            roadConnections
+          });
+          intersectionKeyToTL.set(`${x},${y}`, tl);
+        }
+      }
+    }
+
     function drawDashedPath (g, points, dash, gap) {
       for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i], p2 = points[i + 1];
@@ -581,10 +620,11 @@
     }
 
     function layout () {
-      const w = 1200; // фиксированная ширина канваса
-      const h = 800;  // фиксированная высота канваса
+      const w = 1200;
+      const h = 800;
       const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
       world.scale.set(scale);
+      world.pivot.set(0, 0);
       world.position.set(
         (w - CONFIG.WORLD_WIDTH * scale) / 2,
         (h - CONFIG.WORLD_HEIGHT * scale) / 2
@@ -623,7 +663,42 @@
       let dx = p2.x - p1.x;
       let dy = p2.y - p1.y;
       let segLen = Math.hypot(dx, dy);
-      carProgress += speed;
+
+      // Координаты потенциальной новой позиции
+      let nextProgress = carProgress + speed;
+      let tNext = nextProgress / segLen;
+      let nx = p1.x + dx * tNext;
+      let ny = p1.y + dy * tNext;
+
+      // Проверяем, пересекаем ли центр перекрёстка и нужно ли ждать на красный
+      const cx = p2.x; // точки пути совпадают с центрами перекрёстков
+      const cy = p2.y;
+      const approachingIntersection = (Math.sign(dx) !== 0 && Math.sign(dx) === Math.sign(cx - car.position.x)) || (Math.sign(dy) !== 0 && Math.sign(dy) === Math.sign(cy - car.position.y));
+
+      if (approachingIntersection) {
+        const key = `${cx},${cy}`;
+        const tl = intersectionKeyToTL.get(key);
+        if (tl) {
+          const dir = getDirectionForSegment(dx, dy);
+          if (!tl.isPassAllowed(dir)) {
+            // Стоим перед центром перекрёстка на расстоянии стоп-линии
+            const stopDist = CONFIG.ROAD_WIDTH * 0.6;
+            const distToCenter = Math.hypot(cx - car.position.x, cy - car.position.y);
+            if (distToCenter <= stopDist) {
+              // Ждём: не двигаемся дальше и выравниваем на стоп-линии
+              const angle = Math.atan2(dy, dx);
+              const sx = cx - Math.cos(angle) * stopDist;
+              const sy = cy - Math.sin(angle) * stopDist;
+              car.position.set(sx, sy);
+              car.rotation = angle;
+              avatar.rotation = -car.rotation;
+              return; // стоп, пока красный
+            }
+          }
+        }
+      }
+
+      carProgress = nextProgress;
       while (carProgress > segLen) {
         carProgress -= segLen;
         carSegment = (carSegment + 1) % carPath.length;
@@ -632,6 +707,7 @@
         dx = p2.x - p1.x;
         dy = p2.y - p1.y;
         segLen = Math.hypot(dx, dy);
+        tNext = carProgress / segLen;
       }
       const t = carProgress / segLen;
       car.position.set(p1.x + dx * t, p1.y + dy * t);
