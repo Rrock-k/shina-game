@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=3.0, minimum-scale=0.5">
   <title>Карта Шины</title>
   <style>
     html,
@@ -12,9 +13,14 @@
       padding: 0;
       background: #222;
       overflow: auto;
-      touch-action: pan-x pan-y;
+      touch-action: manipulation;
       -webkit-overflow-scrolling: touch;
       font-family: 'Arial', sans-serif;
+      /* Предотвращаем выделение текста на мобильных */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
     }
 
     /* Панель управления */
@@ -115,6 +121,18 @@
       background: linear-gradient(135deg, #e67e22, #d35400);
     }
 
+    .control-panel .speed-button:disabled {
+      background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .control-panel .speed-button:disabled:hover {
+      background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+      transform: none;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
     /* Игровая область */
     .game-container {
       margin-top: 80px;
@@ -130,7 +148,12 @@
       width: 1200px;
       height: 800px;
       border: 2px solid #444;
-      touch-action: none;
+      touch-action: manipulation;
+      /* Улучшаем производительность на мобильных */
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
     }
 
     /* Стили для панорамирования */
@@ -153,15 +176,15 @@
       .control-panel {
         padding: 0 10px;
       }
-      
+
       .control-panel .info-section {
         gap: 20px;
       }
-      
+
       .control-panel .info-value {
         font-size: 16px;
       }
-      
+
       .control-panel .clock {
         font-size: 20px;
       }
@@ -173,15 +196,50 @@
         flex-direction: column;
         padding: 10px;
       }
-      
+
       .control-panel .info-section {
         gap: 15px;
         flex-wrap: wrap;
         justify-content: center;
       }
-      
+
       .control-panel .controls-section {
         margin-top: 10px;
+      }
+    }
+
+    /* Мобильные стили */
+    @media (max-width: 768px) {
+      .game-container {
+        width: 100vw;
+        height: calc(100vh - 100px);
+        overflow: hidden;
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        max-width: 1200px;
+        max-height: 800px;
+        object-fit: contain;
+      }
+
+      .control-panel {
+        height: 80px;
+        padding: 5px;
+      }
+
+      .control-panel .info-value {
+        font-size: 14px;
+      }
+
+      .control-panel .clock {
+        font-size: 18px;
+      }
+
+      .control-panel .speed-button {
+        padding: 8px 16px;
+        font-size: 12px;
       }
     }
   </style>
@@ -207,6 +265,9 @@
     </div>
     <div class="controls-section">
       <button class="speed-button" id="speed-button">Скорость x1</button>
+      <button class="speed-button" id="zoom-button" style="display: none;">Полный экран</button>
+      <button class="speed-button" id="zoom-in-button" style="display: none;">🔍+</button>
+      <button class="speed-button" id="zoom-out-button" style="display: none;">🔍-</button>
     </div>
   </div>
 
@@ -421,13 +482,26 @@
       { location: 'box', name: 'Бокс', stayHours: 1 },
     ];
 
+    // Определяем мобильное устройство в начале
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     setupApp();
+
+    // Создаем panningController раньше, чтобы он был доступен в setupWorld
+    let panningController;
+
     setupWorld();
     createCar();
     layout();
     window.addEventListener('resize', () => {
       // Убираем изменение размера canvas - оставляем фиксированный размер
       layout();
+
+      // Если включен полноэкранный режим, обновляем его при изменении размера окна
+      if (typeof panningController !== 'undefined' && panningController && panningController.isFullscreenMode()) {
+        panningController.toggleFullscreen(); // выключаем
+        panningController.toggleFullscreen(); // включаем с новыми размерами
+      }
     });
 
 
@@ -498,6 +572,9 @@
       routeDisplay = document.getElementById('route-info');
       const statusDisplay = document.getElementById('game-status');
       const speedButton = document.getElementById('speed-button');
+      const zoomButton = document.getElementById('zoom-button');
+      const zoomInButton = document.getElementById('zoom-in-button');
+      const zoomOutButton = document.getElementById('zoom-out-button');
 
       // Настраиваем кнопку скорости
       speedButton.addEventListener('click', () => {
@@ -519,6 +596,73 @@
       speedButton.textContent = isSpeedBoosted ? 'Скорость x5' : 'Скорость x1';
       speedButton.classList.toggle('boosted', isSpeedBoosted);
 
+      // Настраиваем кнопку масштабирования
+      zoomButton.addEventListener('click', () => {
+        if (typeof panningController !== 'undefined' && panningController) {
+          panningController.toggleZoom();
+          updateZoomButton();
+        }
+      });
+
+      // Настраиваем кнопки увеличения/уменьшения масштаба
+      zoomInButton.addEventListener('click', () => {
+        if (typeof panningController !== 'undefined' && panningController) {
+          panningController.zoomIn();
+          updateZoomButton();
+        }
+      });
+
+      zoomOutButton.addEventListener('click', () => {
+        if (typeof panningController !== 'undefined' && panningController) {
+          panningController.zoomOut();
+          updateZoomButton();
+        }
+      });
+
+      // Функция обновления кнопки масштабирования
+      function updateZoomButton () {
+        if (typeof panningController !== 'undefined' && panningController) {
+          const isFullscreen = panningController.isFullscreenMode();
+          if (isFullscreen) {
+            zoomButton.textContent = 'Обычный размер';
+            zoomButton.classList.add('boosted');
+          } else {
+            const scale = panningController.getCurrentScale();
+            zoomButton.textContent = `Полный экран`;
+            zoomButton.classList.toggle('boosted', scale > 1.1);
+          }
+
+          // Обновляем состояние кнопок масштабирования
+          if (isMobile) {
+            const scale = panningController.getCurrentScale();
+            zoomInButton.disabled = scale >= 10;
+            zoomOutButton.disabled = scale <= 0.1;
+          }
+        }
+      }
+
+      // Инициализируем panningController
+      panningController = new PanningController();
+      panningController.setWorld(world);
+      panningController.setOnZoomChange((scale) => {
+        if (typeof updateZoomButton === 'function') {
+          updateZoomButton();
+        }
+      });
+      panningController.setOnFullscreenChange((isFullscreen) => {
+        if (typeof updateZoomButton === 'function') {
+          updateZoomButton();
+        }
+      });
+
+      // Показываем кнопки масштабирования на мобильных устройствах
+      if (isMobile) {
+        zoomButton.style.display = 'block';
+        zoomInButton.style.display = 'block';
+        zoomOutButton.style.display = 'block';
+        updateZoomButton();
+      }
+
       // Инициализируем дисплей маршрута
       updateRouteDisplay();
       // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
@@ -535,7 +679,7 @@
       if (!routeDisplay) return; // защита от вызова до инициализации
       const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
       const statusDisplay = document.getElementById('game-status');
-      
+
       if (isAtDestination) {
         const remainingHours = Math.max(0, stayTimer).toFixed(1);
         routeDisplay.textContent = `${currentDest.name} (${remainingHours}ч)`;
@@ -886,6 +1030,8 @@
       }
 
       const hitRadius = 60;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
       for (let j = 0; j < horizontalRoadYs.length; j++) {
         for (let i = 0; i < verticalRoadXs.length; i++) {
           const x = verticalRoadXs[i];
@@ -898,6 +1044,7 @@
           g.eventMode = 'static';
           g.cursor = 'pointer';
           g.hitArea = new PIXI.Circle(0, 0, hitRadius);
+
           const show = () => {
             hoverLabel.text = labelText;
             hoverLabel.position.set(x, y - 16);
@@ -906,10 +1053,27 @@
           const hide = () => {
             hoverLabel.visible = false;
           };
-          g.on('pointerover', show);
-          g.on('pointerout', hide);
-          g.on('pointerenter', show);
-          g.on('pointerleave', hide);
+
+          if (isMobile) {
+            // На мобильных устройствах используем touch события
+            g.on('touchstart', (e) => {
+              e.stopPropagation(); // предотвращаем конфликт с панорамированием
+              show();
+            });
+            g.on('touchend', (e) => {
+              e.stopPropagation();
+              // Задержка перед скрытием, чтобы пользователь успел увидеть
+              setTimeout(hide, 2000);
+            });
+            g.on('touchcancel', hide);
+          } else {
+            // На десктопе используем pointer события
+            g.on('pointerover', show);
+            g.on('pointerout', hide);
+            g.on('pointerenter', show);
+            g.on('pointerleave', hide);
+          }
+
           layer.addChild(g);
         }
       }
@@ -1044,12 +1208,17 @@
       const w = 1200;
       const h = 800;
       const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
-      world.scale.set(scale);
-      world.pivot.set(0, 0);
-      world.position.set(
-        (w - CONFIG.WORLD_WIDTH * scale) / 2,
-        (h - CONFIG.WORLD_HEIGHT * scale) / 2
-      );
+
+      // Только устанавливаем базовый масштаб, если panningController не активен
+      if (!panningController || panningController.getCurrentScale() === 1) {
+        world.scale.set(scale);
+        world.pivot.set(0, 0);
+        world.position.set(
+          (w - CONFIG.WORLD_WIDTH * scale) / 2,
+          (h - CONFIG.WORLD_HEIGHT * scale) / 2
+        );
+      }
+
       labelsLayer.children.forEach(label => {
         label.scale.set(1 / scale);
       });
@@ -1758,8 +1927,7 @@
       }
     }
 
-    // Инициализируем панорамирование
-    const panningController = new PanningController();
+    // panningController теперь инициализируется в setupWorld()
 
     // Настраиваем игровую область для панорамирования
     const gameContainer = document.querySelector('.game-container');
@@ -1768,12 +1936,19 @@
     gameContainer.style.overflow = 'auto';
 
     // Добавляем подсказку для мобильных устройств
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if (isMobile) {
       console.log('📱 Мобильное устройство обнаружено!');
       console.log('👆 Одиночное касание - панорамирование');
-      console.log('🤏 Двойное касание - масштабирование');
-      console.log('👆👆 Двойной тап - сброс масштаба');
+      console.log('🤏 Два пальца - одновременное масштабирование И панорамирование (0.1x - 10x)');
+      console.log('🔍+ Кнопка увеличения - приближение');
+      console.log('🔍- Кнопка уменьшения - отдаление');
+      console.log('📱 Кнопка "Полный экран" - переключение полноэкранного режима');
+      console.log('📍 Касание перекрестка - показать координаты');
+
+      // Показываем уведомление о мобильных жестах
+      setTimeout(() => {
+        showSpeedNotification('📱 Мобильные жесты: касание - панорамирование, два пальца - зум+панорамирование');
+      }, 2000);
     }
   </script>
 </body>
