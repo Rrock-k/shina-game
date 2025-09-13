@@ -30,6 +30,7 @@
 <body>
   <script type="module">
     import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './trafficLights.js';
+    import { CarTrafficController } from './carTrafficControl.js';
     const CONFIG = {
       WORLD_WIDTH: 3000,
       WORLD_HEIGHT: 2000,
@@ -95,11 +96,12 @@
     const CAR_SPEED = 9;
 
     // globals
-    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, borderLayer, uiLayer, car;
+    let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, car;
     let carPath = [], carSegment = 0, carProgress = 0;
     let avatar;
     let horizontalRoadYs = [], verticalRoadXs = [];
     let hoverLabel;
+    let carTrafficController;
 
     // Геометрия зон, вычисленная при отрисовке
     const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
@@ -123,7 +125,7 @@
     // Формат: 'A1', 'B2', 'C3' и т.д. (буква = столбец дороги, цифра = ряд дороги)
     // Можно легко редактировать этот массив для изменения расположения светофоров!
     const TRAFFIC_LIGHTS_CONFIG = [
-      'A1', 'A2', 'A3',        // левый столбец (въезд в город)
+      'A2', 'A3',        // левый столбец (въезд в город)
       'B2', 'B4',        // второй столбец  
       'C1', 'C3',        // третий столбец
       'D2', 'D4',        // четвертый столбец
@@ -193,9 +195,10 @@
       labelsLayer = new PIXI.Container();
       intersectionsLayer = new PIXI.Container();
       decorLayer = new PIXI.Container();
+      trafficLightsLayer = new PIXI.Container(); // слой для светофоров (поверх машин)
       borderLayer = new PIXI.Container();
 
-      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, decorLayer, borderLayer);
+      world.addChild(gridLayer, roadsLayer, intersectionsLayer, lotsLayer, zonesLayer, labelsLayer, decorLayer, trafficLightsLayer, borderLayer);
 
       drawGrid(gridLayer);
       drawRoads(roadsLayer);
@@ -203,8 +206,8 @@
       drawLots(lotsLayer);
       drawZones(zonesLayer);
       // placeLabels(labelsLayer);
-      // Светофоры теперь создаются на каждом перекрёстке
-      createTrafficLightsForAllIntersections(decorLayer);
+      // Светофоры теперь создаются на каждом перекрёстке (в отдельном слое поверх машин)
+      createTrafficLightsForAllIntersections(trafficLightsLayer);
       // drawAlina(decorLayer);
       drawWorldBorder(borderLayer);
 
@@ -893,7 +896,8 @@
       const needsPrefix = car && (Math.abs(car.position.x - startIntersection.x) > 1 || Math.abs(car.position.y - startIntersection.y) > 1);
       const path = needsPrefix ? [{ x: car.position.x, y: car.position.y }, startIntersection, ...graphPath] : graphPath;
 
-      console.log(`Graph path to ${currentDestination.name}:`, path.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
+      console.log(`🗺️ Graph path to ${currentDestination.name}:`, path.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
+      console.log(`🚗 Car will start from segment 0: (${path[0]?.x?.toFixed(0) || 'N/A'},${path[0]?.y?.toFixed(0) || 'N/A'}) to (${path[1]?.x?.toFixed(0) || 'N/A'},${path[1]?.y?.toFixed(0) || 'N/A'})`);
       return path;
     }
 
@@ -909,6 +913,9 @@
       avatar.width = 60;
       avatar.height = 60;
       car.addChild(avatar);
+
+      // Инициализируем контроллер светофоров
+      carTrafficController = new CarTrafficController();
 
       // Начинаем с первого пункта назначения (работа)
       currentRouteIndex = 1; // работа, а не дом
@@ -1040,11 +1047,45 @@
         return;
       }
 
+      // 🚦 ПРОВЕРКА СВЕТОФОРА ПЕРЕД ПРИБЛИЖЕНИЕМ К ПЕРЕКРЕСТКУ 🚦
+      if (carTrafficController) {
+        const currentPos = { x: car.position.x, y: car.position.y };
+        const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
+        const roadPositions = { verticalRoadXs, horizontalRoadYs };
+
+        // Проверяем расстояние до целевого перекрестка
+        const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
+
+        // ОТЛАДКА: показываем информацию о движении (только первые секунды)
+        if (carSegment === 0 && carProgress < 20) {
+          console.log(`🚗 DEBUG: segment=${carSegment}, progress=${carProgress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, from=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
+        }
+
+        // Проверяем светофор только если:
+        // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
+        // 2. И НЕ стоим прямо на перекрестке старта 
+        if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора
+          const trafficCheck = carTrafficController.checkTrafficLights(
+            currentPos,
+            targetIntersection,
+            intersectionKeyToTL,
+            roadPositions
+          );
+
+          if (!trafficCheck.canMove) {
+            // Красный свет - останавливаемся
+            console.log(`🚦 Остановка перед красным светом на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
+            return; // не обновляем carProgress - машина стоит
+          }
+        }
+      }
+
       // Обновляем прогресс по текущему сегменту
       carProgress += speed;
 
       // Проверяем, завершили ли мы текущий сегмент
       if (carProgress >= segLen) {
+
         // Переходим к следующему сегменту
         carProgress = carProgress - segLen; // остаток переносим
         carSegment++;
