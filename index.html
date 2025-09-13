@@ -101,6 +101,9 @@
     let horizontalRoadYs = [], verticalRoadXs = [];
     let hoverLabel;
 
+    // Геометрия зон, вычисленная при отрисовке
+    const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
+
     // Система маршрутов и времени
     let gameTime = { hours: 8, minutes: 0 }; // начинаем с 8:00
     let timeSpeed = 60; // 1 реальная секунда = 1 игровая минута
@@ -131,38 +134,13 @@
 
     // 🚛 МАРШРУТ ШИНЫ 🚛
     // Массив с маршрутом: место назначения и время пребывания (в игровых часах)
-    // Координаты исправлены для соответствия реальным центрам зон
+    // Позиции вычисляются динамически из геометрии зон, а НЕ захардкожены
     const ROUTE_SCHEDULE = [
-      {
-        location: 'house',
-        name: 'Дом',
-        stayHours: 2,
-        position: { x: 420, y: 575 } // центр дома (CONFIG.ZONES.house x+w/2, y+h/2)
-      },
-      {
-        location: 'work',
-        name: 'Работа',
-        stayHours: 5,
-        position: { x: 2060, y: 1450 } // центр работы (CONFIG.ZONES.work x+w/2, y+h/2)
-      },
-      {
-        location: 'relatives',
-        name: 'Родственники',
-        stayHours: 1.5,
-        position: { x: 1520, y: 575 } // центр родственников (CONFIG.ZONES.relatives x+w/2, y+h/2)
-      },
-      {
-        location: 'box',
-        name: 'Бокс',
-        stayHours: 1,
-        position: { x: 420, y: 1450 } // центр бокса (CONFIG.ZONES.box x+w/2, y+h/2)
-      },
-      {
-        location: 'institute',
-        name: 'Институт',
-        stayHours: 2,
-        position: { x: 2550, y: 1425 } // центр института (CONFIG.ZONES.institute x, y)
-      }
+      { location: 'house', name: 'Дом', stayHours: 2 },
+      { location: 'work', name: 'Работа', stayHours: 5 },
+      { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
+      { location: 'box', name: 'Бокс', stayHours: 1 },
+      { location: 'institute', name: 'Институт', stayHours: 2 }
     ];
 
     setupApp();
@@ -266,6 +244,13 @@
 
       // Инициализируем дисплей маршрута
       updateRouteDisplay();
+      // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
+      setTimeout(() => {
+        // перестроим путь, когда геометрия зон уже известна
+        if (car) {
+          carPath = buildCarPath();
+        }
+      }, 0);
     }
 
     // Обновление дисплея маршрута
@@ -517,6 +502,8 @@
           const minX = Math.min(...cells.map(({ c }) => startX + c * (lotWidth + gap)));
           const maxX = Math.max(...cells.map(({ c }) => startX + c * (lotWidth + gap) + lotWidth));
           drawLabel(CONFIG.ZONES[name].label, cgx, cgy, maxX - minX);
+          // Сохраняем геометрию зоны (центр и bbox)
+          zoneGeometry.set(name, { type: 'composite', center: { x: cgx, y: cgy } });
           return;
         }
 
@@ -533,7 +520,11 @@
         const w = (maxC - minC + 1) * lotWidth + (maxC - minC) * gap;
         const h = (maxR - minR + 1) * lotHeight + (maxR - minR) * gap;
         drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
-        drawLabel(CONFIG.ZONES[name].label, x + w / 2, y + h / 2, w);
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        drawLabel(CONFIG.ZONES[name].label, cx, cy, w);
+        // Сохраняем геометрию зоны
+        zoneGeometry.set(name, { type: 'rect', center: { x: cx, y: cy }, bounds: { x, y, w, h } });
       }
 
       drawZoneFromCells('house', 'house');
@@ -541,6 +532,11 @@
       drawZoneFromCells('work', 'work');
       drawZoneFromCells('box', 'box');
       drawZoneFromCells('institute', 'institute');
+      // Для круга сохранить центр и радиус
+      const inst = CONFIG.ZONES.institute;
+      if (inst?.type === 'circle') {
+        zoneGeometry.set('institute', { type: 'circle', center: { x: inst.x, y: inst.y }, bounds: { x: inst.x, y: inst.y, r: inst.r } });
+      }
     }
 
     function drawRoads (layer) {
@@ -864,6 +860,17 @@
       return nodes;
     }
 
+    function getDestinationCenter (locationKey) {
+      const z = zoneGeometry.get(locationKey);
+      if (z && z.center) return z.center;
+      // fallback: из статического конфига
+      const def = CONFIG.ZONES[locationKey];
+      if (!def) return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+      if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
+      if (def.type === 'circle') return { x: def.x, y: def.y };
+      return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+    }
+
     // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
     function buildCarPath () {
       const currentDestination = ROUTE_SCHEDULE[currentRouteIndex];
@@ -874,11 +881,12 @@
       if (car && car.position && (car.position.x !== 0 || car.position.y !== 0)) {
         startIJ = getNearestIntersectionIJ(car.position.x, car.position.y);
       } else {
-        const housePos = ROUTE_SCHEDULE[0].position;
+        const housePos = getDestinationCenter('house');
         startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
       }
 
-      const graphPath = buildGraphPathToBuilding(startIJ, currentDestination.position);
+      const destCenter = getDestinationCenter(currentDestination.location);
+      const graphPath = buildGraphPathToBuilding(startIJ, destCenter);
 
       // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
       const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
