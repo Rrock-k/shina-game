@@ -20,7 +20,7 @@ import { randInt } from './utils/math.js';
 import Game from './game/Game.js';
 
 // globals
-let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
+let world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
 let carPath = [], carSegment = 0, carProgress = 0;
 let avatar;
 let carTrafficController;
@@ -205,7 +205,8 @@ const TRAFFIC_LIGHTS_CONFIG = [
 // Определяем мобильное устройство в начале
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-setupApp();
+// Создаем экземпляр игры
+const game = new Game();
 
 timeManager = new TimeManager();
 pauseManager = new PauseManager();
@@ -263,25 +264,10 @@ function shouldHaveTrafficLight (i, j) {
   return TRAFFIC_LIGHTS_CONFIG.includes(coord);
 }
 
-function setupApp () {
-  app = new PIXI.Application({
-    width: 1200,
-    height: 800,
-    autoDensity: true,
-    resolution: window.devicePixelRatio || 1,
-    backgroundColor: 0x3a6f3e
-  });
-  // Добавляем canvas в игровую область
-  const gameContainer = document.querySelector('.game-container');
-  gameContainer.appendChild(app.view);
-  // Включаем систему событий для всей сцены
-  app.stage.eventMode = 'static';
-  app.stage.hitArea = new PIXI.Rectangle(0, 0, 1200, 800);
-}
 
 function setupWorld () {
   world = new PIXI.Container();
-  app.stage.addChild(world);
+  game.app.stage.addChild(world);
   
   gridLayer = new PIXI.Container();
   roadsLayer = new PIXI.Container();
@@ -299,7 +285,7 @@ function setupWorld () {
   window.decorLayer = decorLayer;
   window.trafficLightsLayer = trafficLightsLayer;
 
-  worldRenderer = new WorldRenderer(CONFIG, app);
+  worldRenderer = new WorldRenderer(CONFIG, game.app);
   worldRenderer.init(world, {
     grid: gridLayer,
     roads: roadsLayer,
@@ -339,10 +325,10 @@ function setupWorld () {
 
   // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
   lightingLayer.zIndex = 1000; // поверх ночного оверлея
-  app.stage.addChild(lightingLayer);
+  game.app.stage.addChild(lightingLayer);
 
   uiLayer.zIndex = 2000; // поверх всего
-  app.stage.addChild(uiLayer);
+  game.app.stage.addChild(uiLayer);
 
   const pauseButton = document.getElementById('pause-button');
   const speedButton = document.getElementById('speed-button');
@@ -475,7 +461,7 @@ function createTrafficLightsForAllIntersections (layer) {
 
       const tl = initTrafficLightsForIntersection({
         PIXI,
-        app,
+        app: game.app,
         layer,
         x,
         y,
@@ -594,8 +580,8 @@ function createCar () {
   lastStayTimerDay = gameTime.day;
 
   decorLayer.addChild(car);
-  app.ticker.add(updateCar);
-  app.ticker.add(() => {
+  game.app.ticker.add(updateCar);
+  game.app.ticker.add(() => {
     timeManager.update();
     if (uiRenderer) {
       uiRenderer.updateDateTimeDisplay();
@@ -870,7 +856,4 @@ const gameContainer = document.querySelector('.game-container');
 gameContainer.style.width = '1200px';
 gameContainer.style.height = '800px';
 gameContainer.style.overflow = 'auto';
-
-// Создаем экземпляр игры
-const game = new Game();
 
