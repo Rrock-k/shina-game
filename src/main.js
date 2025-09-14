@@ -266,24 +266,19 @@ function shouldHaveTrafficLight (i, j) {
 
 
 function setupWorld () {
-  world = new PIXI.Container();
-  game.app.stage.addChild(world);
-  
-  gridLayer = new PIXI.Container();
-  roadsLayer = new PIXI.Container();
-  lotsLayer = new PIXI.Container();
-  zonesLayer = new PIXI.Container();
-  labelsLayer = new PIXI.Container();
-  intersectionsLayer = new PIXI.Container();
-  decorLayer = new PIXI.Container();
-  trafficLightsLayer = new PIXI.Container(); // слой для светофоров (поверх машин)
-  borderLayer = new PIXI.Container();
-  lightingLayer = new PIXI.Container(); // слой для всех источников света (поверх ночного оверлея)
-
-  // Делаем world и слои глобально доступными для dayNightManager
-  window.world = world;
-  window.decorLayer = decorLayer;
-  window.trafficLightsLayer = trafficLightsLayer;
+  // Получаем слои из экземпляра игры
+  world = game.world;
+  gridLayer = game.gridLayer;
+  roadsLayer = game.roadsLayer;
+  lotsLayer = game.lotsLayer;
+  zonesLayer = game.zonesLayer;
+  labelsLayer = game.labelsLayer;
+  intersectionsLayer = game.intersectionsLayer;
+  decorLayer = game.decorLayer;
+  trafficLightsLayer = game.trafficLightsLayer;
+  borderLayer = game.borderLayer;
+  lightingLayer = game.lightingLayer;
+  uiLayer = game.uiLayer;
 
   worldRenderer = new WorldRenderer(CONFIG, game.app);
   worldRenderer.init(world, {
@@ -320,8 +315,6 @@ function setupWorld () {
 
   // Добавляем светофоры - будут добавлены поверх оверлея
   world.addChild(trafficLightsLayer);
-
-  uiLayer = new PIXI.Container();
 
   // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
   lightingLayer.zIndex = 1000; // поверх ночного оверлея
