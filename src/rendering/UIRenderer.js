@@ -130,6 +130,7 @@ export class UIRenderer {
             // Переключаем паузу
             this.pauseManager.togglePause();
             this.timeManager.setPaused(this.pauseManager.isPaused());
+            this.updatePauseModeDisplay();
             break;
           case 'menu-speed':
             // Переключаем скорость
@@ -143,6 +144,7 @@ export class UIRenderer {
           case 'menu-daynight':
             // Переключаем режим дня/ночи (не закрываем меню)
             this.dayNightManager.toggleDayNightMode();
+            this.updateDayNightModeDisplay();
             break;
           case 'menu-car-lights':
             // Переключаем фары машины (не закрываем меню)
@@ -284,6 +286,33 @@ export class UIRenderer {
     }
     
     lightsStatus.textContent = headlightsOn ? 'ВКЛ' : 'ВЫКЛ';
+  }
+
+  /**
+   * Обновление отображения состояния паузы в меню
+   */
+  updatePauseModeDisplay() {
+    const pauseModeText = document.getElementById('pause-mode-text');
+    if (!pauseModeText || !this.pauseManager) return;
+    
+    pauseModeText.textContent = this.pauseManager.isPaused() ? 'Включена' : 'Выключена';
+  }
+
+  /**
+   * Обновление отображения режима дня/ночи в меню
+   */
+  updateDayNightModeDisplay() {
+    const dayNightModeText = document.getElementById('daynight-mode-text');
+    if (!dayNightModeText || !this.dayNightManager) return;
+    
+    const modeTexts = {
+      'auto': 'Авто',
+      'day': 'День',
+      'night': 'Ночь'
+    };
+    
+    const currentMode = this.dayNightManager.getCurrentMode();
+    dayNightModeText.textContent = modeTexts[currentMode] || 'Авто';
   }
 
   /**
@@ -934,6 +963,8 @@ export class UIRenderer {
     this.updateZoomButton();
     this.updateSpeedDisplay();
     this.updateCarLightsDisplay();
+    this.updatePauseModeDisplay();
+    this.updateDayNightModeDisplay();
     
     // Обновляем журнал, если он открыт
     const journalModal = document.getElementById('journal-modal');
