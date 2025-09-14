@@ -263,6 +263,8 @@ function setupWorld () {
   worldRenderer.init(world, {
     grid: gridLayer,
     roads: roadsLayer,
+    lots: lotsLayer,
+    zones: zonesLayer,
     border: borderLayer
   });
 
@@ -276,10 +278,8 @@ function setupWorld () {
   world.addChild(borderLayer);
 
   // Используем WorldRenderer для отрисовки базовых элементов
-  worldRenderer.render();
+  worldRenderer.render(zoneGeometry);
   createIntersections(intersectionsLayer);
-  drawLots(lotsLayer);
-  drawZones(zonesLayer);
   // placeLabels(labelsLayer);
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
   createTrafficLightsForAllIntersections(trafficLightsLayer);
@@ -592,248 +592,11 @@ function randInt (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function generateBuildingSlots (maxSlots) {
-  const sizes = [];
-  const target = randInt(Math.max(3, Math.floor(maxSlots / 2)), maxSlots);
-  let used = 0;
-  while (used < target) {
-    const remaining = target - used;
-    const maxTake = Math.min(remaining, CONFIG.LOTS.MAX_MULTI_SLOT);
-    const roll = Math.random();
-    let take = 1;
-    if (maxTake >= 3 && roll < 0.18) take = 3;
-    else if (maxTake >= 2 && roll < 0.55) take = 2;
-    sizes.push(take);
-    used += take;
-  }
-  return sizes;
-}
+// Функция generateBuildingSlots перенесена в WorldRenderer
 
-function drawLots (layer) {
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const verticalRoadXs = getVerticalRoadXs();
-  if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
-  const roadHalf = CONFIG.ROAD_WIDTH / 2;
-  const cols = 2; // по горизонтали
-  const rows = 3; // по вертикали
-  const gap = CONFIG.LOTS.GAP;
-  const padding = CONFIG.LOTS.PADDING;
+// Функция drawLots перенесена в WorldRenderer
 
-  for (let j = 0; j < horizontalRoadYs.length - 1; j++) {
-    const yTop = horizontalRoadYs[j] + roadHalf;
-    const yBottom = horizontalRoadYs[j + 1] - roadHalf;
-    const blockHeight = Math.max(0, yBottom - yTop);
-    const innerHeight = Math.max(0, blockHeight - padding * 2);
-    if (innerHeight <= 0) continue;
-    const totalGapsV = gap * (rows - 1);
-    const lotHeight = (innerHeight - totalGapsV) / rows;
-
-    for (let i = 0; i < verticalRoadXs.length - 1; i++) {
-      const xLeft = verticalRoadXs[i] + roadHalf;
-      const xRight = verticalRoadXs[i + 1] - roadHalf;
-      const blockWidth = Math.max(0, xRight - xLeft);
-      const innerWidth = Math.max(0, blockWidth - padding * 2);
-      if (innerWidth <= 0) continue;
-      const totalGapsH = gap * (cols - 1);
-      const lotWidth = (innerWidth - totalGapsH) / cols;
-
-      const startX = xLeft + padding;
-      const startY = yTop + padding;
-
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const rx = startX + c * (lotWidth + gap);
-          const ry = startY + r * (lotHeight + gap);
-          const g = new PIXI.Graphics();
-          g.lineStyle(1, CONFIG.COLORS.lotBorder, 0.9);
-          g.beginFill(CONFIG.COLORS.lotFill, CONFIG.LOTS.FILL_ALPHA);
-          g.drawRect(rx, ry, lotWidth, lotHeight);
-          g.endFill();
-          layer.addChild(g);
-        }
-      }
-    }
-  }
-}
-
-function drawZones (layer) {
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const verticalRoadXs = getVerticalRoadXs();
-  if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
-  const roadHalf = CONFIG.ROAD_WIDTH / 2;
-  const cols = 2;
-  const rows = 3;
-  const gap = CONFIG.LOTS.GAP;
-  const padding = CONFIG.LOTS.PADDING;
-
-  const zoneLayout = CONFIG.ZONE_LAYOUT;
-  const blocksAcross = verticalRoadXs.length - 1;
-  const blocksDown = horizontalRoadYs.length - 1;
-
-  function getBlockRect (bi, bj) {
-    const yTop = horizontalRoadYs[bj] + roadHalf;
-    const yBottom = horizontalRoadYs[bj + 1] - roadHalf;
-    const xLeft = verticalRoadXs[bi] + roadHalf;
-    const xRight = verticalRoadXs[bi + 1] - roadHalf;
-    const blockWidth = Math.max(0, xRight - xLeft);
-    const blockHeight = Math.max(0, yBottom - yTop);
-    const innerWidth = Math.max(0, blockWidth - padding * 2);
-    const innerHeight = Math.max(0, blockHeight - padding * 2);
-    const totalGapsH = gap * (cols - 1);
-    const totalGapsV = gap * (rows - 1);
-    const lotWidth = (innerWidth - totalGapsH) / cols;
-    const lotHeight = (innerHeight - totalGapsV) / rows;
-    const startX = xLeft + padding;
-    const startY = yTop + padding;
-    return { startX, startY, lotWidth, lotHeight };
-  }
-
-  function drawZoneRect (x, y, w, h, color) {
-    const g = new PIXI.Graphics();
-    g.lineStyle(2, 0x333333, 0.9);
-    g.beginFill(color, 1.0);
-    g.drawRect(x, y, w, h);
-    g.endFill();
-    layer.addChild(g);
-    return g;
-  }
-
-  function drawLabel (textValue, x, y, maxWidth) {
-    const label = createWrappedLabel(textValue, CONFIG.BASE_FONT, Math.max(60, maxWidth * 0.9));
-    label.position.set(x, y);
-    layer.addChild(label);
-  }
-
-  function createWrappedLabel (textValue, fontSize, maxWidth) {
-    const style = new PIXI.TextStyle({
-      fontFamily: 'sans-serif',
-      fontSize,
-      fill: 0x000000,
-      wordWrap: true,
-      wordWrapWidth: maxWidth,
-      breakWords: true,
-      align: 'center',
-      stroke: 0xffffff,
-      strokeThickness: 4
-    });
-    const label = new PIXI.Text(textValue, style);
-    label.anchor.set(0.5);
-    return label;
-  }
-
-  function drawZoneFromCells (name, colorKey) {
-    const conf = zoneLayout[name];
-    if (!conf) return;
-    const bi = conf.block.i;
-    const bj = conf.block.j;
-    if (bi < 0 || bj < 0 || bi >= blocksAcross || bj >= blocksDown) return;
-    const { startX, startY, lotWidth, lotHeight } = getBlockRect(bi, bj);
-
-    // Для института рисуем Г-образно, иначе — объединённый прямоугольник
-    if (name === 'institute') {
-      // Ячейки по конфигу в координатах сетки лотов
-      const cells = conf.cells.map(([c, r]) => ({ c, r }));
-
-      // Вспомогательная: группировать последовательные числа
-      const groupConsecutive = (arr) => {
-        const groups = [];
-        let start = null, prev = null;
-        arr.forEach(v => {
-          if (start === null) { start = v; prev = v; return; }
-          if (v === prev + 1) { prev = v; return; }
-          groups.push([start, prev]);
-          start = v; prev = v;
-        });
-        if (start !== null) groups.push([start, prev]);
-        return groups;
-      };
-
-      // Горизонтальные полосы: по каждому ряду объединяем соседние колонки и ЗАПОЛНЯЕМ внутренние гэпы
-      const rowsUsed = Array.from(new Set(cells.map(x => x.r))).sort((a, b) => a - b);
-      rowsUsed.forEach(r => {
-        const colsHere = cells.filter(x => x.r === r).map(x => x.c).sort((a, b) => a - b);
-        const seqs = groupConsecutive(colsHere);
-        seqs.forEach(([c0, c1]) => {
-          const x = startX + c0 * (lotWidth + gap);
-          const y = startY + r * (lotHeight + gap);
-          const w = (c1 - c0 + 1) * lotWidth + (c1 - c0) * gap; // перекрываем горизонтальные гэпы
-          const h = lotHeight;
-          drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
-        });
-      });
-
-      // Вертикальные полосы: по каждой колонке объединяем соседние ряды и ЗАПОЛНЯЕМ вертикальные гэпы
-      const colsUsed = Array.from(new Set(cells.map(x => x.c))).sort((a, b) => a - b);
-      colsUsed.forEach(c => {
-        const rowsHere = cells.filter(x => x.c === c).map(x => x.r).sort((a, b) => a - b);
-        const seqs = groupConsecutive(rowsHere);
-        seqs.forEach(([r0, r1]) => {
-          const x = startX + c * (lotWidth + gap);
-          const y = startY + r0 * (lotHeight + gap);
-          const w = lotWidth;
-          const h = (r1 - r0 + 1) * lotHeight + (r1 - r0) * gap; // перекрываем вертикальные гэпы
-          drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
-        });
-      });
-
-      // Вычисляем границы Г-образной зоны
-      const minX = Math.min(...cells.map(({ c }) => startX + c * (lotWidth + gap)));
-      const maxX = Math.max(...cells.map(({ c }) => startX + c * (lotWidth + gap) + lotWidth));
-      const minY = Math.min(...cells.map(({ r }) => startY + r * (lotHeight + gap)));
-      const maxY = Math.max(...cells.map(({ r }) => startY + r * (lotHeight + gap) + lotHeight));
-
-      // Подпись в центре тяжести фигуры (среднее центров занятых ячеек)
-      const centers = cells.map(({ c, r }) => ({
-        cx: startX + c * (lotWidth + gap) + lotWidth / 2,
-        cy: startY + r * (lotHeight + gap) + lotHeight / 2
-      }));
-      const cgx = centers.reduce((s, p) => s + p.cx, 0) / centers.length;
-      const cgy = centers.reduce((s, p) => s + p.cy, 0) / centers.length;
-      // Ширина для переноса: охватывающая ширина фигуры
-      drawLabel(CONFIG.ZONES[name].label, cgx, cgy, maxX - minX);
-
-      // Сохраняем геометрию зоны (центр и bbox)
-      const zoneData = {
-        type: 'composite',
-        center: { x: cgx, y: cgy },
-        bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
-      };
-      zoneGeometry.set(name, zoneData);
-      console.log(`🏛️ Сохранена геометрия зоны ${name}:`, zoneData);
-      return;
-    }
-
-    // Общее объединение для прямоугольных зон
-    let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
-    conf.cells.forEach(([c, r]) => {
-      minC = Math.min(minC, c);
-      minR = Math.min(minR, r);
-      maxC = Math.max(maxC, c);
-      maxR = Math.max(maxR, r);
-    });
-    const x = startX + minC * (lotWidth + gap);
-    const y = startY + minR * (lotHeight + gap);
-    const w = (maxC - minC + 1) * lotWidth + (maxC - minC) * gap;
-    const h = (maxR - minR + 1) * lotHeight + (maxR - minR) * gap;
-    drawZoneRect(x, y, w, h, CONFIG.COLORS[colorKey]);
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    drawLabel(CONFIG.ZONES[name].label, cx, cy, w);
-    // Сохраняем геометрию зоны
-    zoneGeometry.set(name, { type: 'rect', center: { x: cx, y: cy }, bounds: { x, y, w, h } });
-  }
-
-  drawZoneFromCells('house', 'house');
-  drawZoneFromCells('relatives', 'relatives');
-  drawZoneFromCells('work', 'work');
-  drawZoneFromCells('box', 'box');
-  drawZoneFromCells('institute', 'institute');
-  // Для круга сохранить центр и радиус (только если не была установлена Г-образная зона)
-  const inst = CONFIG.ZONES.institute;
-  if (inst?.type === 'circle' && !zoneGeometry.has('institute')) {
-    zoneGeometry.set('institute', { type: 'circle', center: { x: inst.x, y: inst.y }, bounds: { x: inst.x, y: inst.y, r: inst.r } });
-  }
-}
+// Функция drawZones перенесена в WorldRenderer
 
 // Функция drawRoads перенесена в WorldRenderer
 
