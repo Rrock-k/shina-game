@@ -8,6 +8,7 @@ import { PauseManager } from './game/PauseManager.js';
 import { DayNightManager } from './game/DayNightManager.js';
 import { WorldRenderer } from './rendering/WorldRenderer.js';
 import { CarRenderer } from './rendering/CarRenderer.js';
+import { UIRenderer } from './rendering/UIRenderer.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -17,7 +18,7 @@ let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let timeManager, pauseManager, dayNightManager, worldRenderer, carRenderer;
+let timeManager, pauseManager, dayNightManager, worldRenderer, carRenderer, uiRenderer;
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -27,16 +28,6 @@ let debugInfo = {
   logInterval: 1000 // логировать каждую секунду
 };
 
-// УПРАВЛЕНИЕ СКОРОСТЬЮ И ПАУЗОЙ (перенесено в PauseManager)
-
-
-// УПРАВЛЕНИЕ РЕЖИМАМИ ДНЯ/НОЧИ (перенесено в DayNightManager)
-
-// Функции для работы с localStorage (перенесены в PauseManager)
-
-// loadDayNightSettings перенесена в DayNightManager
-
-// Функции для управления паузой (перенесены в PauseManager)
 
 // Дебаг-функция для логирования
 function debugLog (message, data = null) {
@@ -53,12 +44,6 @@ function debugLogAlways (message, data = null) {
   if (!DEBUG_MODE) return;
   console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
 }
-
-// Функции для работы с датами
-// getMonthName перенесена в TimeManager
-
-// Функции для ночного режима (перенесены в DayNightManager)
-// isNightTime, createCityNightOverlay, updateNightMode
 
 // Обновление таймера пребывания в здании
 let lastStayTimerUpdate = 0;
@@ -100,38 +85,12 @@ function updateStayTimer() {
 
 
 
-// Функция для переключения режимов дня/ночи
-// Функции переключения режимов дня/ночи (перенесены в DayNightManager)
-// toggleDayNightMode, updateDayNightModeText
-
-// Функции работы с источниками света (перенесены в DayNightManager)
-// addLightSource, removeLightSource
-
-
-
-// Функции цветовых фильтров (перенесены в DayNightManager)
-// applyNightColorFilter, resetDayColorFilter
-
-// Функции работы с датами перенесены в TimeManager
-// getDayOfWeekShort, getDayOfWeek, getDaysInMonth, formatGameDateTime
-
-
-// Показать уведомление о скорости
-// showSpeedNotification перенесена в PauseManager
-
 // Геометрия зон, вычисленная при отрисовке
 const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
 
-// Система маршрутов и времени (перенесено в TimeManager)
-let datetimeDisplay;
-let routeDisplay;
 let currentRouteIndex = 0;
 let stayTimer = 0; // таймер пребывания в текущем месте
-let isAtDestination = false; // находится ли машина в пункте назначения
-let savedCarState = null; // сохраненное состояние машины при входе в здание: {nextIntersection: {x,y}, direction: number, currentPosition: {x,y}}
-
-// Система ночного режима (перенесена в DayNightManager)
-// isNightMode, cityNightOverlay, nightTransitionSpeed, currentCityNightAlpha
+let savedCarState = null; // сохраненное состояние машины при входе в здание
 // Хранилище светофоров по ключу перекрёстка
 const intersectionKeyToTL = new Map();
 // Координатор зеленой волны светофоров
@@ -151,29 +110,8 @@ const TRAFFIC_LIGHTS_CONFIG = [
   'G1', 'G2', 'G3', 'G4' // правый столбец (выезд из города) - все перекрестки
 ];
 
-// 🚛 МАРШРУТ ШИНЫ 🚛
-// Массив с маршрутом: место назначения и время пребывания (в игровых часах)
-// Позиции вычисляются динамически из геометрии зон, а НЕ захардкожены
-const ROUTE_SCHEDULE = [
-  { location: 'house', name: 'Дом', stayHours: 2 },
-  { location: 'institute', name: 'Институт', stayHours: 2 },
-  { location: 'work', name: 'Работа', stayHours: 5 },
-  { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
-  { location: 'box', name: 'Бокс', stayHours: 1 },
-];
-
 // Определяем мобильное устройство в начале
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-// Настройки скорости загружаются в PauseManager
-
-// Настройки режима дня/ночи загружаются в DayNightManager
-
-// Обновляем текст режима дня/ночи и паузы в меню после загрузки
-setTimeout(() => {
-  dayNightManager.updateDayNightModeText();
-  pauseManager.updatePauseModeText();
-}, 100);
 
 setupApp();
 
@@ -192,6 +130,18 @@ setupWorld();
 
 // Инициализируем dayNightManager после создания PIXI приложения
 dayNightManager = new DayNightManager(PIXI, CONFIG);
+
+// Инициализируем UIRenderer
+uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController);
+
+// Инициализируем UI
+uiRenderer.init();
+
+// Обновляем текст режима дня/ночи и паузы в меню после инициализации
+setTimeout(() => {
+  dayNightManager.updateDayNightModeText();
+  pauseManager.updatePauseModeText();
+}, 100);
 
 createCar();
 layout();
@@ -306,9 +256,6 @@ function setupWorld () {
   uiLayer.zIndex = 2000; // поверх всего
   app.stage.addChild(uiLayer);
 
-  // Получаем ссылки на HTML элементы панели управления
-  datetimeDisplay = document.getElementById('game-datetime');
-  routeDisplay = document.getElementById('route-info');
   const pauseButton = document.getElementById('pause-button');
   const speedButton = document.getElementById('speed-button');
   const zoomButton = document.getElementById('zoom-button');
@@ -348,7 +295,7 @@ function setupWorld () {
   zoomButton.addEventListener('click', () => {
     if (typeof panningController !== 'undefined' && panningController) {
       panningController.toggleZoom();
-      updateZoomButton();
+      uiRenderer.updateZoomButton();
     }
   });
 
@@ -356,64 +303,34 @@ function setupWorld () {
   zoomInButton.addEventListener('click', () => {
     if (typeof panningController !== 'undefined' && panningController) {
       panningController.zoomIn();
-      updateZoomButton();
+      uiRenderer.updateZoomButton();
     }
   });
 
   zoomOutButton.addEventListener('click', () => {
     if (typeof panningController !== 'undefined' && panningController) {
       panningController.zoomOut();
-      updateZoomButton();
+      uiRenderer.updateZoomButton();
     }
   });
 
-  // Функция обновления кнопки масштабирования
-  function updateZoomButton () {
-    if (typeof panningController !== 'undefined' && panningController) {
-      const isFullscreen = panningController.isFullscreenMode();
-      if (isFullscreen) {
-        zoomButton.textContent = 'Обычный размер';
-        zoomButton.classList.add('boosted');
-      } else {
-        const scale = panningController.getCurrentScale();
-        zoomButton.textContent = `Полный экран`;
-        zoomButton.classList.toggle('boosted', scale > 1.1);
-      }
-
-      // Обновляем состояние кнопок масштабирования
-      if (isMobile) {
-        const scale = panningController.getCurrentScale();
-        zoomInButton.disabled = scale >= 10;
-        zoomOutButton.disabled = scale <= 0.1;
-      }
-    }
-  }
 
   // Инициализируем panningController
   panningController = new PanningController();
   panningController.setWorld(world);
   panningController.setOnZoomChange((scale) => {
-    if (typeof updateZoomButton === 'function') {
-      updateZoomButton();
+    if (uiRenderer) {
+      uiRenderer.updateZoomButton();
     }
   });
   panningController.setOnFullscreenChange((isFullscreen) => {
-    if (typeof updateZoomButton === 'function') {
-      updateZoomButton();
+    if (uiRenderer) {
+      uiRenderer.updateZoomButton();
     }
   });
 
   // На мобильных устройствах кнопки масштабирования скрыты
 
-  // Инициализируем меню-бургер
-  initMenu();
-
-  // Инициализируем дисплеи
-  updateRouteDisplay();
-  // Инициализируем дисплей даты и времени
-  if (datetimeDisplay) {
-    datetimeDisplay.innerHTML = timeManager.formatDateTime();
-  }
   // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
@@ -424,163 +341,6 @@ function setupWorld () {
   }, 0);
 }
 
-// Инициализация меню-бургера
-function initMenu () {
-  const burgerButton = document.getElementById('burger-button');
-  const menuModal = document.getElementById('menu-modal');
-  const modalClose = document.getElementById('modal-close');
-  const menuItems = document.querySelectorAll('.menu-item');
-
-  // Функция для обновления состояния панорамирования
-  function updatePanningState () {
-    const isMenuOpen = menuModal.classList.contains('active');
-    if (panningController) {
-      panningController.setMenuOpen(isMenuOpen);
-    }
-  }
-
-  // Открытие/закрытие меню по клику на бургер
-  burgerButton.addEventListener('click', () => {
-    menuModal.classList.toggle('active');
-    burgerButton.classList.toggle('active');
-    updatePanningState();
-  });
-
-  // Закрытие меню по клику на крестик
-  modalClose.addEventListener('click', () => {
-    menuModal.classList.remove('active');
-    burgerButton.classList.remove('active');
-    updatePanningState();
-  });
-
-  // Закрытие меню по клику на фон
-  menuModal.addEventListener('click', (e) => {
-    if (e.target === menuModal) {
-      menuModal.classList.remove('active');
-      burgerButton.classList.remove('active');
-      updatePanningState();
-    }
-  });
-
-  // Закрытие меню по нажатию Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && menuModal.classList.contains('active')) {
-      menuModal.classList.remove('active');
-      burgerButton.classList.remove('active');
-      updatePanningState();
-    }
-  });
-
-  // Обработчики для пунктов меню
-  menuItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const itemId = item.id;
-
-      // Выполняем действие в зависимости от выбранного пункта
-      switch (itemId) {
-        case 'menu-pause':
-          // Переключаем паузу
-          pauseManager.togglePause();
-          timeManager.setPaused(pauseManager.isPaused());
-          break;
-        case 'menu-speed':
-          // Переключаем скорость
-          speedButton.click();
-          showMenuNotification('⚡ Скорость переключена');
-          break;
-        case 'menu-daynight':
-          // Переключаем режим дня/ночи (не закрываем меню)
-          dayNightManager.toggleDayNightMode();
-          break;
-        case 'menu-route':
-          showMenuNotification('🗺️ Информация о маршруте', 'Текущий маршрут: ' + ROUTE_SCHEDULE[currentRouteIndex].name);
-          // Закрываем меню
-          menuModal.classList.remove('active');
-          burgerButton.classList.remove('active');
-          updatePanningState();
-          break;
-        case 'menu-settings':
-          showMenuNotification('⚙️ Настройки', 'Настройки игры будут добавлены в следующих версиях');
-          // Закрываем меню
-          menuModal.classList.remove('active');
-          burgerButton.classList.remove('active');
-          updatePanningState();
-          break;
-        case 'menu-help':
-          showMenuNotification('❓ Помощь', 'Используйте мышь для панорамирования, колесо мыши для масштабирования. На мобильных: касание для панорамирования, два пальца для масштабирования. Режим дня/ночи можно переключать: автоматический, только день, только ночь. Все источники света отображаются поверх ночного режима.');
-          // Закрываем меню
-          menuModal.classList.remove('active');
-          burgerButton.classList.remove('active');
-          updatePanningState();
-          break;
-        case 'menu-about':
-          showMenuNotification('ℹ️ О игре', 'Карта Шины - симулятор движения по городу с системой светофоров и маршрутизацией.');
-          // Закрываем меню
-          menuModal.classList.remove('active');
-          burgerButton.classList.remove('active');
-          updatePanningState();
-          break;
-      }
-    });
-  });
-}
-
-// Показать уведомление из меню
-function showMenuNotification (title, message = '') {
-  const notification = document.createElement('div');
-  notification.innerHTML = `<strong>${title}</strong>${message ? '<br>' + message : ''}`;
-  notification.style.cssText = `
-    position: fixed;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
-    padding: 15px 25px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: bold;
-    z-index: 1001;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-    text-align: center;
-    max-width: 300px;
-    animation: slideDown 0.3s ease-out;
-  `;
-
-  document.body.appendChild(notification);
-
-  // Убираем уведомление через 3 секунды
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.style.animation = 'slideDown 0.3s ease-out reverse';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }
-  }, 3000);
-}
-
-// Обновление дисплея маршрута
-function updateRouteDisplay () {
-  if (!routeDisplay) return; // защита от вызова до инициализации
-  const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
-  const prefixSpan = routeDisplay.querySelector('.route-prefix');
-  const destinationSpan = routeDisplay.querySelector('.route-destination');
-
-  if (carRenderer && carRenderer.isAtDestination()) {
-    prefixSpan.textContent = 'В пункте:';
-    destinationSpan.textContent = currentDest.name;
-  } else {
-    prefixSpan.textContent = 'В пути в:';
-    destinationSpan.textContent = currentDest.name;
-  }
-}
-
-// Функция getRoadPositions перенесена в WorldRenderer
-
-// Функции drawGrid и drawWorldBorder перенесены в WorldRenderer
 
 // Функции-обертки для получения позиций дорог из WorldRenderer
 function getHorizontalRoadYs() {
@@ -594,15 +354,6 @@ function getVerticalRoadXs() {
 function randInt (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-
-// Функция generateBuildingSlots перенесена в WorldRenderer
-
-// Функция drawLots перенесена в WorldRenderer
-
-// Функция drawZones перенесена в WorldRenderer
-
-// Функция drawRoads перенесена в WorldRenderer
-
 
 function createTrafficLightsForAllIntersections (layer) {
   intersectionKeyToTL.clear();
@@ -800,7 +551,7 @@ function getDestinationCenter (locationKey) {
 
 // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
 function buildCarPath () {
-  const currentDestination = ROUTE_SCHEDULE[currentRouteIndex];
+  const currentDestination = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   if (!currentDestination) return [];
 
   // Определяем стартовый перекрёсток
@@ -891,8 +642,12 @@ function createCar () {
 
   // Начинаем с первого пункта назначения (работа)
   currentRouteIndex = 1; // работа, а не дом
-  isAtDestination = false;
   stayTimer = 0;
+  
+  // Обновляем индекс маршрута в UIRenderer
+  if (uiRenderer) {
+    uiRenderer.setCurrentRouteIndex(currentRouteIndex);
+  }
 
   // Теперь строим путь и устанавливаем его
   carPath = buildCarPath();
@@ -902,23 +657,22 @@ function createCar () {
   app.ticker.add(updateCar);
   app.ticker.add(() => {
     timeManager.update();
-    updateDateTimeDisplay();
+    if (uiRenderer) {
+      uiRenderer.updateDateTimeDisplay();
+    }
     const gameTime = timeManager.getGameTime();
     dayNightManager.updateNightMode(gameTime);
     updateStayTimer();
+    
+    // Обновляем UI с текущим состоянием машины
+    if (uiRenderer) {
+      uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
+    }
   });
 
-  updateRouteDisplay();
+  uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
 }
 
-// Обновление отображения времени
-function updateDateTimeDisplay() {
-  if (datetimeDisplay) {
-    datetimeDisplay.innerHTML = timeManager.formatDateTime();
-  }
-}
-
-// Обновление игрового времени (перенесено в TimeManager)
 function updateGameTime () {
   // Обновляем время через TimeManager
   timeManager.setPaused(pauseManager.isPaused());
@@ -940,7 +694,7 @@ function updateGameTime () {
   }
 
   // Если находимся в пункте назначения, уменьшаем таймер ожидания
-  if (isAtDestination) {
+  if (carRenderer && carRenderer.isAtDestination()) {
     // Получаем время из TimeManager для расчета таймера
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes;
@@ -958,7 +712,12 @@ function nextDestination () {
   // Скрываем аватарку в текущем здании
   hideBuildingAvatar();
 
-  currentRouteIndex = (currentRouteIndex + 1) % ROUTE_SCHEDULE.length;
+  currentRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
+  
+  // Обновляем индекс маршрута в UIRenderer
+  if (uiRenderer) {
+    uiRenderer.setCurrentRouteIndex(currentRouteIndex);
+  }
   
   if (carRenderer) {
     carRenderer.setAtDestination(false);
@@ -983,14 +742,14 @@ function nextDestination () {
     carRenderer.setPath(newPath);
   }
 
-  updateRouteDisplay();
+  uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
 }
 
 // Сохраняем состояние машины для плавного продолжения движения к следующему пункту
 function saveCarStateForNextDestination () {
   // Определяем следующий пункт назначения
-  const nextRouteIndex = (currentRouteIndex + 1) % ROUTE_SCHEDULE.length;
-  const nextDestination = ROUTE_SCHEDULE[nextRouteIndex];
+  const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
+  const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
 
   if (!nextDestination) return null;
 
@@ -1037,7 +796,7 @@ function saveCarStateForNextDestination () {
 
 // Фиксируем прибытие: вызывается только при достижении последней точки пути (обочины)
 function checkArrival () {
-  const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   if (carRenderer && !carRenderer.isAtDestination()) {
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
 
@@ -1052,7 +811,7 @@ function checkArrival () {
     const gameTime = timeManager.getGameTime();
     lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
     lastStayTimerDay = gameTime.day; // инициализируем день
-    updateRouteDisplay();
+    uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
     // Показываем маленькую аватарку в здании
     showBuildingAvatar(currentDest.location);
   }
@@ -1122,7 +881,7 @@ function showBuildingAvatar (locationKey) {
 
 // Скрыть аватарку в здании
 function hideBuildingAvatar () {
-  const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
+  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   const avatarContainer = buildingAvatars.get(currentDest.location);
   if (avatarContainer && avatarContainer.parent) {
     avatarContainer.parent.removeChild(avatarContainer);
@@ -1156,12 +915,10 @@ function updateCar (delta) {
     carPath = carRenderer.getPath();
     carSegment = carRenderer.getCurrentSegment();
     carProgress = carRenderer.getProgress();
-    isAtDestination = carRenderer.isAtDestination();
     stayTimer = carRenderer.getStayTimer();
   }
 }
 
-// panningController теперь инициализируется в setupWorld()
 
 // Настраиваем игровую область для панорамирования
 const gameContainer = document.querySelector('.game-container');
@@ -1169,14 +926,3 @@ gameContainer.style.width = '1200px';
 gameContainer.style.height = '800px';
 gameContainer.style.overflow = 'auto';
 
-// Добавляем подсказку для мобильных устройств
-if (isMobile) {
-  console.log('📱 Мобильное устройство обнаружено!');
-  console.log('👆 Одиночное касание - панорамирование');
-  console.log('🤏 Два пальца - одновременное масштабирование И панорамирование (0.1x - 10x)');
-  console.log('🔍+ Кнопка увеличения - приближение');
-  console.log('🔍- Кнопка уменьшения - отдаление');
-  console.log('📱 Кнопка "Полный экран" - переключение полноэкранного режима');
-  console.log('📍 Касание перекрестка - показать координаты');
-
-}

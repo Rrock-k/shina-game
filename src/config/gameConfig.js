@@ -59,7 +59,14 @@ export const CONFIG = {
     { x: 1950, y: 1283 }
   ],
   BASE_FONT: 32,
-  BASE_CAR_SPEED: 11.7 // Базовая скорость машины
+  BASE_CAR_SPEED: 11.7, // Базовая скорость машины
+  ROUTE_SCHEDULE: [
+    { location: 'house', name: 'Дом', stayHours: 2 },
+    { location: 'institute', name: 'Институт', stayHours: 2 },
+    { location: 'work', name: 'Работа', stayHours: 5 },
+    { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
+    { location: 'box', name: 'Бокс', stayHours: 1 },
+  ]
 };
 
 // Дополнительные константы
