@@ -30,12 +30,11 @@ function printMenu() {
     console.log();
     console.log('1. 🚀 Запустить игру (npm start)');
     console.log('2. 🔧 Запустить в dev режиме (npm run dev)');
-    console.log('3. 🧪 Запустить тесты (npm test)');
-    console.log('4. 📦 Быстрый сбор файлов (npm run collect)');
-    console.log('5. 📚 Полный сбор файлов (npm run collect-full)');
-    console.log('6. 📊 Показать статистику проекта');
-    console.log('7. 🧹 Очистить временные файлы');
-    console.log('8. ❓ Показать справку');
+    console.log('3. 📦 Быстрый сбор файлов (npm run collect)');
+    console.log('4. 📚 Полный сбор файлов (npm run collect-full)');
+    console.log('5. 📊 Показать статистику проекта');
+    console.log('6. 🧹 Очистить временные файлы');
+    console.log('7. ❓ Показать справку');
     console.log('0. 🚪 Выход');
     console.log();
 }
@@ -62,16 +61,6 @@ function startDev() {
     }
 }
 
-// Функция для запуска тестов
-function runTests() {
-    console.log('🧪 Запуск тестов...');
-    console.log('='.repeat(40));
-    try {
-        execSync('npm test', { stdio: 'inherit' });
-    } catch (error) {
-        console.error('❌ Ошибка запуска тестов:', error.message);
-    }
-}
 
 // Функция для быстрого сбора
 function collectQuick() {
@@ -193,9 +182,6 @@ function showHelp() {
     console.log('  npm start            - Запуск с красивым интерфейсом');
     console.log('  npm run dev          - Простой запуск сервера');
     console.log();
-    console.log('🧪 Тестирование:');
-    console.log('  npm test             - Запуск тестов валидации');
-    console.log();
     console.log('🔧 Прямой запуск скриптов:');
     console.log('  node scripts/collect/quick-collect.cjs');
     console.log('  node scripts/collect/collect-files.cjs');
@@ -217,7 +203,7 @@ function main() {
         printHeader();
         printMenu();
         
-        rl.question('Выберите команду (0-8): ', (answer) => {
+        rl.question('Выберите команду (0-7): ', (answer) => {
             const choice = answer.trim();
             
             switch (choice) {
@@ -228,21 +214,18 @@ function main() {
                     startDev();
                     break;
                 case '3':
-                    runTests();
-                    break;
-                case '4':
                     collectQuick();
                     break;
-                case '5':
+                case '4':
                     collectFull();
                     break;
-                case '6':
+                case '5':
                     showStats();
                     break;
-                case '7':
+                case '6':
                     cleanup();
                     break;
-                case '8':
+                case '7':
                     showHelp();
                     break;
                 case '0':
