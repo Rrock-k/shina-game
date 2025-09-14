@@ -13,6 +13,9 @@ import { UIRenderer } from './rendering/UIRenderer.js';
 // Новые сущности
 import { Car } from './entities/Car.js';
 import { Shina } from './entities/Shina.js';
+// Утилиты
+import { indexOfClosest, getIntersectionCoord, getNearestIntersectionIJ, computeBuildingStop, buildIntersectionPath, buildGraphPathToBuilding } from './utils/geometry.js';
+import { randInt } from './utils/math.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -441,9 +444,6 @@ function getVerticalRoadXs() {
   return worldRenderer ? worldRenderer.getVerticalRoadXs() : [];
 }
 
-function randInt (min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
 
 function createTrafficLightsForAllIntersections (layer) {
   intersectionKeyToTL.clear();
@@ -525,109 +525,9 @@ function layout () {
 
 // ======= Новая логика движения по графу перекрёстков и зданий =======
 // Вспомогательные функции индексации и координат перекрёстков
-function indexOfClosest (arr, value) {
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < arr.length; i++) {
-    const d = Math.abs(arr[i] - value);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  return bestIdx;
-}
 
-function getIntersectionCoord (i, j) {
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  return { x: verticalRoadXs[i], y: horizontalRoadYs[j] };
-}
 
-function getNearestIntersectionIJ (x, y) {
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  return { i: indexOfClosest(verticalRoadXs, x), j: indexOfClosest(horizontalRoadYs, y) };
-}
 
-// Рассчитать точку остановки у здания: на ближайшей дороге, рядом с центром зоны
-// Возвращает { stop: {x,y}, nearestIJ: {i,j}, orientation: 'vertical'|'horizontal' }
-function computeBuildingStop (buildingPos) {
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  
-  const nearestVXIndex = indexOfClosest(verticalRoadXs, buildingPos.x);
-  const nearestVx = verticalRoadXs[nearestVXIndex];
-  const distToV = Math.abs(buildingPos.x - nearestVx);
-
-  const nearestHYIndex = indexOfClosest(horizontalRoadYs, buildingPos.y);
-  const nearestHy = horizontalRoadYs[nearestHYIndex];
-  const distToH = Math.abs(buildingPos.y - nearestHy);
-
-  // Выбираем более близкую дорогу
-  if (distToV <= distToH) {
-    // Остановка на вертикальной дороге: X фиксирован, Y — проекция центра здания
-    const stopY = Math.max(horizontalRoadYs[0], Math.min(horizontalRoadYs[horizontalRoadYs.length - 1], buildingPos.y));
-    const j = indexOfClosest(horizontalRoadYs, stopY);
-    return { stop: { x: nearestVx, y: stopY }, nearestIJ: { i: nearestVXIndex, j }, orientation: 'vertical' };
-  } else {
-    // Остановка на горизонтальной дороге: Y фиксирован, X — проекция центра здания
-    const stopX = Math.max(verticalRoadXs[0], Math.min(verticalRoadXs[verticalRoadXs.length - 1], buildingPos.x));
-    const i = indexOfClosest(verticalRoadXs, stopX);
-    return { stop: { x: stopX, y: nearestHy }, nearestIJ: { i, j: nearestHYIndex }, orientation: 'horizontal' };
-  }
-}
-
-// Поиск пути по сетке перекрёстков (BFS) от (i0,j0) к (i1,j1). Возвращает массив координат перекрёстков
-function buildIntersectionPath (fromIJ, toIJ) {
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const cols = verticalRoadXs.length;
-  const rows = horizontalRoadYs.length;
-  const key = (i, j) => `${i},${j}`;
-  const queue = [];
-  const visited = new Set();
-  const parent = new Map();
-  queue.push(fromIJ);
-  visited.add(key(fromIJ.i, fromIJ.j));
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  while (queue.length) {
-    const cur = queue.shift();
-    if (cur.i === toIJ.i && cur.j === toIJ.j) break;
-    for (const [dx, dy] of dirs) {
-      const ni = cur.i + dx;
-      const nj = cur.j + dy;
-      if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
-      const k = key(ni, nj);
-      if (visited.has(k)) continue;
-      visited.add(k);
-      parent.set(k, key(cur.i, cur.j));
-      queue.push({ i: ni, j: nj });
-    }
-  }
-  // Восстановление пути
-  const pathIJ = [];
-  let ck = key(toIJ.i, toIJ.j);
-  if (!visited.has(ck)) {
-    // на всякий случай — если путь не найден, остаёмся на месте
-    return [getIntersectionCoord(fromIJ.i, fromIJ.j)];
-  }
-  while (ck) {
-    const [si, sj] = ck.split(',').map(Number);
-    pathIJ.push({ i: si, j: sj });
-    ck = parent.get(ck) || null;
-  }
-  pathIJ.reverse();
-  // Преобразуем в массив точек ({x,y})
-  return pathIJ.map(({ i, j }) => getIntersectionCoord(i, j));
-}
-
-// Построить путь только ИЗ перекрёстка В перекрёсток, затем к зданию (на обочину)
-// Возвращает массив точек: [intersections..., buildingStop]
-function buildGraphPathToBuilding (startIJ, buildingPos) {
-  const { stop, nearestIJ } = computeBuildingStop(buildingPos);
-  const nodes = buildIntersectionPath(startIJ, nearestIJ); // только перекрёстки
-  // Добавляем финальную точку остановки у здания
-  nodes.push(stop);
-  return nodes;
-}
 
 function getDestinationCenter (locationKey) {
   const z = zoneGeometry.get(locationKey);
@@ -647,20 +547,23 @@ function buildCarPath () {
   const currentDestination = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   if (!currentDestination) return [];
 
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
+
   // Определяем стартовый перекрёсток
   let startIJ;
   if (carRenderer && carRenderer.getCar() && carRenderer.getCar().position && (carRenderer.getCar().position.x !== 0 || carRenderer.getCar().position.y !== 0)) {
-    startIJ = getNearestIntersectionIJ(carRenderer.getCar().position.x, carRenderer.getCar().position.y);
+    startIJ = getNearestIntersectionIJ(carRenderer.getCar().position.x, carRenderer.getCar().position.y, verticalRoadXs, horizontalRoadYs);
   } else {
     const housePos = getDestinationCenter('house');
-    startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
+    startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
   }
 
   const destCenter = getDestinationCenter(currentDestination.location);
-  const graphPath = buildGraphPathToBuilding(startIJ, destCenter);
+  const graphPath = buildGraphPathToBuilding(startIJ, destCenter, verticalRoadXs, horizontalRoadYs);
 
   // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
-  const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
+  const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, verticalRoadXs, horizontalRoadYs);
   const carPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
   const needsPrefix = carRenderer && (Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1);
   const path = needsPrefix ? [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath] : graphPath;
@@ -722,9 +625,7 @@ function createCar () {
     carPath: [],
     currentRouteIndex: currentRouteIndex,
     savedCarState: savedCarState,
-    getDestinationCenter: getDestinationCenter,
-    getNearestIntersectionIJ: getNearestIntersectionIJ,
-    getIntersectionCoord: getIntersectionCoord
+    getDestinationCenter: getDestinationCenter
   });
   
   // Получаем аватарку из CarRenderer
@@ -878,8 +779,10 @@ function saveCarStateForNextDestination () {
 
   // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
   const currentPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
-  const currentIJ = getNearestIntersectionIJ(currentPos.x, currentPos.y);
-  const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter);
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
+  const currentIJ = getNearestIntersectionIJ(currentPos.x, currentPos.y, verticalRoadXs, horizontalRoadYs);
+  const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter, verticalRoadXs, horizontalRoadYs);
 
   // Находим первый перекресток в пути (не точку остановки у здания)
   let nextIntersection = null;
