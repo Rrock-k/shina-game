@@ -133,43 +133,36 @@ export class UIRenderer {
             if (this.speedButton) {
               this.speedButton.click();
             }
+            // Обновляем отображение скорости в меню
+            this.updateSpeedDisplay();
             this.showMenuNotification('⚡ Скорость переключена');
             break;
           case 'menu-daynight':
             // Переключаем режим дня/ночи (не закрываем меню)
             this.dayNightManager.toggleDayNightMode();
             break;
-          case 'menu-route':
-            this.showMenuNotification('🗺️ Информация о маршруте', 'Текущий маршрут: ' + this.config.ROUTE_SCHEDULE[0].name);
-            // Закрываем меню
-            menuModal.classList.remove('active');
-            burgerButton.classList.remove('active');
-            updatePanningState();
+          case 'menu-car-lights':
+            // Переключаем фары машины (не закрываем меню)
+            if (window.carEntity && typeof window.carEntity.toggleHeadlights === 'function') {
+              window.carEntity.toggleHeadlights();
+              this.updateCarLightsDisplay();
+            }
             break;
-          case 'menu-settings':
-            this.showMenuNotification('⚙️ Настройки', 'Настройки игры будут добавлены в следующих версиях');
-            // Закрываем меню
-            menuModal.classList.remove('active');
-            burgerButton.classList.remove('active');
-            updatePanningState();
+          case 'menu-schedule':
+            // Переключаем отображение расписания
+            this.toggleSchedule();
             break;
           case 'menu-help':
-            this.showMenuNotification('❓ Помощь', 'Используйте мышь для панорамирования, колесо мыши для масштабирования. На мобильных: касание для панорамирования, два пальца для масштабирования. Режим дня/ночи можно переключать: автоматический, только день, только ночь. Все источники света отображаются поверх ночного режима.');
-            // Закрываем меню
-            menuModal.classList.remove('active');
-            burgerButton.classList.remove('active');
-            updatePanningState();
+            // Переключаем отображение помощи
+            this.toggleHelp();
             break;
           case 'menu-journal':
             // Переключаем отображение журнала
             this.toggleJournal();
             break;
           case 'menu-about':
-            this.showMenuNotification('ℹ️ О игре', 'Карта Шины - симулятор движения по городу с системой светофоров и маршрутизацией.');
-            // Закрываем меню
-            menuModal.classList.remove('active');
-            burgerButton.classList.remove('active');
-            updatePanningState();
+            // Переключаем отображение "О игре"
+            this.toggleAbout();
             break;
         }
       });
@@ -235,6 +228,33 @@ export class UIRenderer {
   }
 
   /**
+   * Обновление отображения скорости в меню
+   */
+  updateSpeedDisplay() {
+    const speedDisplay = document.getElementById('speed-display');
+    if (!speedDisplay || !this.pauseManager) return;
+    
+    const speedMultiplier = this.pauseManager.getSpeedMultiplier();
+    speedDisplay.textContent = `x${speedMultiplier}`;
+  }
+
+  /**
+   * Обновление отображения состояния фар в меню
+   */
+  updateCarLightsDisplay() {
+    const lightsStatus = document.getElementById('car-lights-status');
+    if (!lightsStatus) return;
+    
+    // Получаем состояние фар из carEntity, если он доступен
+    let headlightsOn = false;
+    if (window.carEntity && typeof window.carEntity.areHeadlightsOn === 'function') {
+      headlightsOn = window.carEntity.areHeadlightsOn();
+    }
+    
+    lightsStatus.textContent = headlightsOn ? 'ВКЛ' : 'ВЫКЛ';
+  }
+
+  /**
    * Обновление отображения времени
    */
   updateDateTimeDisplay() {
@@ -289,6 +309,15 @@ export class UIRenderer {
       case 'journal':
         modalTitle.textContent = 'Журнал поездок';
         break;
+      case 'schedule':
+        modalTitle.textContent = 'Расписание';
+        break;
+      case 'help':
+        modalTitle.textContent = 'Помощь';
+        break;
+      case 'about':
+        modalTitle.textContent = 'О игре';
+        break;
       default:
         modalTitle.textContent = 'Меню игры';
     }
@@ -314,6 +343,69 @@ export class UIRenderer {
       this.hideJournal();
     } else {
       this.showJournal();
+    }
+  }
+
+  /**
+   * Переключить отображение расписания
+   */
+  toggleSchedule() {
+    // Изменяем состояние меню на расписание
+    this.currentMenuState = 'schedule';
+    this.updateMenuTitle();
+    
+    let scheduleModal = document.getElementById('schedule-modal');
+    if (!scheduleModal) {
+      this.createScheduleModal();
+      scheduleModal = document.getElementById('schedule-modal');
+    }
+    
+    if (scheduleModal.classList.contains('active')) {
+      this.hideSchedule();
+    } else {
+      this.showSchedule();
+    }
+  }
+
+  /**
+   * Переключить отображение помощи
+   */
+  toggleHelp() {
+    // Изменяем состояние меню на помощь
+    this.currentMenuState = 'help';
+    this.updateMenuTitle();
+    
+    let helpModal = document.getElementById('help-modal');
+    if (!helpModal) {
+      this.createHelpModal();
+      helpModal = document.getElementById('help-modal');
+    }
+    
+    if (helpModal.classList.contains('active')) {
+      this.hideHelp();
+    } else {
+      this.showHelp();
+    }
+  }
+
+  /**
+   * Переключить отображение "О игре"
+   */
+  toggleAbout() {
+    // Изменяем состояние меню на "О игре"
+    this.currentMenuState = 'about';
+    this.updateMenuTitle();
+    
+    let aboutModal = document.getElementById('about-modal');
+    if (!aboutModal) {
+      this.createAboutModal();
+      aboutModal = document.getElementById('about-modal');
+    }
+    
+    if (aboutModal.classList.contains('active')) {
+      this.hideAbout();
+    } else {
+      this.showAbout();
     }
   }
 
@@ -364,6 +456,171 @@ export class UIRenderer {
   }
 
   /**
+   * Создать модальное окно расписания
+   */
+  createScheduleModal() {
+    const scheduleModal = document.createElement('div');
+    scheduleModal.id = 'schedule-modal';
+    scheduleModal.className = 'modal-overlay';
+    scheduleModal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <button class="modal-back-btn" id="schedule-back-btn">&lt;</button>
+          <h2 class="modal-title">Расписание</h2>
+          <button class="modal-close" id="schedule-close-btn">&times;</button>
+        </div>
+        <div class="schedule-content">
+          <div class="schedule-list" id="schedule-list">
+            <!-- Элементы расписания будут добавлены динамически -->
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(scheduleModal);
+    
+    // Обработчики событий
+    const backBtn = document.getElementById('schedule-back-btn');
+    const closeBtn = document.getElementById('schedule-close-btn');
+    
+    backBtn.addEventListener('click', () => this.hideSchedule());
+    closeBtn.addEventListener('click', () => this.hideSchedule());
+    
+    // Закрытие по клику на фон
+    scheduleModal.addEventListener('click', (e) => {
+      if (e.target === scheduleModal) {
+        this.hideSchedule();
+      }
+    });
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && scheduleModal.classList.contains('active')) {
+        this.hideSchedule();
+      }
+    });
+  }
+
+  /**
+   * Создать модальное окно помощи
+   */
+  createHelpModal() {
+    const helpModal = document.createElement('div');
+    helpModal.id = 'help-modal';
+    helpModal.className = 'modal-overlay';
+    helpModal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <button class="modal-back-btn" id="help-back-btn">&lt;</button>
+          <h2 class="modal-title">Помощь</h2>
+          <button class="modal-close" id="help-close-btn">&times;</button>
+        </div>
+        <div class="help-content">
+          <div class="help-text">
+            <h3>Управление игрой</h3>
+            <p><strong>Мышь:</strong> панорамирование карты</p>
+            <p><strong>Колесо мыши:</strong> масштабирование</p>
+            <p><strong>На мобильных:</strong> касание для панорамирования, два пальца для масштабирования</p>
+            
+            <h3>Режимы дня/ночи</h3>
+            <p>Можно переключать: автоматический, только день, только ночь</p>
+            <p>Все источники света отображаются поверх ночного режима</p>
+            
+            <h3>Скорость игры</h3>
+            <p>Переключайте скорость: x1, x2, x5</p>
+            
+            <h3>Фары машины</h3>
+            <p>Включайте/выключайте фары по необходимости</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(helpModal);
+    
+    // Обработчики событий
+    const backBtn = document.getElementById('help-back-btn');
+    const closeBtn = document.getElementById('help-close-btn');
+    
+    backBtn.addEventListener('click', () => this.hideHelp());
+    closeBtn.addEventListener('click', () => this.hideHelp());
+    
+    // Закрытие по клику на фон
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) {
+        this.hideHelp();
+      }
+    });
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && helpModal.classList.contains('active')) {
+        this.hideHelp();
+      }
+    });
+  }
+
+  /**
+   * Создать модальное окно "О игре"
+   */
+  createAboutModal() {
+    const aboutModal = document.createElement('div');
+    aboutModal.id = 'about-modal';
+    aboutModal.className = 'modal-overlay';
+    aboutModal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <button class="modal-back-btn" id="about-back-btn">&lt;</button>
+          <h2 class="modal-title">О игре</h2>
+          <button class="modal-close" id="about-close-btn">&times;</button>
+        </div>
+        <div class="about-content">
+          <div class="about-text">
+            <h3>Карта Шины</h3>
+            <p>Симулятор движения по городу с системой светофоров и маршрутизацией.</p>
+            
+            <h3>Особенности</h3>
+            <ul>
+              <li>Реалистичная система светофоров</li>
+              <li>Динамическое управление скоростью</li>
+              <li>Режимы дня и ночи</li>
+              <li>Система фар автомобиля</li>
+              <li>Журнал поездок</li>
+              <li>Расписание маршрутов</li>
+            </ul>
+            
+            <h3>Технологии</h3>
+            <p>Игра создана с использованием PIXI.js для рендеринга и современного JavaScript.</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(aboutModal);
+    
+    // Обработчики событий
+    const backBtn = document.getElementById('about-back-btn');
+    const closeBtn = document.getElementById('about-close-btn');
+    
+    backBtn.addEventListener('click', () => this.hideAbout());
+    closeBtn.addEventListener('click', () => this.hideAbout());
+    
+    // Закрытие по клику на фон
+    aboutModal.addEventListener('click', (e) => {
+      if (e.target === aboutModal) {
+        this.hideAbout();
+      }
+    });
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && aboutModal.classList.contains('active')) {
+        this.hideAbout();
+      }
+    });
+  }
+
+  /**
    * Показать журнал
    */
   showJournal() {
@@ -403,6 +660,118 @@ export class UIRenderer {
       clearInterval(this.journalUpdateInterval);
       this.journalUpdateInterval = null;
     }
+  }
+
+  /**
+   * Показать расписание
+   */
+  showSchedule() {
+    let scheduleModal = document.getElementById('schedule-modal');
+    if (!scheduleModal) {
+      this.createScheduleModal();
+      scheduleModal = document.getElementById('schedule-modal');
+    }
+    
+    scheduleModal.classList.add('active');
+    this.updateScheduleDisplay();
+  }
+
+  /**
+   * Скрыть расписание
+   */
+  hideSchedule() {
+    const scheduleModal = document.getElementById('schedule-modal');
+    if (!scheduleModal) return;
+    
+    scheduleModal.classList.remove('active');
+    
+    // Возвращаем меню в основное состояние
+    this.currentMenuState = 'main';
+    this.updateMenuTitle();
+  }
+
+  /**
+   * Показать помощь
+   */
+  showHelp() {
+    let helpModal = document.getElementById('help-modal');
+    if (!helpModal) {
+      this.createHelpModal();
+      helpModal = document.getElementById('help-modal');
+    }
+    
+    helpModal.classList.add('active');
+  }
+
+  /**
+   * Скрыть помощь
+   */
+  hideHelp() {
+    const helpModal = document.getElementById('help-modal');
+    if (!helpModal) return;
+    
+    helpModal.classList.remove('active');
+    
+    // Возвращаем меню в основное состояние
+    this.currentMenuState = 'main';
+    this.updateMenuTitle();
+  }
+
+  /**
+   * Показать "О игре"
+   */
+  showAbout() {
+    let aboutModal = document.getElementById('about-modal');
+    if (!aboutModal) {
+      this.createAboutModal();
+      aboutModal = document.getElementById('about-modal');
+    }
+    
+    aboutModal.classList.add('active');
+  }
+
+  /**
+   * Скрыть "О игре"
+   */
+  hideAbout() {
+    const aboutModal = document.getElementById('about-modal');
+    if (!aboutModal) return;
+    
+    aboutModal.classList.remove('active');
+    
+    // Возвращаем меню в основное состояние
+    this.currentMenuState = 'main';
+    this.updateMenuTitle();
+  }
+
+  /**
+   * Обновить отображение расписания
+   */
+  updateScheduleDisplay() {
+    const scheduleList = document.getElementById('schedule-list');
+    if (!scheduleList || !this.config) return;
+
+    const schedule = this.config.ROUTE_SCHEDULE;
+    let html = '';
+    
+    schedule.forEach((item, index) => {
+      const isCurrent = index === this.currentRouteIndex;
+      const status = isCurrent ? ' (текущий)' : '';
+      
+      html += `
+        <div class="schedule-item ${isCurrent ? 'current' : ''}">
+          <div class="schedule-time">${item.time || '--:--'}</div>
+          <div class="schedule-destination">${item.name}${status}</div>
+          <div class="schedule-location">${item.location}</div>
+        </div>
+      `;
+    });
+    
+    if (html === '') {
+      html = '<div class="no-schedule">Расписание пусто</div>';
+    }
+    
+    scheduleList.innerHTML = html;
   }
 
   /**
@@ -531,11 +900,19 @@ export class UIRenderer {
     this.updateDateTimeDisplay();
     this.updateRouteDisplay(isAtDestination);
     this.updateZoomButton();
+    this.updateSpeedDisplay();
+    this.updateCarLightsDisplay();
     
     // Обновляем журнал, если он открыт
     const journalModal = document.getElementById('journal-modal');
     if (journalModal && journalModal.classList.contains('active')) {
       this.updateJournalDisplay();
+    }
+    
+    // Обновляем расписание, если оно открыто
+    const scheduleModal = document.getElementById('schedule-modal');
+    if (scheduleModal && scheduleModal.classList.contains('active')) {
+      this.updateScheduleDisplay();
     }
   }
 }

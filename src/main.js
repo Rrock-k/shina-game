@@ -97,6 +97,9 @@ function updateStayTimer() {
 function initEntities() {
   // Создаем сущность машины
   carEntity = new Car(CONFIG, pauseManager);
+  
+  // Делаем carEntity глобально доступным для UI
+  window.carEntity = carEntity;
   carEntity.init({
     currentRouteIndex: currentRouteIndex,
     savedState: savedCarState,
@@ -364,25 +367,37 @@ function setupWorld () {
 
   // Настраиваем кнопку скорости
   speedButton.addEventListener('click', () => {
-    const newBoosted = !pauseManager.isSpeedBoostedEnabled();
-    pauseManager.setSpeedBoosted(newBoosted);
-    pauseManager.setSpeedMultiplier(newBoosted ? 5 : 1);
-    timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
+    const currentSpeed = pauseManager.getSpeedMultiplier();
+    let newSpeed;
+    
+    // Цикл: x1 → x2 → x5 → x1
+    if (currentSpeed === 1) {
+      newSpeed = 2;
+    } else if (currentSpeed === 2) {
+      newSpeed = 5;
+    } else {
+      newSpeed = 1;
+    }
+    
+    pauseManager.setSpeedBoosted(newSpeed > 1);
+    pauseManager.setSpeedMultiplier(newSpeed);
+    timeManager.setSpeedMultiplier(newSpeed);
 
     // Обновляем внешний вид кнопки
-    speedButton.textContent = newBoosted ? 'x5' : 'x1';
-    speedButton.classList.toggle('boosted', newBoosted);
+    speedButton.textContent = `x${newSpeed}`;
+    speedButton.classList.toggle('boosted', newSpeed > 1);
 
     // Логируем изменение
-    console.log(`⚡ СКОРОСТЬ ИГРЫ: ${newBoosted ? 'x5 УСКОРЕНО' : 'x1 НОРМАЛЬНАЯ'}`);
+    console.log(`⚡ СКОРОСТЬ ИГРЫ: x${newSpeed} ${newSpeed > 1 ? 'УСКОРЕНО' : 'НОРМАЛЬНАЯ'}`);
 
     // Показываем уведомление
-    pauseManager.showSpeedNotification(newBoosted ? 'СКОРОСТЬ x5' : 'СКОРОСТЬ x1');
+    pauseManager.showSpeedNotification(`СКОРОСТЬ x${newSpeed}`);
   });
 
   // Инициализируем кнопку
-  speedButton.textContent = pauseManager.isSpeedBoostedEnabled() ? 'x5' : 'x1';
-  speedButton.classList.toggle('boosted', pauseManager.isSpeedBoostedEnabled());
+  const initialSpeed = pauseManager.getSpeedMultiplier();
+  speedButton.textContent = `x${initialSpeed}`;
+  speedButton.classList.toggle('boosted', initialSpeed > 1);
 
   // Настраиваем кнопку масштабирования
   zoomButton.addEventListener('click', () => {

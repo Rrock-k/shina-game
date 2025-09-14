@@ -33,6 +33,9 @@ export class Car {
     // Системы взаимодействия
     this.trafficController = null;
     
+    // Состояние фар
+    this.headlightsOn = false;
+    
     // Callback функции (будут установлены извне)
     this.onArrival = null;
     this.onStateChange = null;
@@ -254,6 +257,36 @@ export class Car {
    */
   setAvatar(avatar) {
     this.avatar = avatar;
+  }
+
+  /**
+   * Переключить состояние фар
+   */
+  toggleHeadlights() {
+    this.headlightsOn = !this.headlightsOn;
+    if (this.onStateChange) {
+      this.onStateChange('headlights_toggled', { headlightsOn: this.headlightsOn });
+    }
+    return this.headlightsOn;
+  }
+
+  /**
+   * Получить состояние фар
+   * @returns {boolean} включены ли фары
+   */
+  areHeadlightsOn() {
+    return this.headlightsOn;
+  }
+
+  /**
+   * Установить состояние фар
+   * @param {boolean} on - включить или выключить фары
+   */
+  setHeadlights(on) {
+    this.headlightsOn = on;
+    if (this.onStateChange) {
+      this.onStateChange('headlights_changed', { headlightsOn: this.headlightsOn });
+    }
   }
 
   /**
