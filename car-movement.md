@@ -141,10 +141,20 @@ function buildGraphPathToBuilding(startIJ, buildingPos) {
 
 ### Этап 3: Улучшение архитектуры (4 шага)
 
-#### Шаг 3.1: Создать класс PathBuilder
+#### Шаг 3.1: Создать класс PathBuilder ✅
 - **Файл**: `src/systems/PathBuilder.js` (новый)
 - **Действие**: Вынести функции построения пути в отдельный класс
 - **Проверка**: Пути строятся через PathBuilder
+- **Статус**: ✅ ВЫПОЛНЕНО - Создан класс PathBuilder с инкапсуляцией всей логики построения путей
+- **Изменения**:
+  - ✅ Создан новый файл `src/systems/PathBuilder.js`
+  - ✅ Перенесены все функции построения пути из `geometry.js` в класс PathBuilder
+  - ✅ Добавлен конструктор, принимающий конфигурацию дорог
+  - ✅ Созданы методы: `buildPathToBuilding()`, `buildIntersectionPath()`, `computeBuildingStop()`, `getNearestIntersectionIJ()`, `getIntersectionCoord()`
+  - ✅ Добавлен метод `updateRoads()` для обновления конфигурации дорог
+  - ✅ Обновлен `main.js` - заменены все прямые вызовы функций на методы PathBuilder
+  - ✅ Убраны неиспользуемые переменные `verticalRoadXs` и `horizontalRoadYs` из `buildCarPath()`
+  - ✅ PathBuilder инициализируется с конфигурацией дорог при создании машины
 
 #### Шаг 3.2: Создать класс MovementController
 - **Файл**: `src/systems/MovementController.js` (новый)

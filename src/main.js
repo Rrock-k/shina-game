@@ -14,7 +14,7 @@ import { UIRenderer } from './rendering/UIRenderer.js';
 import { Car } from './entities/Car.js';
 import { Shina } from './entities/Shina.js';
 // Утилиты
-import { indexOfClosest, getIntersectionCoord, getNearestIntersectionIJ, computeBuildingStop, buildIntersectionPath, buildGraphPathToBuilding } from './utils/geometry.js';
+import { PathBuilder } from './systems/PathBuilder.js';
 import { randInt } from './utils/math.js';
 
 // globals
@@ -22,6 +22,7 @@ let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, inter
 let carPath = [], carSegment = 0, carProgress = 0;
 let avatar;
 let carTrafficController;
+let pathBuilder;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
@@ -565,26 +566,23 @@ function buildCarPath () {
   const currentDestination = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   if (!currentDestination) return [];
 
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-
   // Определяем стартовый перекрёсток
   let startIJ;
   if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
     // Если машина уже существует, имеет позицию И это не первый запуск (не дом), начинаем с её текущей позиции
     const carPos = carEntity.getPosition();
-    startIJ = getNearestIntersectionIJ(carPos.x, carPos.y, verticalRoadXs, horizontalRoadYs);
+    startIJ = pathBuilder.getNearestIntersectionIJ(carPos.x, carPos.y);
   } else {
     // Иначе начинаем с дома (первый запуск или нет машины)
     const housePos = getDestinationCenter('house');
-    startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
+    startIJ = pathBuilder.getNearestIntersectionIJ(housePos.x, housePos.y);
   }
 
   const destCenter = getDestinationCenter(currentDestination.location);
-  const graphPath = buildGraphPathToBuilding(startIJ, destCenter, verticalRoadXs, horizontalRoadYs);
+  const graphPath = pathBuilder.buildPathToBuilding(startIJ, destCenter);
 
   // Строим путь в зависимости от текущего состояния машины
-  const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, verticalRoadXs, horizontalRoadYs);
+  const startIntersection = pathBuilder.getIntersectionCoord(startIJ.i, startIJ.j);
   let path;
   
   if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
@@ -670,6 +668,11 @@ function createCar () {
   
   // Инициализируем контроллер светофоров
   carTrafficController = new CarTrafficController();
+
+  // Инициализируем PathBuilder
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
+  pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs);
 
   // Начинаем с дома
   currentRouteIndex = 0; // дом
@@ -805,10 +808,8 @@ function saveCarStateForNextDestination () {
 
   // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
   const currentPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const currentIJ = getNearestIntersectionIJ(currentPos.x, currentPos.y, verticalRoadXs, horizontalRoadYs);
-  const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter, verticalRoadXs, horizontalRoadYs);
+  const currentIJ = pathBuilder.getNearestIntersectionIJ(currentPos.x, currentPos.y);
+  const nextPath = pathBuilder.buildPathToBuilding(currentIJ, nextDestCenter);
 
   // Находим первый перекресток в пути (не точку остановки у здания)
   let nextIntersection = null;
