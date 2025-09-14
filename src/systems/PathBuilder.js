@@ -11,12 +11,14 @@ import {
   buildIntersectionPath, 
   buildGraphPathToBuilding 
 } from '../utils/geometry.js';
+import { PathValidator } from '../utils/PathValidator.js';
 
 export class PathBuilder {
   constructor(verticalRoadXs, horizontalRoadYs, config = null) {
     this.verticalRoadXs = verticalRoadXs;
     this.horizontalRoadYs = horizontalRoadYs;
     this.config = config;
+    this.validator = new PathValidator(verticalRoadXs, horizontalRoadYs);
   }
 
   /**
@@ -26,12 +28,31 @@ export class PathBuilder {
    * @returns {Array} - массив точек пути включая точку остановки у здания
    */
   buildPathToBuilding(startIJ, buildingPos) {
-    return buildGraphPathToBuilding(
+    // Валидация входных параметров
+    const startValidation = this.validator.validateIntersection(startIJ);
+    if (!startValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации начального перекрестка:', startValidation.errors);
+    }
+    
+    if (!buildingPos || typeof buildingPos.x !== 'number' || typeof buildingPos.y !== 'number') {
+      console.warn('⚠️ Предупреждение валидации позиции здания:', buildingPos);
+      return [];
+    }
+    
+    const path = buildGraphPathToBuilding(
       startIJ, 
       buildingPos, 
       this.verticalRoadXs, 
       this.horizontalRoadYs
     );
+    
+    // Валидация построенного пути
+    const pathValidation = this.validator.validatePath(path, 'buildPathToBuilding');
+    if (!pathValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации построенного пути:', pathValidation.errors);
+    }
+    
+    return path;
   }
 
   /**
@@ -41,12 +62,31 @@ export class PathBuilder {
    * @returns {Array} - массив координат перекрестков {x, y}
    */
   buildIntersectionPath(fromIJ, toIJ) {
-    return buildIntersectionPath(
+    // Валидация входных параметров
+    const fromValidation = this.validator.validateIntersection(fromIJ);
+    if (!fromValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации начального перекрестка:', fromValidation.errors);
+    }
+    
+    const toValidation = this.validator.validateIntersection(toIJ);
+    if (!toValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации конечного перекрестка:', toValidation.errors);
+    }
+    
+    const path = buildIntersectionPath(
       fromIJ, 
       toIJ, 
       this.verticalRoadXs, 
       this.horizontalRoadYs
     );
+    
+    // Валидация построенного пути
+    const pathValidation = this.validator.validatePath(path, 'buildIntersectionPath');
+    if (!pathValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации пути по перекресткам:', pathValidation.errors);
+    }
+    
+    return path;
   }
 
   /**
@@ -55,11 +95,24 @@ export class PathBuilder {
    * @returns {Object} - объект с точкой остановки и информацией о ближайшем перекрестке
    */
   computeBuildingStop(buildingPos) {
-    return computeBuildingStop(
+    if (!buildingPos || typeof buildingPos.x !== 'number' || typeof buildingPos.y !== 'number') {
+      console.warn('⚠️ Предупреждение валидации позиции здания:', buildingPos);
+      return null;
+    }
+    
+    const buildingStop = computeBuildingStop(
       buildingPos, 
       this.verticalRoadXs, 
       this.horizontalRoadYs
     );
+    
+    // Валидация результата
+    const validation = this.validator.validateBuildingStop(buildingStop);
+    if (!validation.isValid) {
+      console.warn('⚠️ Предупреждение валидации точки остановки у здания:', validation.errors);
+    }
+    
+    return buildingStop;
   }
 
   /**
@@ -157,16 +210,35 @@ export class PathBuilder {
           y: currentPos.y + directionY * intermediateDistance
         };
 
-        path.splice(1, 0, intermediatePoint);
-        if (debugLogAlways) {
-          debugLogAlways(`🔄 Добавлена промежуточная точка для плавного старта: угол разности ${(angleDifference * 180 / Math.PI).toFixed(1)}°, длина сегмента ${currentLength.toFixed(1)}, расстояние ${intermediateDistance.toFixed(1)}`);
+        // Проверяем, что промежуточная точка не создает диагональное движение
+        if (!this.validator.wouldCreateDiagonalMovement(currentPos, intermediatePoint, nextPos)) {
+          path.splice(1, 0, intermediatePoint);
+          if (debugLogAlways) {
+            debugLogAlways(`🔄 Добавлена промежуточная точка для плавного старта: угол разности ${(angleDifference * 180 / Math.PI).toFixed(1)}°, длина сегмента ${currentLength.toFixed(1)}, расстояние ${intermediateDistance.toFixed(1)}`);
+          }
+        } else if (debugLogAlways) {
+          const dx1 = Math.abs(intermediatePoint.x - currentPos.x);
+          const dy1 = Math.abs(intermediatePoint.y - currentPos.y);
+          const dx2 = Math.abs(nextPos.x - intermediatePoint.x);
+          const dy2 = Math.abs(nextPos.y - intermediatePoint.y);
+          debugLogAlways(`⚠️ Пропущена промежуточная точка из-за диагонального движения: dx1=${dx1.toFixed(1)}, dy1=${dy1.toFixed(1)}, dx2=${dx2.toFixed(1)}, dy2=${dy2.toFixed(1)}`);
         }
       }
     }
 
+    // Фильтрация дублирующихся точек
+    const finalPath = this.validator.filterDuplicatePoints(path);
+
+    // Валидация финального пути
+    const finalPathValidation = this.validator.validatePath(finalPath, `buildCarPath-${currentDestination.name}`);
+    if (!finalPathValidation.isValid) {
+      console.warn('⚠️ Предупреждение валидации финального пути машины:', finalPathValidation.errors);
+      // Продолжаем работу даже при предупреждениях валидации
+    }
+
     if (debugLogAlways) {
-      debugLogAlways(`🗺️ Graph path to ${currentDestination.name}:`, path.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
-      debugLogAlways(`🚗 Car will start from segment 0: (${path[0]?.x?.toFixed(0) || 'N/A'},${path[0]?.y?.toFixed(0) || 'N/A'}) to (${path[1]?.x?.toFixed(0) || 'N/A'},${path[1]?.y?.toFixed(0) || 'N/A'})`);
+      debugLogAlways(`🗺️ Graph path to ${currentDestination.name}:`, finalPath.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
+      debugLogAlways(`🚗 Car will start from segment 0: (${finalPath[0]?.x?.toFixed(0) || 'N/A'},${finalPath[0]?.y?.toFixed(0) || 'N/A'}) to (${finalPath[1]?.x?.toFixed(0) || 'N/A'},${finalPath[1]?.y?.toFixed(0) || 'N/A'})`);
 
       // Дополнительная отладочная информация о сохраненном состоянии
       if (savedCarState) {
@@ -181,9 +253,10 @@ export class PathBuilder {
       }
     }
 
-    return path;
+    return finalPath;
   }
 
+  
   /**
    * Обновить конфигурацию дорог
    * @param {number[]} verticalRoadXs - массив X координат вертикальных дорог
@@ -192,5 +265,6 @@ export class PathBuilder {
   updateRoads(verticalRoadXs, horizontalRoadYs) {
     this.verticalRoadXs = verticalRoadXs;
     this.horizontalRoadYs = horizontalRoadYs;
+    this.validator.updateRoads(verticalRoadXs, horizontalRoadYs);
   }
 }

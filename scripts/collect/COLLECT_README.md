@@ -12,17 +12,23 @@
 
 **Использование:**
 ```bash
-node collect-files.js
+node collect-files.cjs
+# или
+npm run collect-full
 ```
 
-### 2. `quick-collect.js` - Быстрый скрипт
+### 2. `quick-collect.cjs` - Быстрый скрипт
 - ⚡ Быстрая работа
 - 🎯 Простая логика исключений
 - 📦 Минимальные зависимости
 
 **Использование:**
 ```bash
-node quick-collect.js
+node quick-collect.cjs
+# или
+npm run collect
+# или
+./collect.sh quick
 ```
 
 ## Результат
@@ -49,12 +55,12 @@ node quick-collect.js
 
 ## Исключаемые файлы и папки
 
-### collect-files.js
+### collect-files.cjs
 - Все правила из `.gitignore`
 - Системные файлы (.DS_Store, Thumbs.db)
 - IDE файлы (.vscode, .idea)
 
-### quick-collect.js
+### quick-collect.cjs
 - `node_modules/`
 - `.git/`
 - `.DS_Store`
@@ -63,18 +69,26 @@ node quick-collect.js
 
 ## Рекомендации
 
-- **Для большинства случаев**: используйте `quick-collect.js`
-- **Для сложных проектов**: используйте `collect-files.js`
+- **Для большинства случаев**: используйте `quick-collect.cjs`
+- **Для сложных проектов**: используйте `collect-files.cjs`
 - **Для больших репозиториев**: рассмотрите возможность исключения дополнительных папок
 
 ## Примеры использования
 
 ```bash
 # Быстрый сбор
-node quick-collect.js
+npm run collect
 
 # Полный сбор с .gitignore
-node collect-files.js
+npm run collect-full
+
+# Интерактивное меню утилит
+npm run manage
+
+# Прямой запуск скриптов
+node scripts/collect/quick-collect.cjs
+node scripts/collect/collect-files.cjs
+node scripts/collect/manage.cjs
 
 # Проверка размера результата
 ls -lh repository-content.txt

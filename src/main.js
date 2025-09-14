@@ -584,6 +584,12 @@ function createCar () {
   // Инициализируем PathBuilder
   const verticalRoadXs = getVerticalRoadXs();
   const horizontalRoadYs = getHorizontalRoadYs();
+  console.log('🔧 Инициализация PathBuilder:', {
+    verticalRoads: verticalRoadXs.length,
+    horizontalRoads: horizontalRoadYs.length,
+    verticalRoadXs: verticalRoadXs.slice(0, 5), // первые 5 для примера
+    horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
+  });
   pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
 
   // Начинаем с дома
