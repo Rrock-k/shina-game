@@ -12,7 +12,6 @@ import { WorldRenderer } from './rendering/WorldRenderer.js';
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
 let carPath = [], carSegment = 0, carProgress = 0;
 let avatar;
-let horizontalRoadYs = [], verticalRoadXs = [];
 let hoverLabel;
 let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
@@ -263,6 +262,7 @@ function setupWorld () {
   worldRenderer = new WorldRenderer(CONFIG, app);
   worldRenderer.init(world, {
     grid: gridLayer,
+    roads: roadsLayer,
     border: borderLayer
   });
 
@@ -277,8 +277,6 @@ function setupWorld () {
 
   // Используем WorldRenderer для отрисовки базовых элементов
   worldRenderer.render();
-  
-  drawRoads(roadsLayer);
   createIntersections(intersectionsLayer);
   drawLots(lotsLayer);
   drawZones(zonesLayer);
@@ -577,30 +575,18 @@ function updateRouteDisplay () {
   }
 }
 
-function getRoadPositions () {
-  const margin = CONFIG.ROAD_MARGIN;
-  const horizontalPositions = [];
-  const verticalPositions = [];
-  const availableHeight = CONFIG.WORLD_HEIGHT - 2 * margin;
-  for (let i = 0; i < 4; i++) {
-    const y = margin + (availableHeight / (4 - 1)) * i;
-    horizontalPositions.push(y);
-  }
-  const availableWidth = CONFIG.WORLD_WIDTH - 2 * margin;
-  for (let i = 0; i < 7; i++) {
-    const x = margin + (availableWidth / (7 - 1)) * i;
-    verticalPositions.push(x);
-  }
-  const maxVerticalPos = verticalPositions[verticalPositions.length - 1];
-
-  // Отладочная информация о позициях дорог
-  console.log('Horizontal roads (Y coordinates):', horizontalPositions);
-  console.log('Vertical roads (X coordinates):', verticalPositions);
-
-  return { horizontalPositions, verticalPositions, maxVerticalPos };
-}
+// Функция getRoadPositions перенесена в WorldRenderer
 
 // Функции drawGrid и drawWorldBorder перенесены в WorldRenderer
+
+// Функции-обертки для получения позиций дорог из WorldRenderer
+function getHorizontalRoadYs() {
+  return worldRenderer ? worldRenderer.getHorizontalRoadYs() : [];
+}
+
+function getVerticalRoadXs() {
+  return worldRenderer ? worldRenderer.getVerticalRoadXs() : [];
+}
 
 function randInt (min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -624,6 +610,8 @@ function generateBuildingSlots (maxSlots) {
 }
 
 function drawLots (layer) {
+  const horizontalRoadYs = getHorizontalRoadYs();
+  const verticalRoadXs = getVerticalRoadXs();
   if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
   const roadHalf = CONFIG.ROAD_WIDTH / 2;
   const cols = 2; // по горизонтали
@@ -669,6 +657,8 @@ function drawLots (layer) {
 }
 
 function drawZones (layer) {
+  const horizontalRoadYs = getHorizontalRoadYs();
+  const verticalRoadXs = getVerticalRoadXs();
   if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
   const roadHalf = CONFIG.ROAD_WIDTH / 2;
   const cols = 2;
@@ -845,44 +835,7 @@ function drawZones (layer) {
   }
 }
 
-function drawRoads (layer) {
-  const { horizontalPositions, verticalPositions, maxVerticalPos } = getRoadPositions();
-  horizontalRoadYs = horizontalPositions;
-  verticalRoadXs = verticalPositions;
-
-  // Рисуем горизонтальные дороги
-  horizontalRoadYs.forEach(y => {
-    const h = [{ x: verticalRoadXs[0], y: y }, { x: maxVerticalPos, y: y }];
-    const roadH = new PIXI.Graphics();
-    roadH.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
-    roadH.moveTo(h[0].x, h[0].y);
-    roadH.lineTo(h[1].x, h[1].y);
-    layer.addChild(roadH);
-    const dashH = new PIXI.Graphics();
-    dashH.lineStyle(CONFIG.ROAD_LINE_WIDTH, CONFIG.COLORS.roadLine, 1);
-    drawDashedPath(dashH, h, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
-    layer.addChild(dashH);
-  });
-
-  // Рисуем вертикальные дороги
-  verticalRoadXs.forEach(x => {
-    let v;
-    if (x === maxVerticalPos) {
-      v = [{ x: x, y: 0 }, { x: x, y: CONFIG.WORLD_HEIGHT }];
-    } else {
-      v = [{ x: x, y: horizontalRoadYs[0] }, { x: x, y: horizontalRoadYs[horizontalRoadYs.length - 1] }];
-    }
-    const roadV = new PIXI.Graphics();
-    roadV.lineStyle(CONFIG.ROAD_WIDTH, CONFIG.COLORS.road, 1);
-    roadV.moveTo(v[0].x, v[0].y);
-    roadV.lineTo(v[1].x, v[1].y);
-    layer.addChild(roadV);
-    const dashV = new PIXI.Graphics();
-    dashV.lineStyle(CONFIG.ROAD_LINE_WIDTH, CONFIG.COLORS.roadLine, 1);
-    drawDashedPath(dashV, v, CONFIG.DASH_LENGTH, CONFIG.DASH_GAP);
-    layer.addChild(dashV);
-  });
-}
+// Функция drawRoads перенесена в WorldRenderer
 
 function createIntersections (layer) {
   // Подпись при наведении
@@ -901,6 +854,8 @@ function createIntersections (layer) {
 
   const hitRadius = 60;
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const horizontalRoadYs = getHorizontalRoadYs();
+  const verticalRoadXs = getVerticalRoadXs();
 
   for (let j = 0; j < horizontalRoadYs.length; j++) {
     for (let i = 0; i < verticalRoadXs.length; i++) {
@@ -951,7 +906,9 @@ function createIntersections (layer) {
 
 function createTrafficLightsForAllIntersections (layer) {
   intersectionKeyToTL.clear();
-  const { maxVerticalPos } = getRoadPositions();
+  const { maxVerticalPos } = worldRenderer ? worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
+  const horizontalRoadYs = getHorizontalRoadYs();
+  const verticalRoadXs = getVerticalRoadXs();
 
   for (let j = 0; j < horizontalRoadYs.length; j++) {
     for (let i = 0; i < verticalRoadXs.length; i++) {
@@ -996,25 +953,7 @@ function createTrafficLightsForAllIntersections (layer) {
   }
 }
 
-function drawDashedPath (g, points, dash, gap) {
-  for (let i = 0; i < points.length - 1; i++) {
-    const p1 = points[i], p2 = points[i + 1];
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const len = Math.hypot(dx, dy);
-    let t = 0;
-    while (t <= len) {
-      const from = t;
-      const to = Math.min(t + dash, len);
-      const sx = p1.x + dx * (from / len);
-      const sy = p1.y + dy * (from / len);
-      const ex = p1.x + dx * (to / len);
-      const ey = p1.y + dy * (to / len);
-      g.moveTo(sx, sy);
-      g.lineTo(ex, ey);
-      t += dash + gap;
-    }
-  }
-}
+// Функция drawDashedPath перенесена в WorldRenderer
 
 function drawTrafficLights (layer) {
   CONFIG.TRAFFIC_LIGHTS.forEach(pos => {
@@ -1109,16 +1048,23 @@ function indexOfClosest (arr, value) {
 }
 
 function getIntersectionCoord (i, j) {
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
   return { x: verticalRoadXs[i], y: horizontalRoadYs[j] };
 }
 
 function getNearestIntersectionIJ (x, y) {
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
   return { i: indexOfClosest(verticalRoadXs, x), j: indexOfClosest(horizontalRoadYs, y) };
 }
 
 // Рассчитать точку остановки у здания: на ближайшей дороге, рядом с центром зоны
 // Возвращает { stop: {x,y}, nearestIJ: {i,j}, orientation: 'vertical'|'horizontal' }
 function computeBuildingStop (buildingPos) {
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
+  
   const nearestVXIndex = indexOfClosest(verticalRoadXs, buildingPos.x);
   const nearestVx = verticalRoadXs[nearestVXIndex];
   const distToV = Math.abs(buildingPos.x - nearestVx);
@@ -1143,6 +1089,8 @@ function computeBuildingStop (buildingPos) {
 
 // Поиск пути по сетке перекрёстков (BFS) от (i0,j0) к (i1,j1). Возвращает массив координат перекрёстков
 function buildIntersectionPath (fromIJ, toIJ) {
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
   const cols = verticalRoadXs.length;
   const rows = horizontalRoadYs.length;
   const key = (i, j) => `${i},${j}`;
@@ -1198,6 +1146,8 @@ function getDestinationCenter (locationKey) {
   if (z && z.center) return z.center;
   // fallback: из статического конфига
   const def = CONFIG.ZONES[locationKey];
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
   if (!def) return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
   if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
   if (def.type === 'circle') return { x: def.x, y: def.y };
@@ -1708,7 +1658,7 @@ function updateCar (delta) {
       y: car.position.y + offsetY
     };
     const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
-    const roadPositions = { verticalRoadXs, horizontalRoadYs };
+    const roadPositions = { verticalRoadXs: getVerticalRoadXs(), horizontalRoadYs: getHorizontalRoadYs() };
 
     // Проверяем расстояние до целевого перекрестка
     const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
