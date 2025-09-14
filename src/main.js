@@ -6,6 +6,7 @@ import { CONFIG } from './config/gameConfig.js';
 import { TimeManager } from './game/TimeManager.js';
 import { PauseManager } from './game/PauseManager.js';
 import { DayNightManager } from './game/DayNightManager.js';
+import { JournalManager } from './game/JournalManager.js';
 import { WorldRenderer } from './rendering/WorldRenderer.js';
 import { CarRenderer } from './rendering/CarRenderer.js';
 import { UIRenderer } from './rendering/UIRenderer.js';
@@ -18,7 +19,7 @@ let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let timeManager, pauseManager, dayNightManager, worldRenderer, carRenderer, uiRenderer;
+let timeManager, pauseManager, dayNightManager, journalManager, worldRenderer, carRenderer, uiRenderer;
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -118,6 +119,7 @@ setupApp();
 // Инициализируем менеджеры
 timeManager = new TimeManager();
 pauseManager = new PauseManager();
+journalManager = new JournalManager(timeManager);
 
 // Синхронизируем менеджеры
 timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
@@ -132,7 +134,7 @@ setupWorld();
 dayNightManager = new DayNightManager(PIXI, CONFIG);
 
 // Инициализируем UIRenderer
-uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController);
+uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController, journalManager);
 
 // Инициализируем UI
 uiRenderer.init();
@@ -649,6 +651,8 @@ function createCar () {
     uiRenderer.setCurrentRouteIndex(currentRouteIndex);
   }
 
+  // Не начинаем поездку сразу - она начнется при выходе из здания
+
   // Теперь строим путь и устанавливаем его
   carPath = buildCarPath();
   carRenderer.setPath(carPath);
@@ -709,6 +713,12 @@ function updateGameTime () {
 function nextDestination () {
   debugLogAlways(`🔄 Переход к следующему пункту назначения`);
 
+  // Завершаем пребывание в текущем месте
+  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+  if (journalManager && currentDest) {
+    journalManager.endLocationStay(currentDest.name);
+  }
+
   // Скрываем аватарку в текущем здании
   hideBuildingAvatar();
 
@@ -740,6 +750,12 @@ function nextDestination () {
     // Обновляем путь к новому пункту назначения
     const newPath = buildCarPath();
     carRenderer.setPath(newPath);
+  }
+
+  // Начинаем новую дорогу в журнале при выходе из здания
+  const newDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+  if (journalManager && newDest) {
+    journalManager.startTrip(newDest.name, newDest.location);
   }
 
   uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
@@ -799,6 +815,11 @@ function checkArrival () {
   const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
   if (carRenderer && !carRenderer.isAtDestination()) {
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
+
+    // Завершаем дорогу в журнале при входе в здание
+    if (journalManager && currentDest) {
+      journalManager.endTrip(currentDest.name);
+    }
 
     // Сохраняем состояние машины для плавного продолжения движения
     savedCarState = saveCarStateForNextDestination();

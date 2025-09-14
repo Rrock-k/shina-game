@@ -120,4 +120,11 @@ export class TimeManager {
   getCurrentMinutes() {
     return Math.floor(this.gameTime.minutes);
   }
+
+  // Форматировать только время (HH:MM)
+  formatTime() {
+    const hours = Math.floor(this.gameTime.hours).toString().padStart(2, '0');
+    const minutes = Math.floor(this.gameTime.minutes).toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
 }

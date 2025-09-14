@@ -3,12 +3,13 @@
  * Обрабатывает меню, уведомления, дисплеи и кнопки
  */
 export class UIRenderer {
-  constructor(config, timeManager, pauseManager, dayNightManager, panningController) {
+  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager) {
     this.config = config;
     this.timeManager = timeManager;
     this.pauseManager = pauseManager;
     this.dayNightManager = dayNightManager;
     this.panningController = panningController;
+    this.journalManager = journalManager;
     
     // UI элементы
     this.datetimeDisplay = null;
@@ -21,6 +22,8 @@ export class UIRenderer {
     // Состояние
     this.isInitialized = false;
     this.currentRouteIndex = 0;
+    this.journalUpdateInterval = null;
+    this.currentMenuState = 'main'; // 'main', 'journal'
   }
 
   /**
@@ -43,6 +46,9 @@ export class UIRenderer {
     // Инициализируем дисплеи
     this.updateRouteDisplay();
     this.updateDateTimeDisplay();
+    
+    // Инициализируем заголовок меню
+    this.updateMenuTitle();
     
     this.isInitialized = true;
   }
@@ -96,6 +102,20 @@ export class UIRenderer {
       }
     });
 
+    // Обработчик для кнопки "Назад" в заголовке
+    const modalBackBtn = document.getElementById('modal-back-btn');
+    if (modalBackBtn) {
+      modalBackBtn.addEventListener('click', () => {
+        // Возвращаем меню в основное состояние
+        this.currentMenuState = 'main';
+        this.updateMenuTitle();
+        
+        menuModal.classList.remove('active');
+        burgerButton.classList.remove('active');
+        updatePanningState();
+      });
+    }
+
     // Обработчики для пунктов меню
     menuItems.forEach(item => {
       item.addEventListener('click', () => {
@@ -139,6 +159,10 @@ export class UIRenderer {
             menuModal.classList.remove('active');
             burgerButton.classList.remove('active');
             updatePanningState();
+            break;
+          case 'menu-journal':
+            // Переключаем отображение журнала
+            this.toggleJournal();
             break;
           case 'menu-about':
             this.showMenuNotification('ℹ️ О игре', 'Карта Шины - симулятор движения по городу с системой светофоров и маршрутизацией.');
@@ -252,6 +276,254 @@ export class UIRenderer {
   }
 
   /**
+   * Обновить заголовок меню
+   */
+  updateMenuTitle() {
+    const modalTitle = document.querySelector('.modal-title');
+    if (!modalTitle) return;
+
+    switch (this.currentMenuState) {
+      case 'main':
+        modalTitle.textContent = 'Меню игры';
+        break;
+      case 'journal':
+        modalTitle.textContent = 'Журнал поездок';
+        break;
+      default:
+        modalTitle.textContent = 'Меню игры';
+    }
+  }
+
+
+
+  /**
+   * Переключить отображение журнала
+   */
+  toggleJournal() {
+    // Изменяем состояние меню на журнал
+    this.currentMenuState = 'journal';
+    this.updateMenuTitle();
+    
+    let journalModal = document.getElementById('journal-modal');
+    if (!journalModal) {
+      this.createJournalModal();
+      journalModal = document.getElementById('journal-modal');
+    }
+    
+    if (journalModal.classList.contains('active')) {
+      this.hideJournal();
+    } else {
+      this.showJournal();
+    }
+  }
+
+  /**
+   * Создать модальное окно журнала
+   */
+  createJournalModal() {
+    const journalModal = document.createElement('div');
+    journalModal.id = 'journal-modal';
+    journalModal.className = 'modal-overlay';
+    journalModal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <button class="modal-back-btn" id="journal-back-btn">&lt;</button>
+          <h2 class="modal-title">Журнал поездок</h2>
+          <button class="modal-close" id="journal-close-btn">&times;</button>
+        </div>
+        <div class="journal-content">
+          <div class="trip-list" id="journal-trip-list">
+            <!-- Записи журнала будут добавлены динамически -->
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(journalModal);
+    
+    // Обработчики событий
+    const backBtn = document.getElementById('journal-back-btn');
+    const closeBtn = document.getElementById('journal-close-btn');
+    
+    backBtn.addEventListener('click', () => this.hideJournal());
+    closeBtn.addEventListener('click', () => this.hideJournal());
+    
+    // Закрытие по клику на фон
+    journalModal.addEventListener('click', (e) => {
+      if (e.target === journalModal) {
+        this.hideJournal();
+      }
+    });
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && journalModal.classList.contains('active')) {
+        this.hideJournal();
+      }
+    });
+  }
+
+  /**
+   * Показать журнал
+   */
+  showJournal() {
+    let journalModal = document.getElementById('journal-modal');
+    if (!journalModal) {
+      this.createJournalModal();
+      journalModal = document.getElementById('journal-modal');
+    }
+    
+    journalModal.classList.add('active');
+    this.updateJournalDisplay();
+    
+    // Запускаем обновление в реальном времени
+    if (this.journalUpdateInterval) {
+      clearInterval(this.journalUpdateInterval);
+    }
+    this.journalUpdateInterval = setInterval(() => {
+      this.updateJournalDisplay();
+    }, 1000);
+  }
+
+  /**
+   * Скрыть журнал
+   */
+  hideJournal() {
+    const journalModal = document.getElementById('journal-modal');
+    if (!journalModal) return;
+    
+    journalModal.classList.remove('active');
+    
+    // Возвращаем меню в основное состояние
+    this.currentMenuState = 'main';
+    this.updateMenuTitle();
+    
+    // Останавливаем обновление
+    if (this.journalUpdateInterval) {
+      clearInterval(this.journalUpdateInterval);
+      this.journalUpdateInterval = null;
+    }
+  }
+
+  /**
+   * Обновить отображение журнала
+   */
+  updateJournalDisplay() {
+    if (!this.journalManager) return;
+
+    const tripList = document.getElementById('journal-trip-list');
+    if (!tripList) return;
+
+    const journal = this.journalManager.getJournal();
+    const currentTrip = this.journalManager.getCurrentTrip();
+    
+    // Проверяем, есть ли новые записи
+    const currentJournalLength = tripList.children.length;
+    const newJournalLength = journal.length + (currentTrip ? 1 : 0);
+    
+    let html = '';
+    
+    // Добавляем записи журнала (самые новые внизу)
+    journal.forEach(entry => {
+      if (entry.type === 'road') {
+        // Завершенная дорога
+        html += `
+          <div class="trip-item">
+            <div class="trip-destination">Работа ${entry.startTime}-${entry.endTime}</div>
+            <div class="trip-duration">${entry.duration}</div>
+          </div>
+        `;
+      } else if (entry.type === 'departure') {
+        // Завершение пребывания в месте
+        html += `
+          <div class="trip-item departure">
+            <div class="trip-destination">${entry.destination} ${entry.startTime}-${entry.endTime}</div>
+            <div class="trip-duration">${entry.duration}</div>
+          </div>
+        `;
+      }
+    });
+    
+    // Добавляем текущую поездку в конец, если есть
+    if (currentTrip) {
+      const currentTime = this.timeManager.formatTime();
+      const currentDuration = this.calculateCurrentTripDuration(currentTrip.startTime, currentTime);
+      
+      html += `
+        <div class="trip-item current">
+          <div class="trip-destination">Работа ${currentTrip.startTime}-${currentTime}</div>
+          <div class="trip-duration">${currentDuration}</div>
+        </div>
+      `;
+    }
+    
+    if (html === '') {
+      html = '<div class="no-trips">Записей пока нет</div>';
+    }
+    
+    // Если есть новые записи, добавляем анимацию
+    if (newJournalLength > currentJournalLength) {
+      // Сначала обновляем содержимое
+      tripList.innerHTML = html;
+      
+      // Затем анимируем новые элементы
+      const newItems = Array.from(tripList.children).slice(-(newJournalLength - currentJournalLength));
+      newItems.forEach((item, index) => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+          item.style.transition = 'all 0.5s ease-out';
+          item.style.opacity = '1';
+          item.style.transform = 'translateY(0)';
+        }, index * 100); // Задержка для каждого элемента
+      });
+    } else {
+      // Просто обновляем содержимое без анимации
+      tripList.innerHTML = html;
+    }
+  }
+
+  /**
+   * Вычислить продолжительность текущей поездки
+   * @param {string} startTime - время начала (HH:MM)
+   * @param {string} currentTime - текущее время (HH:MM)
+   * @returns {string} отформатированная продолжительность
+   */
+  calculateCurrentTripDuration(startTime, currentTime) {
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    const [currentHours, currentMinutes] = currentTime.split(':').map(Number);
+    
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
+    
+    let durationMinutes = currentTotalMinutes - startTotalMinutes;
+    
+    // Учитываем переход через день
+    if (durationMinutes < 0) {
+      durationMinutes += 24 * 60;
+    }
+
+    return this.formatDuration(durationMinutes);
+  }
+
+  /**
+   * Форматировать продолжительность
+   * @param {number} minutes - минуты
+   * @returns {string} отформатированная продолжительность
+   */
+  formatDuration(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    
+    if (hours > 0) {
+      return `${hours}ч ${mins}м`;
+    } else {
+      return `${mins}м`;
+    }
+  }
+
+  /**
    * Обновление всех UI элементов
    * @param {boolean} isAtDestination - находится ли машина в пункте назначения
    */
@@ -259,5 +531,11 @@ export class UIRenderer {
     this.updateDateTimeDisplay();
     this.updateRouteDisplay(isAtDestination);
     this.updateZoomButton();
+    
+    // Обновляем журнал, если он открыт
+    const journalModal = document.getElementById('journal-modal');
+    if (journalModal && journalModal.classList.contains('active')) {
+      this.updateJournalDisplay();
+    }
   }
 }
