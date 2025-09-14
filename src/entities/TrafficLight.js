@@ -24,6 +24,10 @@ export class TrafficLight {
     this.startDelay = 0;
     this.isActive = true;
     
+    // Поддержка задержки запуска для зеленой волны
+    this.delayElapsedMs = 0; // сколько времени прошло с момента создания
+    this.isDelayActive = false; // активна ли сейчас задержка
+    
     // Визуальное представление
     this.sprite = null;
     this.lamps = {
@@ -110,7 +114,12 @@ export class TrafficLight {
    */
   setStartDelay(delay) {
     this.startDelay = delay;
-    this.cycleStartTime = Date.now() - delay;
+    this.delayElapsedMs = 0;
+    this.isDelayActive = delay > 0;
+    
+    // Сброс светофора в начальное состояние
+    this.currentPhase = 'red';
+    this.cycleStartTime = Date.now();
   }
 
   /**
@@ -182,6 +191,18 @@ export class TrafficLight {
    */
   update(delta) {
     if (!this.isActive) return;
+
+    // Если активна задержка запуска, ждем ее завершения
+    if (this.isDelayActive) {
+      this.delayElapsedMs += delta;
+      if (this.delayElapsedMs >= this.startDelay) {
+        this.isDelayActive = false;
+        // Начинаем нормальную работу светофора
+        this.cycleStartTime = Date.now();
+        this.updateVisualPhase();
+      }
+      return; // не обновляем фазы во время задержки
+    }
 
     const currentTime = Date.now();
     const elapsedTime = (currentTime - this.cycleStartTime) % this.cycleTime;
@@ -358,7 +379,9 @@ export class TrafficLight {
       if (lamp) lamp.visible = false;
     });
 
-    const activeLamp = this.lamps[this.currentPhase];
+    // Во время задержки показываем красный свет
+    const phaseToShow = this.isDelayActive ? 'red' : this.currentPhase;
+    const activeLamp = this.lamps[phaseToShow];
     if (activeLamp) {
       activeLamp.visible = true;
     }
@@ -490,6 +513,15 @@ export class TrafficLight {
       head.yellow.alpha = state === 'yellow' ? 1 : 0.2;
       head.green.alpha = state === 'green' ? 1 : 0.2;
     };
+
+    // Во время задержки все светофоры показывают красный
+    if (this.isDelayActive) {
+      if (this.heads.N) setHeadState(this.heads.N, 'red');
+      if (this.heads.S) setHeadState(this.heads.S, 'red');
+      if (this.heads.W) setHeadState(this.heads.W, 'red');
+      if (this.heads.E) setHeadState(this.heads.E, 'red');
+      return;
+    }
 
     // Определяем состояние для каждого направления
     let nsState = 'red';

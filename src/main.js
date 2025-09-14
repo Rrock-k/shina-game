@@ -12,7 +12,6 @@ import { CarRenderer } from './rendering/CarRenderer.js';
 import { UIRenderer } from './rendering/UIRenderer.js';
 // Новые сущности
 import { Car } from './entities/Car.js';
-import { TrafficLight } from './entities/TrafficLight.js';
 import { Shina } from './entities/Shina.js';
 
 // globals
@@ -27,7 +26,6 @@ let timeManager, pauseManager, dayNightManager, journalManager, worldRenderer, c
 
 // Новые сущности
 let carEntity, shinaEntity;
-let trafficLights = new Map(); // карта светофоров по ключу перекрестка
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -143,64 +141,8 @@ function initEntities() {
     }
   });
 
-  // Создаем светофоры для всех перекрестков
-  createTrafficLightEntities();
 }
 
-// Создание сущностей светофоров
-function createTrafficLightEntities() {
-  const { maxVerticalPos } = worldRenderer ? worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-
-  for (let i = 0; i < verticalRoadXs.length; i++) {
-    for (let j = 0; j < horizontalRoadYs.length; j++) {
-      const x = verticalRoadXs[i];
-      const y = horizontalRoadYs[j];
-
-      // Проверяем, должен ли быть светофор на этом перекрестке
-      if (!shouldHaveTrafficLight(i, j)) {
-        continue;
-      }
-
-      const key = keyForIntersection(x, y);
-      
-      // Создаем сущность светофора
-      const trafficLight = new TrafficLight(CONFIG, {
-        position: { x, y },
-        direction: 'EW', // можно определить по контексту
-        cycleTime: 10000,
-        redTime: 4000,
-        yellowTime: 1000,
-        greenTime: 5000,
-        onPhaseChange: (phase, light) => {
-          console.log(`🚦 Светофор ${key} изменил фазу: ${phase}`);
-        },
-        onStateChange: (event, light) => {
-          console.log(`🚦 Светофор ${key}: ${event}`);
-        }
-      });
-
-      // Создаем визуальное представление
-      const visual = trafficLight.createVisual({
-        PIXI,
-        roadWidth: 48,
-        lampRadius: 8,
-        roadConnections: { north: true, south: true, east: true, west: true }
-      });
-
-      if (visual) {
-        trafficLightsLayer.addChild(visual);
-      }
-
-      // Сохраняем светофор
-      trafficLights.set(key, trafficLight);
-      
-      // Регистрируем в координаторе зеленой волны
-      trafficCoordinator.addTrafficLight(key, trafficLight, x, y);
-    }
-  }
-}
 
 // Обновление сущностей
 function updateEntities(delta) {
@@ -211,7 +153,7 @@ function updateEntities(delta) {
       debugLog: debugLog,
       debugLogAlways: debugLogAlways,
       carTrafficController: carTrafficController,
-      intersectionKeyToTL: trafficLights,
+      intersectionKeyToTL: intersectionKeyToTL,
       getVerticalRoadXs: getVerticalRoadXs,
       getHorizontalRoadYs: getHorizontalRoadYs,
       buildCarPath: buildCarPath,
@@ -228,9 +170,7 @@ function updateEntities(delta) {
     });
   }
 
-  // Обновляем светофоры
-  trafficLights.forEach((trafficLight, key) => {
-    trafficLight.update(delta);
+  intersectionKeyToTL.forEach((trafficLight, key) => {
   });
 }
 
