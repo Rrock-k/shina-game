@@ -28,7 +28,7 @@ let pathBuilder;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let timeManager, pauseManager, dayNightManager, journalManager, worldRenderer, carRenderer, uiRenderer;
+let worldRenderer, carRenderer, uiRenderer;
 
 // Новые сущности
 let carEntity, shinaEntity;
@@ -208,21 +208,15 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 // Создаем экземпляр игры
 const game = new Game();
 
-timeManager = new TimeManager();
-pauseManager = new PauseManager();
-journalManager = new JournalManager(timeManager);
-
-journalManager.setLocationStartTime('Дом');
-
-// Синхронизируем менеджеры
-timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
-timeManager.setPaused(pauseManager.isPaused());
+// Получаем менеджеры из экземпляра игры
+const timeManager = game.timeManager;
+const pauseManager = game.pauseManager;
+const journalManager = game.journalManager;
+const dayNightManager = game.dayNightManager;
 
 let panningController;
 
 setupWorld();
-
-dayNightManager = new DayNightManager(PIXI, CONFIG);
 
 uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController, journalManager);
 

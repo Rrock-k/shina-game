@@ -1,3 +1,9 @@
+import { TimeManager } from './TimeManager.js';
+import { PauseManager } from './PauseManager.js';
+import { DayNightManager } from './DayNightManager.js';
+import { JournalManager } from './JournalManager.js';
+import { CONFIG } from '../config/gameConfig.js';
+
 /**
  * Главный класс игры - централизует управление игровым состоянием и циклом
  */
@@ -42,6 +48,19 @@ class Game {
         window.world = this.world;
         window.decorLayer = this.decorLayer;
         window.trafficLightsLayer = this.trafficLightsLayer;
+        
+        // Создаем менеджеры
+        this.timeManager = new TimeManager();
+        this.pauseManager = new PauseManager();
+        this.journalManager = new JournalManager(this.timeManager);
+        this.dayNightManager = new DayNightManager(PIXI, CONFIG);
+        
+        // Синхронизируем менеджеры
+        this.timeManager.setSpeedMultiplier(this.pauseManager.getSpeedMultiplier());
+        this.timeManager.setPaused(this.pauseManager.isPaused());
+        
+        // Устанавливаем начальное время в журнале
+        this.journalManager.setLocationStartTime('Дом');
     }
 
     /**
