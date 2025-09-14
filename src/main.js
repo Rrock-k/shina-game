@@ -568,25 +568,40 @@ function buildCarPath () {
   const verticalRoadXs = getVerticalRoadXs();
   const horizontalRoadYs = getHorizontalRoadYs();
 
-  // Определяем стартовый перекрёсток - всегда начинаем с дома
-  const housePos = getDestinationCenter('house');
-  const startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
+  // Определяем стартовый перекрёсток
+  let startIJ;
+  if (carRenderer && carRenderer.getCar() && currentRouteIndex !== 0) {
+    // Если машина уже существует И это не первый запуск (не дом), начинаем с её текущей позиции
+    const carPos = carRenderer.getCar().position;
+    startIJ = getNearestIntersectionIJ(carPos.x, carPos.y, verticalRoadXs, horizontalRoadYs);
+  } else {
+    // Иначе начинаем с дома (первый запуск или нет машины)
+    const housePos = getDestinationCenter('house');
+    startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
+  }
 
   const destCenter = getDestinationCenter(currentDestination.location);
   const graphPath = buildGraphPathToBuilding(startIJ, destCenter, verticalRoadXs, horizontalRoadYs);
 
-  // Если мы начинаем с дома, машина должна стоять рядом с домом, а не в здании
+  // Строим путь в зависимости от текущего состояния машины
   const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, verticalRoadXs, horizontalRoadYs);
   let path;
   
-  if (currentDestination.location === 'house') {
-    // Если цель - дом, машина стоит рядом с домом (на перекрёстке)
-    path = [startIntersection, ...graphPath];
+  if (carRenderer && carRenderer.getCar() && currentRouteIndex !== 0) {
+    // Если машина уже существует И это не первый запуск, проверяем, нужно ли добавить префикс
+    const carPos = carRenderer.getCar().position;
+    const needsPrefix = Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1;
+    
+    if (needsPrefix) {
+      // Машина не на перекрестке, добавляем путь от текущей позиции к перекрестку
+      path = [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath];
+    } else {
+      // Машина уже на перекрестке
+      path = [startIntersection, ...graphPath];
+    }
   } else {
-    // Если цель - другое здание, машина стоит рядом с домом и едет к цели
-    const carPos = carRenderer ? carRenderer.getCar().position : startIntersection;
-    const needsPrefix = carRenderer && (Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1);
-    path = needsPrefix ? [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath] : [startIntersection, ...graphPath];
+    // Машина не существует или это первый запуск, начинаем с перекрестка
+    path = [startIntersection, ...graphPath];
   }
 
   // Если у нас есть сохраненное состояние и мы начинаем с текущей позиции машины,

@@ -532,17 +532,17 @@ export class Car {
     // Определяем стартовый перекрёсток
     let startIJ;
     if (this.position.x !== 0 || this.position.y !== 0) {
-      startIJ = getNearestIntersectionIJ(this.position.x, this.position.y);
+      startIJ = getNearestIntersectionIJ(this.position.x, this.position.y, options.verticalRoadXs, options.horizontalRoadYs);
     } else {
       const housePos = getDestinationCenter('house');
-      startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
+      startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, options.verticalRoadXs, options.horizontalRoadYs);
     }
 
     const destCenter = getDestinationCenter(currentDestination.location);
-    const graphPath = buildGraphPathToBuilding(startIJ, destCenter);
+    const graphPath = buildGraphPathToBuilding(startIJ, destCenter, options.verticalRoadXs, options.horizontalRoadYs);
 
     // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
-    const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
+    const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, options.verticalRoadXs, options.horizontalRoadYs);
     const needsPrefix = Math.abs(this.position.x - startIntersection.x) > 1 || Math.abs(this.position.y - startIntersection.y) > 1;
     const path = needsPrefix ? [{ x: this.position.x, y: this.position.y }, startIntersection, ...graphPath] : graphPath;
 
@@ -615,8 +615,8 @@ export class Car {
     const nextDestCenter = getDestinationCenter(nextDestination.location);
 
     // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
-    const currentIJ = getNearestIntersectionIJ(this.position.x, this.position.y);
-    const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter);
+    const currentIJ = getNearestIntersectionIJ(this.position.x, this.position.y, options.verticalRoadXs, options.horizontalRoadYs);
+    const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter, options.verticalRoadXs, options.horizontalRoadYs);
 
     // Находим первый перекресток на пути к следующему пункту назначения
     let nextIntersection = null;
