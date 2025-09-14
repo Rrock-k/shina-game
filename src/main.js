@@ -2,7 +2,7 @@
 import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './systems/trafficLights.js';
 import { CarTrafficController } from './systems/carTrafficControl.js';
 import { PanningController } from './systems/panning.js';
-import { CONFIG, BASE_CAR_SPEED } from './config/gameConfig.js';
+import { CONFIG } from './config/gameConfig.js';
 import { TimeManager } from './game/TimeManager.js';
 import { PauseManager } from './game/PauseManager.js';
 import { DayNightManager } from './game/DayNightManager.js';

@@ -9,7 +9,7 @@ export class TimeManager {
       minutes: 0
     }; // начинаем с 7 сентября 2025, 06:00
     
-    this.baseTimeSpeed = 60; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
+    this.baseTimeSpeed = 25; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
     this.lastTimeUpdate = Date.now();
     this.speedMultiplier = 1;
     this.isPaused = false;

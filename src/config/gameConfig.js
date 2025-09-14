@@ -10,6 +10,8 @@ export const CONFIG = {
   ROAD_LINE_WIDTH: 12,
   DASH_LENGTH: 60,
   DASH_GAP: 60,
+  BASE_FONT: 32,
+  BASE_CAR_SPEED: 45, 
   COLORS: {
     grid: 0xffffff,
     border: 0xff0000,
@@ -58,8 +60,6 @@ export const CONFIG = {
     { x: 1500, y: 1283 },
     { x: 1950, y: 1283 }
   ],
-  BASE_FONT: 32,
-  BASE_CAR_SPEED: 11.7, // Базовая скорость машины
   ROUTE_SCHEDULE: [
     { location: 'house', name: 'Дом', stayHours: 2 },
     { location: 'institute', name: 'Институт', stayHours: 2 },
@@ -68,6 +68,3 @@ export const CONFIG = {
     { location: 'box', name: 'Бокс', stayHours: 1 },
   ]
 };
-
-// Дополнительные константы
-export const BASE_CAR_SPEED = 11.7; // Базовая скорость машины
