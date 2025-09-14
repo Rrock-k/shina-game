@@ -267,6 +267,7 @@ function setupWorld () {
     intersections: intersectionsLayer,
     trafficLights: trafficLightsLayer,
     labels: labelsLayer,
+    decor: decorLayer,
     border: borderLayer
   });
 
@@ -281,7 +282,6 @@ function setupWorld () {
 
   // Используем WorldRenderer для отрисовки базовых элементов
   worldRenderer.render(zoneGeometry);
-  // placeLabels(labelsLayer);
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
   createTrafficLightsForAllIntersections(trafficLightsLayer);
 
@@ -294,7 +294,6 @@ function setupWorld () {
 
   // Добавляем светофоры - будут добавлены поверх оверлея
   world.addChild(trafficLightsLayer);
-  // drawAlina(decorLayer);
 
   uiLayer = new PIXI.Container();
 
@@ -654,47 +653,6 @@ function createTrafficLightsForAllIntersections (layer) {
 // Функция drawDashedPath перенесена в WorldRenderer
 
 
-function drawAlina (layer) {
-  const house = CONFIG.ZONES.house;
-  const container = new PIXI.Container();
-  container.position.set(house.x + house.w - 40, house.y + house.h - 40);
-  const circle = new PIXI.Graphics();
-  circle.beginFill(0xffffff).drawCircle(0, 0, 15).endFill();
-  const text = new PIXI.Text('A', {
-    fontFamily: 'sans-serif',
-    fontSize: 20,
-    fill: 0x000000,
-    stroke: 0xffffff,
-    strokeThickness: 2
-  });
-  text.anchor.set(0.5);
-  container.addChild(circle, text);
-  layer.addChild(container);
-}
-
-function placeLabels (layer) {
-  for (const key in CONFIG.ZONES) {
-    const z = CONFIG.ZONES[key];
-    let x, y;
-    if (z.type === 'rect') {
-      x = z.x + z.w / 2;
-      y = z.y + z.h / 2;
-    } else {
-      x = z.x;
-      y = z.y;
-    }
-    const text = new PIXI.Text(z.label, {
-      fontFamily: 'sans-serif',
-      fontSize: CONFIG.BASE_FONT,
-      fill: 0xffffff,
-      stroke: 0x000000,
-      strokeThickness: 4
-    });
-    text.anchor.set(0.5);
-    text.position.set(x, y);
-    layer.addChild(text);
-  }
-}
 
 function layout () {
   const w = 1200;

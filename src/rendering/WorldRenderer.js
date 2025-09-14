@@ -177,6 +177,8 @@ export class WorldRenderer {
     if (this.layers.zones) this.layers.zones.removeChildren();
     if (this.layers.intersections) this.layers.intersections.removeChildren();
     if (this.layers.trafficLights) this.layers.trafficLights.removeChildren();
+    if (this.layers.labels) this.layers.labels.removeChildren();
+    if (this.layers.decor) this.layers.decor.removeChildren();
     
     // Отрисовываем базовые элементы
     if (this.layers.grid) this.drawGrid(this.layers.grid);
@@ -184,6 +186,8 @@ export class WorldRenderer {
     if (this.layers.lots) this.drawLots(this.layers.lots);
     if (this.layers.zones && zoneGeometry) this.drawZones(this.layers.zones, zoneGeometry);
     if (this.layers.intersections && this.layers.labels) this.createIntersections(this.layers.intersections, this.layers.labels);
+    // Примечание: placeLabels не вызывается здесь, так как большие надписи зон не нужны
+    if (this.layers.decor) this.drawAlina(this.layers.decor);
     // Примечание: drawTrafficLights не вызывается здесь, так как интерактивные светофоры создаются отдельно через createTrafficLightsForAllIntersections
     if (this.layers.border) this.drawWorldBorder(this.layers.border);
   }
@@ -627,5 +631,55 @@ export class WorldRenderer {
       c.addChild(pole, box, red, yellow, green);
       layer.addChild(c);
     });
+  }
+
+  /**
+   * Отрисовка персонажа Алины
+   * @param {PIXI.Container} layer - слой для отрисовки
+   */
+  drawAlina(layer) {
+    const house = this.config.ZONES.house;
+    const container = new PIXI.Container();
+    container.position.set(house.x + house.w - 40, house.y + house.h - 40);
+    const circle = new PIXI.Graphics();
+    circle.beginFill(0xffffff).drawCircle(0, 0, 15).endFill();
+    const text = new PIXI.Text('A', {
+      fontFamily: 'sans-serif',
+      fontSize: 20,
+      fill: 0x000000,
+      stroke: 0xffffff,
+      strokeThickness: 2
+    });
+    text.anchor.set(0.5);
+    container.addChild(circle, text);
+    layer.addChild(container);
+  }
+
+  /**
+   * Размещение меток зон
+   * @param {PIXI.Container} layer - слой для отрисовки
+   */
+  placeLabels(layer) {
+    for (const key in this.config.ZONES) {
+      const z = this.config.ZONES[key];
+      let x, y;
+      if (z.type === 'rect') {
+        x = z.x + z.w / 2;
+        y = z.y + z.h / 2;
+      } else {
+        x = z.x;
+        y = z.y;
+      }
+      const text = new PIXI.Text(z.label, {
+        fontFamily: 'sans-serif',
+        fontSize: this.config.BASE_FONT,
+        fill: 0xffffff,
+        stroke: 0x000000,
+        strokeThickness: 4
+      });
+      text.anchor.set(0.5);
+      text.position.set(x, y);
+      layer.addChild(text);
+    }
   }
 }
