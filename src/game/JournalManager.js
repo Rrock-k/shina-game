@@ -81,6 +81,17 @@ export class JournalManager {
     this.currentLocation = destination;
     this.locationStartTime = this.currentTrip.endTime;
     
+    // Добавляем запись о входе в здание сразу
+    // Для записи о работе timeFromPrevious должен быть 0, так как это сразу после дороги
+    this.journal.push({
+      type: 'work',
+      destination: destination,
+      duration: '0м', // Время работы пока 0, будет обновлено при выходе
+      timeFromPrevious: '0м', // Сразу после дороги, без перерыва
+      absoluteTime: this.currentTrip.endTime,
+      isActive: true // Флаг активной записи
+    });
+    
     console.log(`📝 Завершена дорога до ${this.currentTrip.destination} в ${this.currentTrip.endTime}, время в пути: ${this.currentTrip.duration}`);
     console.log(`📝 Начало пребывания в ${destination} в ${this.currentTrip.endTime}`);
 
@@ -114,18 +125,14 @@ export class JournalManager {
     const currentTime = this.formatTime(gameTime);
     const stayDuration = this.calculateDuration(this.locationStartTime, currentTime);
 
-    // Получаем время предыдущей записи для расчета времени от нее
-    const previousRecordTime = this.getLastRecordTime();
-    const timeFromPrevious = this.calculateTimeFromPrevious(previousRecordTime, currentTime);
-
-    // Добавляем завершение пребывания в месте (в конец)
-    this.journal.push({
-      type: 'work',
-      destination: location,
-      duration: stayDuration,
-      timeFromPrevious: timeFromPrevious,
-      absoluteTime: currentTime
-    });
+    // Находим и обновляем последнюю активную запись о работе
+    for (let i = this.journal.length - 1; i >= 0; i--) {
+      if (this.journal[i].type === 'work' && this.journal[i].isActive) {
+        this.journal[i].duration = stayDuration;
+        this.journal[i].isActive = false; // Деактивируем запись
+        break;
+      }
+    }
 
     console.log(`📝 Завершено пребывание в ${location} в ${currentTime}, время в месте: ${stayDuration}`);
 

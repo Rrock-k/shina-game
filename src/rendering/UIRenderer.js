@@ -905,17 +905,13 @@ export class UIRenderer {
     const journal = this.journalManager.getJournal();
     const currentTrip = this.journalManager.getCurrentTrip();
     
-    // Проверяем, есть ли новые записи
-    const currentJournalLength = tripList.children.length;
-    const newJournalLength = journal.length + (currentTrip ? 1 : 0);
-    
     let html = '';
     
     // Добавляем записи журнала (самые новые внизу)
     journal.forEach(entry => {
       if (entry.type === 'road') {
-        // Завершенная дорога - показываем время от предыдущей записи
-        const timeDisplay = entry.timeFromPrevious || entry.duration;
+        // Завершенная дорога - показываем время в пути
+        const timeDisplay = entry.duration;
         html += `
           <div class="journal-entry">
             <div class="journal-entry-text">🚗 Дорога -> ${entry.destination} ${timeDisplay}</div>
@@ -923,9 +919,18 @@ export class UIRenderer {
         `;
       } else if (entry.type === 'work') {
         // Работа в месте - показываем название места и время от предыдущей записи
-        const timeDisplay = entry.timeFromPrevious || entry.duration;
+        let timeDisplay;
+        if (entry.isActive) {
+          // Для активной записи показываем текущее время пребывания
+          const currentTime = this.timeManager.formatTime();
+          timeDisplay = this.calculateCurrentTripDuration(entry.absoluteTime, currentTime);
+        } else {
+          // Для завершенной записи показываем сохраненное время пребывания
+          timeDisplay = entry.duration;
+        }
+        const entryClass = entry.isActive ? 'journal-entry current' : 'journal-entry';
         html += `
-          <div class="journal-entry">
+          <div class="${entryClass}">
             <div class="journal-entry-text">${entry.destination}: ${timeDisplay}</div>
           </div>
         `;

@@ -667,6 +667,12 @@ canvas {
   color: #bdc3c7;
 }
 
+/* Подсветка текущей записи журнала */
+.journal-entry.current {
+  background: rgba(52, 152, 219, 0.2);
+  border-color: rgba(52, 152, 219, 0.6);
+}
+
 /* Стили для контента расписания */
 .schedule-container {
   height: calc(100% - 60px);
