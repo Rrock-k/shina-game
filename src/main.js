@@ -195,6 +195,15 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 // Создаем экземпляр игры
 const game = new Game();
 
+// Делаем необходимые переменные глобально доступными для Game.js (временно)
+window.CONFIG = CONFIG;
+window.debugLog = debugLog;
+window.debugLogAlways = debugLogAlways;
+window.debugInfo = debugInfo;
+window.currentRouteIndex = currentRouteIndex;
+window.savedCarState = savedCarState;
+window.zoneGeometry = zoneGeometry;
+
 // Получаем менеджеры из экземпляра игры
 const timeManager = game.timeManager;
 const pauseManager = game.pauseManager;
@@ -530,6 +539,13 @@ function createCar () {
     horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
   });
   pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
+  
+  // Делаем дополнительные переменные глобально доступными для Game.js (временно)
+  window.carTrafficController = carTrafficController;
+  window.pathBuilder = pathBuilder;
+  window.carRenderer = carRenderer;
+  window.intersectionKeyToTL = intersectionKeyToTL;
+  window.getDestinationCenter = getDestinationCenter;
 
   // Начинаем с дома
   currentRouteIndex = 0; // дом
@@ -556,15 +572,6 @@ function createCar () {
   lastStayTimerDay = gameTime.day;
 
   decorLayer.addChild(car);
-  game.app.ticker.add(updateCar);
-  game.app.ticker.add(() => {
-    updateStayTimer();
-    
-    // Обновляем UI с текущим состоянием машины
-    if (uiRenderer) {
-      uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
-    }
-  });
 
   uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
 }
