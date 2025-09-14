@@ -12,7 +12,6 @@ import { WorldRenderer } from './rendering/WorldRenderer.js';
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
 let carPath = [], carSegment = 0, carProgress = 0;
 let avatar;
-let hoverLabel;
 let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
@@ -265,6 +264,9 @@ function setupWorld () {
     roads: roadsLayer,
     lots: lotsLayer,
     zones: zonesLayer,
+    intersections: intersectionsLayer,
+    trafficLights: trafficLightsLayer,
+    labels: labelsLayer,
     border: borderLayer
   });
 
@@ -279,7 +281,6 @@ function setupWorld () {
 
   // Используем WorldRenderer для отрисовки базовых элементов
   worldRenderer.render(zoneGeometry);
-  createIntersections(intersectionsLayer);
   // placeLabels(labelsLayer);
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
   createTrafficLightsForAllIntersections(trafficLightsLayer);
@@ -600,72 +601,6 @@ function randInt (min, max) {
 
 // Функция drawRoads перенесена в WorldRenderer
 
-function createIntersections (layer) {
-  // Подпись при наведении
-  if (!hoverLabel) {
-    hoverLabel = new PIXI.Text('', {
-      fontFamily: 'sans-serif',
-      fontSize: CONFIG.BASE_FONT,
-      fill: 0xffff66,
-      stroke: 0x000000,
-      strokeThickness: 4
-    });
-    hoverLabel.anchor.set(0.5, 1);
-    hoverLabel.visible = false;
-    labelsLayer.addChild(hoverLabel);
-  }
-
-  const hitRadius = 60;
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const verticalRoadXs = getVerticalRoadXs();
-
-  for (let j = 0; j < horizontalRoadYs.length; j++) {
-    for (let i = 0; i < verticalRoadXs.length; i++) {
-      const x = verticalRoadXs[i];
-      const y = horizontalRoadYs[j];
-      const labelText = String.fromCharCode(65 + i) + (j + 1);
-      const g = new PIXI.Graphics();
-      // Прозрачный круг-хитбокс + явная hitArea для стабильного хит-теста
-      g.beginFill(0x000000, 0).drawCircle(0, 0, hitRadius).endFill();
-      g.position.set(x, y);
-      g.eventMode = 'static';
-      g.cursor = 'pointer';
-      g.hitArea = new PIXI.Circle(0, 0, hitRadius);
-
-      const show = () => {
-        hoverLabel.text = labelText;
-        hoverLabel.position.set(x, y - 16);
-        hoverLabel.visible = true;
-      };
-      const hide = () => {
-        hoverLabel.visible = false;
-      };
-
-      if (isMobile) {
-        // На мобильных устройствах используем touch события
-        g.on('touchstart', (e) => {
-          e.stopPropagation(); // предотвращаем конфликт с панорамированием
-          show();
-        });
-        g.on('touchend', (e) => {
-          e.stopPropagation();
-          // Задержка перед скрытием, чтобы пользователь успел увидеть
-          setTimeout(hide, 2000);
-        });
-        g.on('touchcancel', hide);
-      } else {
-        // На десктопе используем pointer события
-        g.on('pointerover', show);
-        g.on('pointerout', hide);
-        g.on('pointerenter', show);
-        g.on('pointerleave', hide);
-      }
-
-      layer.addChild(g);
-    }
-  }
-}
 
 function createTrafficLightsForAllIntersections (layer) {
   intersectionKeyToTL.clear();
@@ -718,21 +653,6 @@ function createTrafficLightsForAllIntersections (layer) {
 
 // Функция drawDashedPath перенесена в WorldRenderer
 
-function drawTrafficLights (layer) {
-  CONFIG.TRAFFIC_LIGHTS.forEach(pos => {
-    const c = new PIXI.Container();
-    c.position.set(pos.x, pos.y);
-    const pole = new PIXI.Graphics();
-    pole.beginFill(0x555555).drawRect(-3, -20, 6, 40).endFill();
-    const box = new PIXI.Graphics();
-    box.beginFill(0x111111).drawRect(-8, -32, 16, 28).endFill();
-    const red = new PIXI.Graphics(); red.beginFill(0xff0000).drawCircle(0, -26, 5).endFill();
-    const yellow = new PIXI.Graphics(); yellow.beginFill(0xffff00).drawCircle(0, -16, 5).endFill();
-    const green = new PIXI.Graphics(); green.beginFill(0x00ff00).drawCircle(0, -6, 5).endFill();
-    c.addChild(pole, box, red, yellow, green);
-    layer.addChild(c);
-  });
-}
 
 function drawAlina (layer) {
   const house = CONFIG.ZONES.house;

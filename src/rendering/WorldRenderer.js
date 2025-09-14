@@ -10,6 +10,7 @@ export class WorldRenderer {
     this.config = config;
     this.app = pixiApp;
     this.layers = {};
+    this.hoverLabel = null;
   }
 
   /**
@@ -174,12 +175,16 @@ export class WorldRenderer {
     if (this.layers.roads) this.layers.roads.removeChildren();
     if (this.layers.lots) this.layers.lots.removeChildren();
     if (this.layers.zones) this.layers.zones.removeChildren();
+    if (this.layers.intersections) this.layers.intersections.removeChildren();
+    if (this.layers.trafficLights) this.layers.trafficLights.removeChildren();
     
     // Отрисовываем базовые элементы
     if (this.layers.grid) this.drawGrid(this.layers.grid);
     if (this.layers.roads) this.drawRoads(this.layers.roads);
     if (this.layers.lots) this.drawLots(this.layers.lots);
     if (this.layers.zones && zoneGeometry) this.drawZones(this.layers.zones, zoneGeometry);
+    if (this.layers.intersections && this.layers.labels) this.createIntersections(this.layers.intersections, this.layers.labels);
+    // Примечание: drawTrafficLights не вызывается здесь, так как интерактивные светофоры создаются отдельно через createTrafficLightsForAllIntersections
     if (this.layers.border) this.drawWorldBorder(this.layers.border);
   }
 
@@ -523,5 +528,104 @@ export class WorldRenderer {
     if (inst?.type === 'circle' && !zoneGeometry.has('institute')) {
       zoneGeometry.set('institute', { type: 'circle', center: { x: inst.x, y: inst.y }, bounds: { x: inst.x, y: inst.y, r: inst.r } });
     }
+  }
+
+  /**
+   * Создание перекрестков с интерактивными элементами
+   * @param {PIXI.Container} layer - слой для отрисовки
+   * @param {PIXI.Container} labelsLayer - слой для меток
+   * @returns {PIXI.Text} hoverLabel - метка при наведении
+   */
+  createIntersections(layer, labelsLayer) {
+    // Подпись при наведении
+    let hoverLabel;
+    if (!this.hoverLabel) {
+      hoverLabel = new PIXI.Text('', {
+        fontFamily: 'sans-serif',
+        fontSize: this.config.BASE_FONT,
+        fill: 0xffff66,
+        stroke: 0x000000,
+        strokeThickness: 4
+      });
+      hoverLabel.anchor.set(0.5, 1);
+      hoverLabel.visible = false;
+      labelsLayer.addChild(hoverLabel);
+      this.hoverLabel = hoverLabel;
+    } else {
+      hoverLabel = this.hoverLabel;
+    }
+
+    const hitRadius = 60;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const horizontalRoadYs = this.getHorizontalRoadYs();
+    const verticalRoadXs = this.getVerticalRoadXs();
+
+    for (let j = 0; j < horizontalRoadYs.length; j++) {
+      for (let i = 0; i < verticalRoadXs.length; i++) {
+        const x = verticalRoadXs[i];
+        const y = horizontalRoadYs[j];
+        const labelText = String.fromCharCode(65 + i) + (j + 1);
+        const g = new PIXI.Graphics();
+        // Прозрачный круг-хитбокс + явная hitArea для стабильного хит-теста
+        g.beginFill(0x000000, 0).drawCircle(0, 0, hitRadius).endFill();
+        g.position.set(x, y);
+        g.eventMode = 'static';
+        g.cursor = 'pointer';
+        g.hitArea = new PIXI.Circle(0, 0, hitRadius);
+
+        const show = () => {
+          hoverLabel.text = labelText;
+          hoverLabel.position.set(x, y - 16);
+          hoverLabel.visible = true;
+        };
+        const hide = () => {
+          hoverLabel.visible = false;
+        };
+
+        if (isMobile) {
+          // На мобильных устройствах используем touch события
+          g.on('touchstart', (e) => {
+            e.stopPropagation(); // предотвращаем конфликт с панорамированием
+            show();
+          });
+          g.on('touchend', (e) => {
+            e.stopPropagation();
+            // Задержка перед скрытием, чтобы пользователь успел увидеть
+            setTimeout(hide, 2000);
+          });
+          g.on('touchcancel', hide);
+        } else {
+          // На десктопе используем pointer события
+          g.on('pointerover', show);
+          g.on('pointerout', hide);
+          g.on('pointerenter', show);
+          g.on('pointerleave', hide);
+        }
+
+        layer.addChild(g);
+      }
+    }
+
+    return hoverLabel;
+  }
+
+  /**
+   * Отрисовка светофоров
+   * @param {PIXI.Container} layer - слой для отрисовки
+   */
+  drawTrafficLights(layer) {
+    this.config.TRAFFIC_LIGHTS.forEach(pos => {
+      const c = new PIXI.Container();
+      c.position.set(pos.x, pos.y);
+      const pole = new PIXI.Graphics();
+      pole.beginFill(0x555555).drawRect(-3, -20, 6, 40).endFill();
+      const box = new PIXI.Graphics();
+      box.beginFill(0x111111).drawRect(-8, -32, 16, 28).endFill();
+      const red = new PIXI.Graphics(); red.beginFill(0xff0000).drawCircle(0, -26, 5).endFill();
+      const yellow = new PIXI.Graphics(); yellow.beginFill(0xffff00).drawCircle(0, -16, 5).endFill();
+      const green = new PIXI.Graphics(); green.beginFill(0x00ff00).drawCircle(0, -6, 5).endFill();
+      c.addChild(pole, box, red, yellow, green);
+      layer.addChild(c);
+    });
   }
 }
