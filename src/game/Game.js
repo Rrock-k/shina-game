@@ -133,6 +133,11 @@ class Game {
         // Обновляем ночной режим
         const gameTime = this.timeManager.getGameTime();
         this.dayNightManager.updateNightMode(gameTime);
+        
+        // Обновляем UI (включая журнал)
+        if (this.uiRenderer) {
+            this.uiRenderer.update();
+        }
     }
 
 }

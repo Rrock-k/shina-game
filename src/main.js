@@ -563,8 +563,6 @@ function createCar () {
     // Обновляем UI с текущим состоянием машины
     if (uiRenderer) {
       uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
-      // Обновляем весь UI (включая журнал)
-      uiRenderer.update();
     }
   });
 
