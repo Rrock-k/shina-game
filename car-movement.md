@@ -155,6 +155,10 @@ function buildGraphPathToBuilding(startIJ, buildingPos) {
   - ✅ Обновлен `main.js` - заменены все прямые вызовы функций на методы PathBuilder
   - ✅ Убраны неиспользуемые переменные `verticalRoadXs` и `horizontalRoadYs` из `buildCarPath()`
   - ✅ PathBuilder инициализируется с конфигурацией дорог при создании машины
+  - ✅ ИСПРАВЛЕНА ПРОБЛЕМА С НАЧАЛОМ ИГРЫ ПОСЛЕ БОКСА - используется проверка позиции машины вместо флага
+  - ✅ Оптимизирована логика - убран лишний флаг `isFirstGameStart`, используется естественный показатель:
+    - Если `carEntity.getPosition().x === 0 && carEntity.getPosition().y === 0` - первый запуск (начинаем с дома)
+    - Если позиция не (0,0) - машина уже была инициализирована (продолжаем с текущей позиции)
 
 #### Шаг 3.2: Создать класс MovementController
 - **Файл**: `src/systems/MovementController.js` (новый)

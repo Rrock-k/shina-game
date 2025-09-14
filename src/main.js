@@ -568,12 +568,12 @@ function buildCarPath () {
 
   // Определяем стартовый перекрёсток
   let startIJ;
-  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
-    // Если машина уже существует, имеет позицию И это не первый запуск (не дом), начинаем с её текущей позиции
+  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0)) {
+    // Машина имеет позицию (не (0,0)) - начинаем с текущей позиции
     const carPos = carEntity.getPosition();
     startIJ = pathBuilder.getNearestIntersectionIJ(carPos.x, carPos.y);
   } else {
-    // Иначе начинаем с дома (первый запуск или нет машины)
+    // Машина в позиции (0,0) или не существует - начинаем с дома (первый запуск)
     const housePos = getDestinationCenter('house');
     startIJ = pathBuilder.getNearestIntersectionIJ(housePos.x, housePos.y);
   }
@@ -585,8 +585,8 @@ function buildCarPath () {
   const startIntersection = pathBuilder.getIntersectionCoord(startIJ.i, startIJ.j);
   let path;
   
-  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
-    // Если машина уже существует, имеет позицию И это не первый запуск, проверяем, нужно ли добавить префикс
+  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0)) {
+    // Если машина имеет позицию (не (0,0)), проверяем, нужно ли добавить префикс
     const carPos = carEntity.getPosition();
     const needsPrefix = Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1;
     
