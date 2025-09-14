@@ -64,7 +64,6 @@ export class JournalManager {
     this.currentTrip.duration = this.calculateDuration(this.currentTrip.startTime, this.currentTrip.endTime);
     this.currentTrip.status = 'completed';
 
-    // Получаем время предыдущей записи для расчета времени от нее
     const previousRecordTime = this.getLastRecordTime();
     const timeFromPrevious = this.calculateTimeFromPrevious(previousRecordTime, this.currentTrip.endTime);
 
@@ -151,7 +150,6 @@ export class JournalManager {
       return '00:00';
     }
     
-    // Получаем абсолютное время из последней записи
     const lastEntry = this.journal[this.journal.length - 1];
     return lastEntry.absoluteTime || '00:00';
   }

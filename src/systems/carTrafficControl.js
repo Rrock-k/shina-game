@@ -26,7 +26,6 @@ export class CarTrafficController {
     const dy = targetIntersection.y - carPosition.y;
     const direction = getDirectionForSegment(dx, dy);
 
-    // Проверяем, является ли целевая точка перекрестком
     const intersectionKey = `${targetIntersection.x},${targetIntersection.y}`;
     const trafficLight = intersectionMap.get(intersectionKey);
 
@@ -36,7 +35,6 @@ export class CarTrafficController {
       return { canMove: true, shouldStop: false };
     }
 
-    // Проверяем разрешение движения
     const isPassAllowed = trafficLight.isPassAllowed(direction);
     const distanceToIntersection = Math.hypot(
       carPosition.x - targetIntersection.x,
@@ -95,7 +93,6 @@ export class CarTrafficController {
       const currentRoadY = this.findNearestRoadY(carPosition.y, horizontalRoadYs);
       
       for (const roadX of verticalRoadXs) {
-        // Проверяем, находится ли перекресток впереди по X
         const isAhead = (dx > 0 && roadX > carPosition.x) || (dx < 0 && roadX < carPosition.x);
         
         if (isAhead) {
@@ -108,7 +105,6 @@ export class CarTrafficController {
       const currentRoadX = this.findNearestRoadX(carPosition.x, verticalRoadXs);
       
       for (const roadY of horizontalRoadYs) {
-        // Проверяем, находится ли перекресток впереди по Y
         const isAhead = (dy > 0 && roadY > carPosition.y) || (dy < 0 && roadY < carPosition.y);
         
         if (isAhead) {

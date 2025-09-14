@@ -109,7 +109,6 @@ export class PauseManager {
 
   // Показать уведомление о скорости
   showSpeedNotification(message) {
-    // Создаем HTML уведомление
     const notification = document.createElement('div');
     notification.textContent = message;
     notification.style.cssText = `

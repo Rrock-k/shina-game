@@ -56,7 +56,6 @@ export class Car {
     this.onArrival = options.onArrival || null;
     this.onStateChange = options.onStateChange || null;
     
-    // Устанавливаем начальную позицию
     if (options.initialPosition) {
       this.position = { ...options.initialPosition };
     }
@@ -412,7 +411,6 @@ export class Car {
     const nextRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
     const nextDestination = this.config.ROUTE_SCHEDULE[nextRouteIndex];
 
-    // Получаем центр следующего пункта назначения
     const nextDestCenter = getDestinationCenter(nextDestination.location);
 
     // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
@@ -496,12 +494,10 @@ export class Car {
 
     if (!this._isAtDestination) return;
 
-    // Получаем игровое время из timeManager
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes;
     const currentDay = gameTime.day;
 
-    // Инициализируем таймер если нужно
     if (this.stayTimer > 0) {
       // Вычисляем разность времени в игровых минутах
       const timeDiff = currentTime - (options.lastStayTimerUpdate || currentTime);
@@ -516,7 +512,6 @@ export class Car {
       }
     }
 
-    // Проверяем, истек ли таймер пребывания
     if (this.stayTimer <= 0 && this._isAtDestination) {
       debugLogAlways(`⏰ Время пребывания истекло, переходим к следующему пункту назначения`);
       this.goToNextDestination(options);
@@ -546,7 +541,6 @@ export class Car {
     this.setAtDestination(true);
     this.setStayTimer(currentDest.stayHours);
     
-    // Получаем текущее игровое время
     const gameTime = timeManager.getGameTime();
     const lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
     const lastStayTimerDay = gameTime.day;

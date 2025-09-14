@@ -40,7 +40,6 @@ let debugInfo = {
 };
 
 
-// Дебаг-функция для логирования
 function debugLog (message, data = null) {
   if (!DEBUG_MODE) return;
   const now = Date.now();
@@ -50,7 +49,6 @@ function debugLog (message, data = null) {
   }
 }
 
-// Дебаг-функция для постоянного логирования
 function debugLogAlways (message, data = null) {
   if (!DEBUG_MODE) return;
   console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
@@ -62,7 +60,6 @@ let lastStayTimerDay = 0;
 
 function updateStayTimer() {
   if (carEntity && carEntity.isAtDestination()) {
-    // Получаем игровое время из timeManager
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
     const currentDay = gameTime.day; // день месяца
@@ -96,7 +93,6 @@ function updateStayTimer() {
 
 // Инициализация новых сущностей
 function initEntities() {
-  // Создаем сущность машины
   carEntity = new Car(CONFIG, pauseManager);
   
   // Делаем carEntity глобально доступным для UI
@@ -125,14 +121,12 @@ function initEntities() {
       carEntity.setAvatar(avatar);
     }
     
-    // Устанавливаем начальную позицию из carRenderer
     if (carSprite) {
       carEntity.setPosition({ x: carSprite.position.x, y: carSprite.position.y });
       carEntity.setRotation(carSprite.rotation);
     }
   }
 
-  // Создаем сущность Шины
   shinaEntity = new Shina(CONFIG);
   shinaEntity.init({
     position: { x: 0, y: 0 },
@@ -211,30 +205,24 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 
 setupApp();
 
-// Инициализируем менеджеры
 timeManager = new TimeManager();
 pauseManager = new PauseManager();
 journalManager = new JournalManager(timeManager);
 
-// Устанавливаем время начала пребывания дома сразу после создания JournalManager
 journalManager.setLocationStartTime('Дом');
 
 // Синхронизируем менеджеры
 timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
 timeManager.setPaused(pauseManager.isPaused());
 
-// Создаем panningController раньше, чтобы он был доступен в setupWorld
 let panningController;
 
 setupWorld();
 
-// Инициализируем dayNightManager после создания PIXI приложения
 dayNightManager = new DayNightManager(PIXI, CONFIG);
 
-// Инициализируем UIRenderer
 uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController, journalManager);
 
-// Инициализируем UI
 uiRenderer.init();
 
 // Обновляем текст режима дня/ночи и паузы в меню после инициализации
@@ -309,7 +297,6 @@ function setupWorld () {
   window.decorLayer = decorLayer;
   window.trafficLightsLayer = trafficLightsLayer;
 
-  // Инициализируем WorldRenderer
   worldRenderer = new WorldRenderer(CONFIG, app);
   worldRenderer.init(world, {
     grid: gridLayer,
@@ -337,7 +324,6 @@ function setupWorld () {
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
   createTrafficLightsForAllIntersections(trafficLightsLayer);
 
-  // Создаем и добавляем городской ночной оверлей (ПЕРЕД машиной)
   // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
   // Оверлей будет создан позже в updateNightMode
 
@@ -398,7 +384,6 @@ function setupWorld () {
     pauseManager.showSpeedNotification(`СКОРОСТЬ x${newSpeed}`);
   });
 
-  // Инициализируем кнопку
   const initialSpeed = pauseManager.getSpeedMultiplier();
   speedButton.textContent = `x${initialSpeed}`;
   speedButton.classList.toggle('boosted', initialSpeed > 1);
@@ -427,7 +412,6 @@ function setupWorld () {
   });
 
 
-  // Инициализируем panningController
   panningController = new PanningController();
   panningController.setWorld(world);
   panningController.setOnZoomChange((scale) => {
@@ -475,7 +459,6 @@ function createTrafficLightsForAllIntersections (layer) {
       const x = verticalRoadXs[i];
       const y = horizontalRoadYs[j];
 
-      // Проверяем, должен ли быть светофор на этом перекрестке
       if (!shouldHaveTrafficLight(i, j)) {
         continue; // пропускаем этот перекресток
       }
@@ -507,7 +490,6 @@ function createTrafficLightsForAllIntersections (layer) {
     }
   }
 
-  // Устанавливаем точку начала зеленой волны в левом верхнем углу
   if (verticalRoadXs.length > 0 && horizontalRoadYs.length > 0) {
     trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
   }
@@ -522,7 +504,6 @@ function layout () {
   const h = 800;
   const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
 
-  // Только устанавливаем базовый масштаб, если panningController не активен
   if (!panningController || panningController.getCurrentScale() === 1) {
     world.scale.set(scale);
     world.pivot.set(0, 0);
@@ -538,7 +519,6 @@ function layout () {
 
   // Светофоры теперь внутри world, поэтому синхронизация не нужна
   
-  // Инициализируем новые сущности
   initEntities();
 }
 
@@ -564,10 +544,8 @@ function getDestinationCenter (locationKey) {
 // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
 
 function createCar () {
-  // Создаем CarRenderer
   carRenderer = new CarRenderer(CONFIG, pauseManager);
   
-  // Создаем машину с помощью CarRenderer (без пути пока)
   car = carRenderer.createCar({
     carPath: [],
     currentRouteIndex: currentRouteIndex,
@@ -575,13 +553,10 @@ function createCar () {
     getDestinationCenter: getDestinationCenter
   });
   
-  // Получаем аватарку из CarRenderer
   avatar = carRenderer.getAvatar();
   
-  // Инициализируем контроллер светофоров
   carTrafficController = new CarTrafficController();
 
-  // Инициализируем PathBuilder
   const verticalRoadXs = getVerticalRoadXs();
   const horizontalRoadYs = getHorizontalRoadYs();
   console.log('🔧 Инициализация PathBuilder:', {
@@ -603,18 +578,15 @@ function createCar () {
 
   // Не начинаем поездку сразу - она начнется при выходе из здания
 
-  // Теперь строим путь и устанавливаем его
   carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
   
   // Если carEntity уже создан, обновляем его путь
   if (carEntity) {
     carEntity.setPath(carPath);
-    // Устанавливаем, что машина уже в пункте назначения (дома)
     carEntity.setAtDestination(true);
     carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   }
   
-  // Инициализируем таймер пребывания
   const gameTime = timeManager.getGameTime();
   lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
   lastStayTimerDay = gameTime.day;
@@ -663,7 +635,6 @@ function updateGameTime () {
 
   // Если находимся в пункте назначения, уменьшаем таймер ожидания
   if (carEntity && carEntity.isAtDestination()) {
-    // Получаем время из TimeManager для расчета таймера
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes;
     const currentDay = gameTime.day;
@@ -721,7 +692,6 @@ function saveCarStateForNextDestination () {
 
   if (!nextDestination) return null;
 
-  // Получаем центр следующего пункта назначения
   const nextDestCenter = getDestinationCenter(nextDestination.location);
 
   // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
@@ -771,7 +741,6 @@ function checkArrival () {
     // Завершаем дорогу в журнале при входе в здание
     if (journalManager && currentDest) {
       journalManager.endTrip(currentDest.name);
-      // Устанавливаем время начала пребывания в месте
       journalManager.setLocationStartTime(currentDest.name);
     }
 
@@ -785,7 +754,6 @@ function checkArrival () {
       carEntity.setStayTimer(currentDest.stayHours);
     }
     
-    // Получаем текущее игровое время
     const gameTime = timeManager.getGameTime();
     lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
     lastStayTimerDay = gameTime.day; // инициализируем день
@@ -805,7 +773,6 @@ function showBuildingAvatar (locationKey) {
     carRenderer.setAvatarVisible(false);
   }
 
-  // Создаем аватарку в здании (такого же размера как в машинке)
   const avatarContainer = new PIXI.Container();
 
   // Квадратный фон (исходный размер без скругления)

@@ -96,7 +96,6 @@ export class MovementController {
       isAtDestination: this.car._isAtDestination
     });
 
-    // Проверяем, есть ли у нас путь
     if (this.car.path.length < 2) {
       console.log('No valid path, rebuilding...');
       if (buildCarPath) {
@@ -105,7 +104,6 @@ export class MovementController {
       return;
     }
 
-    // Проверяем, что текущий сегмент существует
     if (this.car.currentSegment >= this.car.path.length) {
       console.log('Invalid segment, rebuilding path...');
       if (buildCarPath) {
@@ -122,7 +120,6 @@ export class MovementController {
       return;
     }
 
-    // Проверяем, изменился ли путь (для инвалидации кэша)
     const currentPathHash = this.car.path ? this.car.path.length + '_' + this.car.path[0]?.x + '_' + this.car.path[0]?.y : 'null';
     if (this._lastPathHash !== currentPathHash) {
       this._invalidateCache();
@@ -166,7 +163,6 @@ export class MovementController {
       speed: speed.toFixed(2)
     });
 
-    // Проверяем, завершили ли мы текущий сегмент
     if (this.car.progress >= segLen) {
       debugLogAlways('🚗 Завершен сегмент', {
         segment: this.car.currentSegment,
@@ -178,7 +174,6 @@ export class MovementController {
       this.car.progress = this.car.progress - segLen; // остаток переносим
       this.car.currentSegment++;
 
-      // Проверяем, не достигли ли мы конца пути
       if (this.car.currentSegment >= this.car.path.length - 1) {
         this._finishPath();
         if (checkArrival) checkArrival();
@@ -201,7 +196,6 @@ export class MovementController {
     // Обновляем поворот машинки в направлении движения
     this._updateRotation(dx, dy, updateLightBeams, debugLogAlways);
 
-    // Устанавливаем машину так, чтобы передняя часть была в точке пути
     this._updatePosition(newX, newY);
   }
 
@@ -249,7 +243,6 @@ export class MovementController {
       horizontalRoadYs: getHorizontalRoadYs() 
     };
 
-    // Проверяем расстояние до целевого перекрестка
     const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
 
     // ОТЛАДКА: показываем информацию о движении (только первые секунды)
@@ -257,7 +250,6 @@ export class MovementController {
       console.log(`🚗 DEBUG: segment=${this.car.currentSegment}, progress=${this.car.progress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${this.car.position.x.toFixed(0)},${this.car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
     }
 
-    // Проверяем светофор только если:
     // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
     // 2. И НЕ стоим прямо на перекрестке старта 
     if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора

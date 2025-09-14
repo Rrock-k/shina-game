@@ -213,7 +213,6 @@ class PanningController {
           const scale = currentDistance / this.initialDistance;
           const newScale = this.initialScale * scale;
           
-          // Ограничиваем масштабирование и устанавливаем как целевой
           this.targetScale = Math.max(this.minScale, Math.min(this.maxScale, newScale));
           
           // Вычисляем текущий центр между пальцами

@@ -58,11 +58,9 @@ export class TrafficLight {
     this.startDelay = options.startDelay || 0;
     this.isActive = options.isActive !== undefined ? options.isActive : true;
     
-    // Устанавливаем callback функции
     this.onPhaseChange = options.onPhaseChange || null;
     this.onStateChange = options.onStateChange || null;
     
-    // Инициализируем время начала цикла
     this.cycleStartTime = Date.now() - this.startDelay;
   }
 
@@ -411,7 +409,6 @@ export class TrafficLight {
     const offset = roadWidth * 1.2;
     const heads = {};
 
-    // Создаем головы светофора для каждого направления
     if (roadConnections.north) {
       const headN = this.createTrafficLightHead(PIXI, 'horizontal', lampRadius);
       headN.container.position.set(0, -offset);
@@ -472,7 +469,6 @@ export class TrafficLight {
     
     container.addChild(graphics);
 
-    // Создаем лампы
     const red = new PIXI.Graphics();
     const yellow = new PIXI.Graphics();
     const green = new PIXI.Graphics();

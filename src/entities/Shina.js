@@ -55,12 +55,10 @@ export class Shina {
     this.currentState = options.initialState || 'available';
     this.isVisible = options.isVisible !== undefined ? options.isVisible : true;
     
-    // Устанавливаем callback функции
     this.onStateChange = options.onStateChange || null;
     this.onAvailabilityChange = options.onAvailabilityChange || null;
     this.onMessageReceived = options.onMessageReceived || null;
     
-    // Инициализируем время начала состояния
     this.stateStartTime = Date.now();
     
     // Добавляем начальное состояние в историю
@@ -105,7 +103,6 @@ export class Shina {
       lastState.duration = stateChangeTime - lastState.startTime;
     }
     
-    // Устанавливаем новое состояние
     this.currentState = state;
     this.stateStartTime = stateChangeTime;
     this.stateDuration = options.duration || 0;
@@ -202,15 +199,12 @@ export class Shina {
    * @returns {string} состояние
    */
   determineStateFromTime(hour, dayOfWeek) {
-    // Проверяем, рабочий ли день
     const isWorkDay = this.workSchedule.workDays.includes(dayOfWeek);
     
-    // Проверяем, время работы
     if (isWorkDay && hour >= this.workSchedule.startHour && hour < this.workSchedule.endHour) {
       return 'atWork';
     }
     
-    // Проверяем, время сна
     if (hour >= this.sleepSchedule.sleepHour || hour < this.sleepSchedule.wakeHour) {
       return 'sleeping';
     }
@@ -347,7 +341,6 @@ export class Shina {
   getNotifications() {
     const notifications = [];
     
-    // Проверяем изменения состояния друзей
     this.friends.forEach(friend => {
       if (friend.lastStateChange && friend.lastStateChange > this.lastNotificationCheck) {
         notifications.push({
@@ -551,7 +544,6 @@ export class Shina {
     let nextChangeTime = null;
     let nextState = this.currentState;
 
-    // Проверяем все возможные изменения состояния
     const possibleStates = ['available', 'atWork', 'sleeping'];
     
     for (const state of possibleStates) {

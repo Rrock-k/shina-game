@@ -33,7 +33,6 @@ export class UIRenderer {
   init() {
     if (this.isInitialized) return;
     
-    // Получаем ссылки на UI элементы
     this.datetimeDisplay = document.getElementById('game-datetime');
     this.routeDisplay = document.getElementById('route-info');
     this.zoomButton = document.getElementById('zoom-button');
@@ -41,17 +40,13 @@ export class UIRenderer {
     this.zoomOutButton = document.getElementById('zoom-out-button');
     this.speedButton = document.getElementById('speed-button');
     
-    // Инициализируем меню
     this.initMenu();
     
-    // Инициализируем горячие клавиши
     this.initKeyboardShortcuts();
     
-    // Инициализируем дисплеи
     this.updateRouteDisplay();
     this.updateDateTimeDisplay();
     
-    // Инициализируем заголовок меню
     this.updateMenuTitle();
     
     this.isInitialized = true;
@@ -310,7 +305,6 @@ export class UIRenderer {
    */
   initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-      // Проверяем, что пользователь не находится в поле ввода
       const activeElement = document.activeElement;
       const isInputField = activeElement && (
         activeElement.tagName === 'INPUT' || 
@@ -420,7 +414,6 @@ export class UIRenderer {
     const lightsStatus = document.getElementById('car-lights-status');
     if (!lightsStatus) return;
     
-    // Получаем состояние фар из carEntity, если он доступен
     let headlightsOn = false;
     if (window.carEntity && typeof window.carEntity.areHeadlightsOn === 'function') {
       headlightsOn = window.carEntity.areHeadlightsOn();

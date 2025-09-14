@@ -138,7 +138,6 @@ class IntersectionTrafficLight {
       return; // не обновляем фазы во время задержки
     }
 
-    // Проверяем, не на паузе ли игра (если глобальная переменная доступна)
     if (typeof window !== 'undefined' && window.isGamePaused) {
       return; // не обновляем фазы во время паузы
     }

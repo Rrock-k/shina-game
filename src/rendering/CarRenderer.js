@@ -79,12 +79,10 @@ class CarRenderer {
     this.avatar.height = 60;
     this.car.addChild(this.avatar);
 
-    // Устанавливаем пивот машины в центр для упрощения расчетов
     // car.position будет указывать на центр машины
     this.car.pivot.set(0, 0); // пивот в центре
     this.car.position.set(0, 0); // начальная позиция
 
-    // Устанавливаем начальный поворот из сохраненного состояния, если есть
     const initialRotation = (options.savedCarState && options.savedCarState.direction) || 0;
     this.car.rotation = initialRotation;
     if (this.avatar) {

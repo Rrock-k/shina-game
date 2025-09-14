@@ -77,7 +77,6 @@ export class DayNightManager {
       console.log(`🌙 ${this.isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
     }
 
-    // Создаем городской оверлей если его нет
     if (!this.cityNightOverlay) {
       this.createCityNightOverlay();
     }
@@ -105,7 +104,6 @@ export class DayNightManager {
       }
     }
 
-    // Проверяем, что оверлей создан и добавлен в сцену
     if (!this.isOverlayReady()) {
       console.warn('⚠️ cityNightOverlay не создан или не добавлен в сцену');
       return;

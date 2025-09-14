@@ -173,7 +173,6 @@ export class PathBuilder {
     let path;
     
     if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0)) {
-      // Если машина имеет позицию (не (0,0)), проверяем, нужно ли добавить префикс
       const carPos = carEntity.getPosition();
       const needsPrefix = Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1;
       
@@ -215,7 +214,6 @@ export class PathBuilder {
           y: currentPos.y + directionY * intermediateDistance
         };
 
-        // Проверяем, что промежуточная точка не создает диагональное движение
         if (!this.validator.wouldCreateDiagonalMovement(currentPos, intermediatePoint, nextPos)) {
           path.splice(1, 0, intermediatePoint);
           if (debugLogAlways) {
