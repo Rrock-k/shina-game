@@ -16,6 +16,8 @@ import { Shina } from './entities/Shina.js';
 // Утилиты
 import { PathBuilder } from './systems/PathBuilder.js';
 import { randInt } from './utils/math.js';
+// Главный класс игры
+import Game from './game/Game.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -868,4 +870,7 @@ const gameContainer = document.querySelector('.game-container');
 gameContainer.style.width = '1200px';
 gameContainer.style.height = '800px';
 gameContainer.style.overflow = 'auto';
+
+// Создаем экземпляр игры
+const game = new Game();
 
