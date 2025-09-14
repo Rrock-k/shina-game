@@ -7,6 +7,7 @@ import { TimeManager } from './game/TimeManager.js';
 import { PauseManager } from './game/PauseManager.js';
 import { DayNightManager } from './game/DayNightManager.js';
 import { WorldRenderer } from './rendering/WorldRenderer.js';
+import { CarRenderer } from './rendering/CarRenderer.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -16,7 +17,7 @@ let carTrafficController;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let timeManager, pauseManager, dayNightManager, worldRenderer;
+let timeManager, pauseManager, dayNightManager, worldRenderer, carRenderer;
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -64,34 +65,35 @@ let lastStayTimerUpdate = 0;
 let lastStayTimerDay = 0;
 
 function updateStayTimer() {
-  if (!isAtDestination) return;
-  
-  // Получаем игровое время из timeManager
-  const gameTime = timeManager.getGameTime();
-  const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
-  const currentDay = gameTime.day; // день месяца
-  
-  // Обновляем таймер только при изменении времени
-  if (currentTime !== lastStayTimerUpdate || currentDay !== lastStayTimerDay) {
-    let timeDiff;
+  if (carRenderer && carRenderer.isAtDestination()) {
+    // Получаем игровое время из timeManager
+    const gameTime = timeManager.getGameTime();
+    const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
+    const currentDay = gameTime.day; // день месяца
     
-    // Если день изменился, это переход через полночь
-    if (currentDay !== lastStayTimerDay) {
-      // Время с последнего обновления до полуночи + время с полуночи до текущего момента
-      timeDiff = (24 * 60 - lastStayTimerUpdate) + currentTime;
-      console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
-    } else {
-      timeDiff = currentTime - lastStayTimerUpdate;
-    }
-    
-    stayTimer -= timeDiff / 60; // переводим в игровые часы
-    lastStayTimerUpdate = currentTime;
-    lastStayTimerDay = currentDay;
-    
-    if (stayTimer <= 0) {
-      // Время пребывания закончилось, едем к следующему пункту
-      console.log('🚗 Время пребывания закончилось, продолжаем движение');
-      nextDestination();
+    // Обновляем таймер только при изменении времени
+    if (currentTime !== lastStayTimerUpdate || currentDay !== lastStayTimerDay) {
+      let timeDiff;
+      
+      // Если день изменился, это переход через полночь
+      if (currentDay !== lastStayTimerDay) {
+        // Время с последнего обновления до полуночи + время с полуночи до текущего момента
+        timeDiff = (24 * 60 - lastStayTimerUpdate) + currentTime;
+        console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
+      } else {
+        timeDiff = currentTime - lastStayTimerUpdate;
+      }
+      
+      const newStayTimer = carRenderer.getStayTimer() - timeDiff / 60; // переводим в игровые часы
+      carRenderer.setStayTimer(newStayTimer);
+      lastStayTimerUpdate = currentTime;
+      lastStayTimerDay = currentDay;
+      
+      if (newStayTimer <= 0) {
+        // Время пребывания закончилось, едем к следующему пункту
+        console.log('🚗 Время пребывания закончилось, продолжаем движение');
+        nextDestination();
+      }
     }
   }
 }
@@ -415,8 +417,9 @@ function setupWorld () {
   // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
-    if (car) {
-      carPath = buildCarPath();
+    if (carRenderer) {
+      const newPath = buildCarPath();
+      carRenderer.setPath(newPath);
     }
   }, 0);
 }
@@ -566,7 +569,7 @@ function updateRouteDisplay () {
   const prefixSpan = routeDisplay.querySelector('.route-prefix');
   const destinationSpan = routeDisplay.querySelector('.route-destination');
 
-  if (isAtDestination) {
+  if (carRenderer && carRenderer.isAtDestination()) {
     prefixSpan.textContent = 'В пункте:';
     destinationSpan.textContent = currentDest.name;
   } else {
@@ -802,8 +805,8 @@ function buildCarPath () {
 
   // Определяем стартовый перекрёсток
   let startIJ;
-  if (car && car.position && (car.position.x !== 0 || car.position.y !== 0)) {
-    startIJ = getNearestIntersectionIJ(car.position.x, car.position.y);
+  if (carRenderer && carRenderer.getCar() && carRenderer.getCar().position && (carRenderer.getCar().position.x !== 0 || carRenderer.getCar().position.y !== 0)) {
+    startIJ = getNearestIntersectionIJ(carRenderer.getCar().position.x, carRenderer.getCar().position.y);
   } else {
     const housePos = getDestinationCenter('house');
     startIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
@@ -814,8 +817,9 @@ function buildCarPath () {
 
   // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
   const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j);
-  const needsPrefix = car && (Math.abs(car.position.x - startIntersection.x) > 1 || Math.abs(car.position.y - startIntersection.y) > 1);
-  const path = needsPrefix ? [{ x: car.position.x, y: car.position.y }, startIntersection, ...graphPath] : graphPath;
+  const carPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
+  const needsPrefix = carRenderer && (Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1);
+  const path = needsPrefix ? [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath] : graphPath;
 
   // Если у нас есть сохраненное состояние и мы начинаем с текущей позиции машины,
   // добавляем промежуточную точку в направлении движения для плавного старта
@@ -866,72 +870,22 @@ function buildCarPath () {
 }
 
 function createCar () {
-  car = new PIXI.Container();
-
-  // Кузов машины
-  const body = new PIXI.Graphics();
-  body.beginFill(0xff8800).drawRect(-60, -30, 120, 60).endFill();
-  car.addChild(body);
-
-  // Радиатор (передняя решетка) - ВПЕРЕДИ
-  const radiator = new PIXI.Graphics();
-  radiator.beginFill(0x333333).drawRect(45, -25, 10, 50).endFill();
-  // Горизонтальные полоски радиатора
-  for (let i = 0; i < 5; i++) {
-    const line = new PIXI.Graphics();
-    line.lineStyle(2, 0x666666);
-    line.moveTo(45, -20 + i * 10);
-    line.lineTo(55, -20 + i * 10);
-    radiator.addChild(line);
-  }
-  car.addChild(radiator);
-
-  // Передние фары - ВПЕРЕДИ
-  const leftHeadlight = new PIXI.Graphics();
-  leftHeadlight.beginFill(0xffffaa).drawCircle(50, -20, 8).endFill();
-  leftHeadlight.lineStyle(1, 0x333333);
-  leftHeadlight.drawCircle(50, -20, 8);
-  car.addChild(leftHeadlight);
-
-  const rightHeadlight = new PIXI.Graphics();
-  rightHeadlight.beginFill(0xffffaa).drawCircle(50, 20, 8).endFill();
-  rightHeadlight.lineStyle(1, 0x333333);
-  rightHeadlight.drawCircle(50, 20, 8);
-  car.addChild(rightHeadlight);
-
-
-  // Задние фары - СЗАДИ
-  const leftTailLight = new PIXI.Graphics();
-  leftTailLight.beginFill(0xff0000).drawCircle(-50, -20, 6).endFill();
-  leftTailLight.lineStyle(1, 0x333333);
-  leftTailLight.drawCircle(-50, -20, 6);
-  car.addChild(leftTailLight);
-
-  const rightTailLight = new PIXI.Graphics();
-  rightTailLight.beginFill(0xff0000).drawCircle(-50, 20, 6).endFill();
-  rightTailLight.lineStyle(1, 0x333333);
-  rightTailLight.drawCircle(-50, 20, 6);
-  car.addChild(rightTailLight);
-
-  // Крыша машинки (квадратик по размеру аватарки)
-  const roof = new PIXI.Graphics();
-  roof.beginFill(0xcc6600).drawRect(-30, -30, 60, 60).endFill();
-  roof.lineStyle(2, 0x333333);
-  roof.drawRect(-30, -30, 60, 60);
-  car.addChild(roof);
-
-  // Аватарка Шины (исходный размер без скругления)
-  avatar = PIXI.Sprite.from('/public/shina.jpeg');
-  avatar.anchor.set(0.5);
-  avatar.width = 60;
-  avatar.height = 60;
-  car.addChild(avatar);
-
-  // Устанавливаем пивот машины в центр для упрощения расчетов
-  // car.position будет указывать на центр машины
-  car.pivot.set(0, 0); // пивот в центре
-  car.position.set(0, 0); // начальная позиция
-
+  // Создаем CarRenderer
+  carRenderer = new CarRenderer(CONFIG, pauseManager);
+  
+  // Создаем машину с помощью CarRenderer (без пути пока)
+  car = carRenderer.createCar({
+    carPath: [],
+    currentRouteIndex: currentRouteIndex,
+    savedCarState: savedCarState,
+    getDestinationCenter: getDestinationCenter,
+    getNearestIntersectionIJ: getNearestIntersectionIJ,
+    getIntersectionCoord: getIntersectionCoord
+  });
+  
+  // Получаем аватарку из CarRenderer
+  avatar = carRenderer.getAvatar();
+  
   // Инициализируем контроллер светофоров
   carTrafficController = new CarTrafficController();
 
@@ -940,42 +894,9 @@ function createCar () {
   isAtDestination = false;
   stayTimer = 0;
 
-  // Строим путь сначала, чтобы определить стартовую позицию
+  // Теперь строим путь и устанавливаем его
   carPath = buildCarPath();
-  carSegment = 0;
-  carProgress = 0;
-
-  // Устанавливаем машину на первую точку пути (которая должна быть на дороге)
-  if (carPath.length > 0) {
-    // Используем сохраненное направление, если оно есть, иначе 0
-    const initialRotation = (savedCarState && savedCarState.direction) || 0;
-    car.rotation = initialRotation;
-    if (avatar) {
-      avatar.rotation = -initialRotation;
-    }
-
-    // Устанавливаем машину так, чтобы передняя часть была в точке пути
-    const carLength = 120;
-    const offsetX = -carLength / 2 * Math.cos(initialRotation);
-    const offsetY = -carLength / 2 * Math.sin(initialRotation);
-    car.position.set(carPath[0].x + offsetX, carPath[0].y + offsetY);
-    console.log('Car starts at:', carPath[0], 'with rotation:', initialRotation);
-  } else {
-    // Fallback: устанавливаем на ближайшую дорогу к дому
-    const housePos = getDestinationCenter('house');
-    const houseIJ = getNearestIntersectionIJ(housePos.x, housePos.y);
-    const roadPos = getIntersectionCoord(houseIJ.i, houseIJ.j);
-    const initialRotation = (savedCarState && savedCarState.direction) || 0;
-    car.rotation = initialRotation;
-    if (avatar) {
-      avatar.rotation = -initialRotation;
-    }
-    const carLength = 120;
-    const offsetX = -carLength / 2 * Math.cos(initialRotation);
-    const offsetY = -carLength / 2 * Math.sin(initialRotation);
-    car.position.set(roadPos.x + offsetX, roadPos.y + offsetY);
-    console.log('Car fallback position:', roadPos, 'with rotation:', initialRotation);
-  }
+  carRenderer.setPath(carPath);
 
   decorLayer.addChild(car);
   app.ticker.add(updateCar);
@@ -1038,30 +959,29 @@ function nextDestination () {
   hideBuildingAvatar();
 
   currentRouteIndex = (currentRouteIndex + 1) % ROUTE_SCHEDULE.length;
-  isAtDestination = false;
-  stayTimer = 0;
+  
+  if (carRenderer) {
+    carRenderer.setAtDestination(false);
+    carRenderer.setStayTimer(0);
 
-  // Восстанавливаем сохраненное состояние машины
-  if (savedCarState) {
-    car.rotation = savedCarState.direction;
-    if (avatar) {
-      avatar.rotation = -savedCarState.direction;
+    // Восстанавливаем сохраненное состояние машины
+    if (savedCarState) {
+      carRenderer.setRotation(savedCarState.direction);
+
+      if (savedCarState.nextIntersection) {
+        console.log(`🔄 Восстановлено направление к перекрестку: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к перекрестку (${savedCarState.nextIntersection.x}, ${savedCarState.nextIntersection.y})`);
+      } else {
+        console.log(`🔄 Восстановлено направление к пункту назначения: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к ${savedCarState.nextDestination.name} (${savedCarState.nextDestCenter.x}, ${savedCarState.nextDestCenter.y})`);
+      }
+
+      // Очищаем сохраненное состояние после использования
+      savedCarState = null;
     }
 
-    if (savedCarState.nextIntersection) {
-      console.log(`🔄 Восстановлено направление к перекрестку: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к перекрестку (${savedCarState.nextIntersection.x}, ${savedCarState.nextIntersection.y})`);
-    } else {
-      console.log(`🔄 Восстановлено направление к пункту назначения: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к ${savedCarState.nextDestination.name} (${savedCarState.nextDestCenter.x}, ${savedCarState.nextDestCenter.y})`);
-    }
-
-    // Очищаем сохраненное состояние после использования
-    savedCarState = null;
+    // Обновляем путь к новому пункту назначения
+    const newPath = buildCarPath();
+    carRenderer.setPath(newPath);
   }
-
-  // Обновляем путь к новому пункту назначения
-  carPath = buildCarPath();
-  carSegment = 0;
-  carProgress = 0;
 
   updateRouteDisplay();
 }
@@ -1078,7 +998,7 @@ function saveCarStateForNextDestination () {
   const nextDestCenter = getDestinationCenter(nextDestination.location);
 
   // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
-  const currentPos = car.position;
+  const currentPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
   const currentIJ = getNearestIntersectionIJ(currentPos.x, currentPos.y);
   const nextPath = buildGraphPathToBuilding(currentIJ, nextDestCenter);
 
@@ -1118,15 +1038,15 @@ function saveCarStateForNextDestination () {
 // Фиксируем прибытие: вызывается только при достижении последней точки пути (обочины)
 function checkArrival () {
   const currentDest = ROUTE_SCHEDULE[currentRouteIndex];
-  if (!isAtDestination) {
+  if (carRenderer && !carRenderer.isAtDestination()) {
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
 
     // Сохраняем состояние машины для плавного продолжения движения
     savedCarState = saveCarStateForNextDestination();
     debugLogAlways(`💾 Сохранено состояние машины:`, savedCarState);
 
-    isAtDestination = true;
-    stayTimer = currentDest.stayHours;
+    carRenderer.setAtDestination(true);
+    carRenderer.setStayTimer(currentDest.stayHours);
     
     // Получаем текущее игровое время
     const gameTime = timeManager.getGameTime();
@@ -1144,8 +1064,8 @@ function showBuildingAvatar (locationKey) {
   if (!buildingCenter) return;
 
   // Скрываем аватарку из машинки
-  if (avatar) {
-    avatar.visible = false;
+  if (carRenderer) {
+    carRenderer.setAvatarVisible(false);
   }
 
   // Создаем аватарку в здании (такого же размера как в машинке)
@@ -1211,209 +1131,33 @@ function hideBuildingAvatar () {
   }
 
   // Показываем аватарку обратно в машинке
-  if (avatar) {
-    avatar.visible = true;
+  if (carRenderer) {
+    carRenderer.setAvatarVisible(true);
   }
 }
 
 function updateCar (delta) {
-  debugInfo.frameCount++;
-
-  // Если игра на паузе, не обновляем машину
-  if (pauseManager.isPaused()) {
-    debugLog('🚗 Игра на паузе, машина не двигается');
-    return;
-  }
-
-  // Если находимся в пункте назначения, не двигаемся
-  if (isAtDestination) {
-    debugLog('🚗 Машина в пункте назначения, не двигается');
-    checkArrival(); // обновляем статус
-    return;
-  }
-
-  const speed = BASE_CAR_SPEED * pauseManager.getSpeedMultiplier() * delta;
-  debugLog('🚗 Состояние машины', {
-    speed: speed.toFixed(2),
-    delta: delta.toFixed(3),
-    position: `(${car.position.x.toFixed(1)}, ${car.position.y.toFixed(1)})`,
-    rotation: `${(car.rotation * 180 / Math.PI).toFixed(1)}°`,
-    segment: `${carSegment}/${carPath.length - 1}`,
-    isAtDestination: isAtDestination
-  });
-
-  // Проверяем, есть ли у нас путь
-  if (carPath.length < 2) {
-    console.log('No valid path, rebuilding...');
-    carPath = buildCarPath();
-    carSegment = 0;
-    carProgress = 0;
-    return;
-  }
-
-  // Проверяем, что текущий сегмент существует
-  if (carSegment >= carPath.length) {
-    console.log('Invalid segment, rebuilding path...');
-    carPath = buildCarPath();
-    carSegment = 0;
-    carProgress = 0;
-    return;
-  }
-
-  // Убеждаемся, что carSegment находится в допустимых пределах
-  if (carSegment >= carPath.length - 1) {
-    // Достигли конца пути
-    // console.log('Reached end of path');
-    const finalX = carPath[carPath.length - 1].x;
-    const finalY = carPath[carPath.length - 1].y;
-    const carLength = 120;
-    const offsetX = -carLength / 2 * Math.cos(car.rotation);
-    const offsetY = -carLength / 2 * Math.sin(car.rotation);
-    car.position.set(finalX + offsetX, finalY + offsetY);
-    checkArrival();
-    return;
-  }
-
-  let p1 = carPath[carSegment];
-  let p2 = carPath[carSegment + 1];
-  let dx = p2.x - p1.x;
-  let dy = p2.y - p1.y;
-  let segLen = Math.hypot(dx, dy);
-
-  // Если текущий сегмент имеет нулевую длину, переходим к следующему
-  if (segLen < 0.1) {
-    // console.log('Zero-length segment, skipping to next');
-    carSegment++;
-    carProgress = 0;
-    return;
-  }
-
-  // 🚦 ПРОВЕРКА СВЕТОФОРА ПЕРЕД ПРИБЛИЖЕНИЕМ К ПЕРЕКРЕСТКУ 🚦
-  if (carTrafficController) {
-    // Вычисляем реальную позицию передней части машины
-    const carLength = 120;
-    const offsetX = carLength / 2 * Math.cos(car.rotation);
-    const offsetY = carLength / 2 * Math.sin(car.rotation);
-    const currentPos = {
-      x: car.position.x + offsetX,
-      y: car.position.y + offsetY
-    };
-    const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
-    const roadPositions = { verticalRoadXs: getVerticalRoadXs(), horizontalRoadYs: getHorizontalRoadYs() };
-
-    // Проверяем расстояние до целевого перекрестка
-    const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
-
-    // ОТЛАДКА: показываем информацию о движении (только первые секунды)
-    if (carSegment === 0 && carProgress < 20) {
-      console.log(`🚗 DEBUG: segment=${carSegment}, progress=${carProgress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${car.position.x.toFixed(0)},${car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
-    }
-
-    // Проверяем светофор только если:
-    // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
-    // 2. И НЕ стоим прямо на перекрестке старта 
-    if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора
-      const trafficCheck = carTrafficController.checkTrafficLights(
-        currentPos,
-        targetIntersection,
-        intersectionKeyToTL,
-        roadPositions
-      );
-
-      if (!trafficCheck.canMove) {
-        // Красный свет - останавливаемся
-        debugLogAlways(`🚦 Остановка перед красным светом на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
-        return; // не обновляем carProgress - машина стоит
-      }
-    }
-  }
-
-  // Обновляем прогресс по текущему сегменту
-  carProgress += speed;
-  debugLog('🚗 Движение по сегменту', {
-    segment: carSegment,
-    progress: carProgress.toFixed(1),
-    segLen: segLen.toFixed(1),
-    speed: speed.toFixed(2)
-  });
-
-  // Проверяем, завершили ли мы текущий сегмент
-  if (carProgress >= segLen) {
-    debugLogAlways('🚗 Завершен сегмент', {
-      segment: carSegment,
-      progress: carProgress.toFixed(1),
-      segLen: segLen.toFixed(1)
+  // Используем CarRenderer для обновления машины
+  if (carRenderer) {
+    carRenderer.updateCar(delta, {
+      checkArrival: checkArrival,
+      debugLog: debugLog,
+      debugLogAlways: debugLogAlways,
+      carTrafficController: carTrafficController,
+      intersectionKeyToTL: intersectionKeyToTL,
+      getVerticalRoadXs: getVerticalRoadXs,
+      getHorizontalRoadYs: getHorizontalRoadYs,
+      buildCarPath: buildCarPath,
+      updateLightBeams: undefined, // Функция не реализована
+      debugInfo: debugInfo
     });
-
-    // Переходим к следующему сегменту
-    carProgress = carProgress - segLen; // остаток переносим
-    carSegment++;
-
-    // Проверяем, не достигли ли мы конца пути
-    if (carSegment >= carPath.length - 1) {
-      // console.log('Reached final destination');
-      const finalX = carPath[carPath.length - 1].x;
-      const finalY = carPath[carPath.length - 1].y;
-      const carLength = 120;
-      const offsetX = -carLength / 2 * Math.cos(car.rotation);
-      const offsetY = -carLength / 2 * Math.sin(car.rotation);
-      car.position.set(finalX + offsetX, finalY + offsetY);
-      checkArrival();
-      return;
-    }
-
-    // Обновляем данные для нового сегмента
-    p1 = carPath[carSegment];
-    p2 = carPath[carSegment + 1];
-    dx = p2.x - p1.x;
-    dy = p2.y - p1.y;
-    segLen = Math.hypot(dx, dy);
-  }
-
-  // Вычисляем текущую позицию на сегменте
-  const t = segLen > 0 ? Math.min(1, carProgress / segLen) : 0;
-  const newX = p1.x + dx * t;
-  const newY = p1.y + dy * t;
-
-  // Обновляем поворот машинки в направлении движения
-  if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-    const targetRotation = Math.atan2(dy, dx);
-    const oldRotation = car.rotation;
-    car.rotation = targetRotation;
-    if (avatar) {
-      avatar.rotation = -targetRotation;
-    }
-
-    // Обновляем лучи света при повороте
-    if (car.leftLightBeam && car.rightLightBeam) {
-      updateLightBeams();
-    }
-
-    // Логируем поворот только если он значительный
-    const rotationDiff = Math.abs(targetRotation - oldRotation);
-    if (rotationDiff > 0.1) {
-      debugLogAlways('🚗 Поворот машины', {
-        oldRotation: (oldRotation * 180 / Math.PI).toFixed(1) + '°',
-        newRotation: (targetRotation * 180 / Math.PI).toFixed(1) + '°',
-        diff: (rotationDiff * 180 / Math.PI).toFixed(1) + '°'
-      });
-    }
-  }
-
-  // Устанавливаем машину так, чтобы передняя часть была в точке пути
-  const carLength = 120;
-  const offsetX = -carLength / 2 * Math.cos(car.rotation);
-  const offsetY = -carLength / 2 * Math.sin(car.rotation);
-  car.position.set(newX + offsetX, newY + offsetY);
-
-
-  // console.log(`Car at segment ${carSegment}/${carPath.length - 1}, progress: ${carProgress.toFixed(1)}/${segLen.toFixed(1)}, pos: (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
-
-  // Проверяем прибытие в пункт назначения: до последней точки пути
-  const lastPoint = carPath[carPath.length - 1];
-  const distToLast = Math.hypot(car.position.x - lastPoint.x, car.position.y - lastPoint.y);
-  if (distToLast < 20) {
-    checkArrival();
+    
+    // Синхронизируем глобальные переменные с CarRenderer
+    carPath = carRenderer.getPath();
+    carSegment = carRenderer.getCurrentSegment();
+    carProgress = carRenderer.getProgress();
+    isAtDestination = carRenderer.isAtDestination();
+    stayTimer = carRenderer.getStayTimer();
   }
 }
 
