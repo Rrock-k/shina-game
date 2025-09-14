@@ -1,3 +1,5 @@
+import { MovementController } from '../systems/MovementController.js';
+
 /**
  * Класс машины - основная сущность для движения по карте
  * Управляет позицией, маршрутом, состоянием и взаимодействием с системами
@@ -39,6 +41,9 @@ export class Car {
     // Callback функции (будут установлены извне)
     this.onArrival = null;
     this.onStateChange = null;
+    
+    // Контроллер движения
+    this.movementController = new MovementController(this, config);
   }
 
   /**
@@ -303,212 +308,8 @@ export class Car {
    * @param {Object} options - дополнительные опции для обновления
    */
   update(delta, options = {}) {
-    const {
-      checkArrival,
-      debugLog,
-      debugLogAlways,
-      carTrafficController,
-      intersectionKeyToTL,
-      getVerticalRoadXs,
-      getHorizontalRoadYs,
-      buildCarPath,
-      updateLightBeams,
-      debugInfo
-    } = options;
-
-    if (debugInfo) {
-      debugInfo.frameCount++;
-    }
-
-    // Если игра на паузе, не обновляем машину
-    if (this.pauseManager.isPaused()) {
-      debugLog('🚗 Игра на паузе, машина не двигается');
-      return;
-    }
-
-    // Если находимся в пункте назначения, не двигаемся
-    if (this._isAtDestination) {
-      debugLog('🚗 Машина в пункте назначения, не двигается');
-      if (checkArrival) checkArrival(); // обновляем статус
-      return;
-    }
-
-    const speed = this.config.BASE_CAR_SPEED * this.pauseManager.getSpeedMultiplier() * delta;
-    debugLog('🚗 Состояние машины', {
-      speed: speed.toFixed(2),
-      delta: delta.toFixed(3),
-      position: `(${this.position.x.toFixed(1)}, ${this.position.y.toFixed(1)})`,
-      rotation: `${(this.rotation * 180 / Math.PI).toFixed(1)}°`,
-      segment: `${this.currentSegment}/${this.path.length - 1}`,
-      isAtDestination: this._isAtDestination
-    });
-
-    // Проверяем, есть ли у нас путь
-    if (this.path.length < 2) {
-      console.log('No valid path, rebuilding...');
-      if (buildCarPath) {
-        this.setPath(buildCarPath());
-      }
-      return;
-    }
-
-    // Проверяем, что текущий сегмент существует
-    if (this.currentSegment >= this.path.length) {
-      console.log('Invalid segment, rebuilding path...');
-      if (buildCarPath) {
-        this.setPath(buildCarPath());
-      }
-      return;
-    }
-
-    // Убеждаемся, что currentSegment находится в допустимых пределах
-    if (this.currentSegment >= this.path.length - 1) {
-      // Достигли конца пути
-      const finalX = this.path[this.path.length - 1].x;
-      const finalY = this.path[this.path.length - 1].y;
-      const carLength = 120;
-      const offsetX = -carLength / 2 * Math.cos(this.rotation);
-      const offsetY = -carLength / 2 * Math.sin(this.rotation);
-      this.position = { x: finalX + offsetX, y: finalY + offsetY };
-      if (checkArrival) checkArrival();
-      return;
-    }
-
-    let p1 = this.path[this.currentSegment];
-    let p2 = this.path[this.currentSegment + 1];
-    let dx = p2.x - p1.x;
-    let dy = p2.y - p1.y;
-    let segLen = Math.hypot(dx, dy);
-
-    // Если текущий сегмент имеет нулевую длину, переходим к следующему
-    if (segLen < 0.1) {
-      this.currentSegment++;
-      this.progress = 0;
-      return;
-    }
-
-    // 🚦 ПРОВЕРКА СВЕТОФОРА ПЕРЕД ПРИБЛИЖЕНИЕМ К ПЕРЕКРЕСТКУ 🚦
-    if (carTrafficController && getVerticalRoadXs && getHorizontalRoadYs) {
-      // Вычисляем реальную позицию передней части машины
-      const carLength = 120;
-      const offsetX = carLength / 2 * Math.cos(this.rotation);
-      const offsetY = carLength / 2 * Math.sin(this.rotation);
-      const currentPos = {
-        x: this.position.x + offsetX,
-        y: this.position.y + offsetY
-      };
-      const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
-      const roadPositions = { 
-        verticalRoadXs: getVerticalRoadXs(), 
-        horizontalRoadYs: getHorizontalRoadYs() 
-      };
-
-      // Проверяем расстояние до целевого перекрестка
-      const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
-
-      // ОТЛАДКА: показываем информацию о движении (только первые секунды)
-      if (this.currentSegment === 0 && this.progress < 20) {
-        console.log(`🚗 DEBUG: segment=${this.currentSegment}, progress=${this.progress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${this.position.x.toFixed(0)},${this.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
-      }
-
-      // Проверяем светофор только если:
-      // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
-      // 2. И НЕ стоим прямо на перекрестке старта 
-      if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора
-        const trafficCheck = carTrafficController.checkTrafficLights(
-          currentPos,
-          targetIntersection,
-          intersectionKeyToTL,
-          roadPositions
-        );
-
-        if (!trafficCheck.canMove) {
-          // Красный свет - останавливаемся
-          debugLogAlways(`🚦 Остановка перед красным светом на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
-          return; // не обновляем progress - машина стоит
-        }
-      }
-    }
-
-    // Обновляем прогресс по текущему сегменту
-    this.progress += speed;
-    debugLog('🚗 Движение по сегменту', {
-      segment: this.currentSegment,
-      progress: this.progress.toFixed(1),
-      segLen: segLen.toFixed(1),
-      speed: speed.toFixed(2)
-    });
-
-    // Проверяем, завершили ли мы текущий сегмент
-    if (this.progress >= segLen) {
-      debugLogAlways('🚗 Завершен сегмент', {
-        segment: this.currentSegment,
-        progress: this.progress.toFixed(1),
-        segLen: segLen.toFixed(1)
-      });
-
-      // Переходим к следующему сегменту
-      this.progress = this.progress - segLen; // остаток переносим
-      this.currentSegment++;
-
-      // Проверяем, не достигли ли мы конца пути
-      if (this.currentSegment >= this.path.length - 1) {
-        const finalX = this.path[this.path.length - 1].x;
-        const finalY = this.path[this.path.length - 1].y;
-        const carLength = 120;
-        const offsetX = -carLength / 2 * Math.cos(this.rotation);
-        const offsetY = -carLength / 2 * Math.sin(this.rotation);
-        this.position = { x: finalX + offsetX, y: finalY + offsetY };
-        if (checkArrival) checkArrival();
-        return;
-      }
-
-      // Обновляем данные для нового сегмента
-      p1 = this.path[this.currentSegment];
-      p2 = this.path[this.currentSegment + 1];
-      dx = p2.x - p1.x;
-      dy = p2.y - p1.y;
-      segLen = Math.hypot(dx, dy);
-    }
-
-    // Вычисляем текущую позицию на сегменте
-    const t = segLen > 0 ? Math.min(1, this.progress / segLen) : 0;
-    const newX = p1.x + dx * t;
-    const newY = p1.y + dy * t;
-
-    // Обновляем поворот машинки в направлении движения
-    if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-      const targetRotation = Math.atan2(dy, dx);
-      const oldRotation = this.rotation;
-      this.rotation = targetRotation;
-
-      // Обновляем лучи света при повороте
-      if (updateLightBeams && typeof updateLightBeams === 'function') {
-        updateLightBeams();
-      }
-
-      // Логируем поворот только если он значительный
-      const rotationDiff = Math.abs(targetRotation - oldRotation);
-      if (rotationDiff > 0.1) {
-        debugLogAlways('🚗 Поворот машины', {
-          oldRotation: (oldRotation * 180 / Math.PI).toFixed(1) + '°',
-          newRotation: (targetRotation * 180 / Math.PI).toFixed(1) + '°',
-          diff: (rotationDiff * 180 / Math.PI).toFixed(1) + '°'
-        });
-      }
-    }
-
-    // Устанавливаем машину так, чтобы передняя часть была в точке пути
-    const carLength = 120;
-    const offsetX = -carLength / 2 * Math.cos(this.rotation);
-    const offsetY = -carLength / 2 * Math.sin(this.rotation);
-    this.position = { x: newX + offsetX, y: newY + offsetY };
-
-    // Обновляем визуальное представление если есть
-    if (this.sprite) {
-      this.sprite.position.set(this.position.x, this.position.y);
-      this.sprite.rotation = this.rotation;
-    }
+    // Делегируем всю логику движения в MovementController
+    this.movementController.update(delta, options);
   }
 
   /**

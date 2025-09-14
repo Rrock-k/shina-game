@@ -160,10 +160,20 @@ function buildGraphPathToBuilding(startIJ, buildingPos) {
     - Если `carEntity.getPosition().x === 0 && carEntity.getPosition().y === 0` - первый запуск (начинаем с дома)
     - Если позиция не (0,0) - машина уже была инициализирована (продолжаем с текущей позиции)
 
-#### Шаг 3.2: Создать класс MovementController
+#### Шаг 3.2: Создать класс MovementController ✅
 - **Файл**: `src/systems/MovementController.js` (новый)
 - **Действие**: Вынести логику движения из Car в отдельный контроллер
 - **Проверка**: Движение управляется через MovementController
+- **Статус**: ✅ ВЫПОЛНЕНО - Создан класс MovementController с полной логикой движения
+- **Изменения**:
+  - ✅ Создан новый файл `src/systems/MovementController.js`
+  - ✅ Перенесена вся логика движения из `Car.update()` в `MovementController.update()`
+  - ✅ Разделена логика на приватные методы: `_finishPath()`, `_checkTrafficLights()`, `_updateRotation()`, `_updatePosition()`
+  - ✅ Добавлен конструктор, принимающий carEntity и config
+  - ✅ Обновлен `Car.js` - добавлен импорт MovementController
+  - ✅ Создается экземпляр MovementController в конструкторе Car
+  - ✅ Метод `Car.update()` теперь делегирует вызов в `movementController.update()`
+  - ✅ Сохранена вся функциональность: проверка светофоров, обновление позиции, повороты, завершение пути
 
 #### Шаг 3.3: Упростить зависимости
 - **Действие**: Убрать циклические зависимости между модулями
