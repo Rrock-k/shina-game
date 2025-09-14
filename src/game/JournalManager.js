@@ -7,8 +7,22 @@ export class JournalManager {
     this.timeManager = timeManager;
     this.journal = [];
     this.currentTrip = null;
-    this.currentLocation = null; // текущее место пребывания
+    this.currentLocation = 'Дом'; // Шина изначально дома
     this.locationStartTime = null; // время начала пребывания в месте
+    
+    console.log(`📝 Шина начинает дома`);
+  }
+
+
+  /**
+   * Установить время начала пребывания в месте
+   * @param {string} location - название места
+   */
+  setLocationStartTime(location) {
+    const gameTime = this.timeManager.getGameTime();
+    this.currentLocation = location;
+    this.locationStartTime = this.formatTime(gameTime);
+    console.log(`📝 Начало пребывания в ${location} в ${this.locationStartTime}`);
   }
 
   /**
@@ -18,6 +32,11 @@ export class JournalManager {
    */
   startTrip(destination, location) {
     const gameTime = this.timeManager.getGameTime();
+    
+    // Завершаем предыдущее пребывание в месте, если есть
+    if (this.currentLocation && this.locationStartTime) {
+      this.endLocationStay(this.currentLocation);
+    }
     
     this.currentTrip = {
       id: Date.now(),
@@ -45,11 +64,17 @@ export class JournalManager {
     this.currentTrip.duration = this.calculateDuration(this.currentTrip.startTime, this.currentTrip.endTime);
     this.currentTrip.status = 'completed';
 
+    // Получаем время предыдущей записи для расчета времени от нее
+    const previousRecordTime = this.getLastRecordTime();
+    const timeFromPrevious = this.calculateTimeFromPrevious(previousRecordTime, this.currentTrip.endTime);
+
     // Добавляем завершенную дорогу в журнал (в конец)
     this.journal.push({
       type: 'road',
       destination: this.currentTrip.destination,
-      duration: this.currentTrip.duration
+      duration: this.currentTrip.duration,
+      timeFromPrevious: timeFromPrevious,
+      absoluteTime: this.currentTrip.endTime
     });
 
     // Записываем начало пребывания в месте
@@ -89,11 +114,17 @@ export class JournalManager {
     const currentTime = this.formatTime(gameTime);
     const stayDuration = this.calculateDuration(this.locationStartTime, currentTime);
 
+    // Получаем время предыдущей записи для расчета времени от нее
+    const previousRecordTime = this.getLastRecordTime();
+    const timeFromPrevious = this.calculateTimeFromPrevious(previousRecordTime, currentTime);
+
     // Добавляем завершение пребывания в месте (в конец)
     this.journal.push({
       type: 'work',
       destination: location,
-      duration: stayDuration
+      duration: stayDuration,
+      timeFromPrevious: timeFromPrevious,
+      absoluteTime: currentTime
     });
 
     console.log(`📝 Завершено пребывание в ${location} в ${currentTime}, время в месте: ${stayDuration}`);
@@ -102,6 +133,58 @@ export class JournalManager {
     this.locationStartTime = null;
   }
 
+
+  /**
+   * Получить время последней записи в журнале
+   * @returns {string|null} время последней записи или null
+   */
+  getLastRecordTime() {
+    if (this.journal.length === 0) {
+      // Если журнал пуст, используем время начала игры (00:00)
+      return '00:00';
+    }
+    
+    // Получаем абсолютное время из последней записи
+    const lastEntry = this.journal[this.journal.length - 1];
+    return lastEntry.absoluteTime || '00:00';
+  }
+
+  /**
+   * Рассчитать время от предыдущей записи
+   * @param {string} previousTime - время предыдущей записи
+   * @param {string} currentTime - текущее время
+   * @returns {string} время от предыдущей записи
+   */
+  calculateTimeFromPrevious(previousTime, currentTime) {
+    if (!previousTime) return currentTime;
+    
+    const [prevHours, prevMinutes] = previousTime.split(':').map(Number);
+    const [currHours, currMinutes] = currentTime.split(':').map(Number);
+    
+    const prevTotalMinutes = prevHours * 60 + prevMinutes;
+    const currTotalMinutes = currHours * 60 + currMinutes;
+    
+    let durationMinutes = currTotalMinutes - prevTotalMinutes;
+    
+    // Учитываем переход через день
+    if (durationMinutes < 0) {
+      durationMinutes += 24 * 60;
+    }
+
+    return this.formatDuration(durationMinutes);
+  }
+
+  /**
+   * Добавить время к предыдущей записи (для получения абсолютного времени)
+   * @param {string} timeFromPrevious - время от предыдущей записи
+   * @returns {string} абсолютное время
+   */
+  addTimeToPrevious(timeFromPrevious) {
+    // Это упрощенная версия - в реальности нужно парсить timeFromPrevious
+    // и добавлять к предыдущему времени, но для простоты возвращаем текущее время
+    const gameTime = this.timeManager.getGameTime();
+    return this.formatTime(gameTime);
+  }
 
   /**
    * Очистить журнал

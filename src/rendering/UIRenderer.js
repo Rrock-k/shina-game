@@ -908,17 +908,19 @@ export class UIRenderer {
     // Добавляем записи журнала (самые новые внизу)
     journal.forEach(entry => {
       if (entry.type === 'road') {
-        // Завершенная дорога
+        // Завершенная дорога - показываем время от предыдущей записи
+        const timeDisplay = entry.timeFromPrevious || entry.duration;
         html += `
           <div class="journal-entry">
-            <div class="journal-entry-text">🚗 Дорога -> ${entry.destination} ${entry.duration}</div>
+            <div class="journal-entry-text">🚗 Дорога -> ${entry.destination} ${timeDisplay}</div>
           </div>
         `;
       } else if (entry.type === 'work') {
-        // Работа в месте
+        // Работа в месте - показываем название места и время от предыдущей записи
+        const timeDisplay = entry.timeFromPrevious || entry.duration;
         html += `
           <div class="journal-entry">
-            <div class="journal-entry-text">Работа: ${entry.duration}</div>
+            <div class="journal-entry-text">${entry.destination}: ${timeDisplay}</div>
           </div>
         `;
       }
@@ -981,6 +983,30 @@ export class UIRenderer {
     } else {
       return `${mins}м`;
     }
+  }
+
+  /**
+   * Форматировать продолжительность для поездок (только минуты)
+   * @param {string} duration - продолжительность в формате "Xч Yм" или "Xм"
+   * @returns {string} отформатированная продолжительность только в минутах
+   */
+  formatDurationForRoad(duration) {
+    // Если уже в формате "Xм", возвращаем как есть
+    if (duration.endsWith('м') && !duration.includes('ч')) {
+      return duration;
+    }
+    
+    // Парсим формат "Xч Yм" и конвертируем в минуты
+    const match = duration.match(/(\d+)ч\s*(\d+)м/);
+    if (match) {
+      const hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const totalMinutes = hours * 60 + minutes;
+      return `${totalMinutes}м`;
+    }
+    
+    // Если не удалось распарсить, возвращаем как есть
+    return duration;
   }
 
   /**

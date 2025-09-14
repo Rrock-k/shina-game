@@ -135,7 +135,7 @@ function initEntities() {
   shinaEntity = new Shina(CONFIG);
   shinaEntity.init({
     position: { x: 0, y: 0 },
-    initialState: 'available',
+    initialState: 'atWork', // Шина дома в начале игры
     onStateChange: (oldState, newState, shina) => {
       console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
     },
@@ -214,6 +214,9 @@ setupApp();
 timeManager = new TimeManager();
 pauseManager = new PauseManager();
 journalManager = new JournalManager(timeManager);
+
+// Устанавливаем время начала пребывания дома сразу после создания JournalManager
+journalManager.setLocationStartTime('Дом');
 
 // Синхронизируем менеджеры
 timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
@@ -565,26 +568,30 @@ function buildCarPath () {
   const verticalRoadXs = getVerticalRoadXs();
   const horizontalRoadYs = getHorizontalRoadYs();
 
-  // Определяем стартовый перекрёсток
-  let startIJ;
-  if (carRenderer && carRenderer.getCar() && carRenderer.getCar().position && (carRenderer.getCar().position.x !== 0 || carRenderer.getCar().position.y !== 0)) {
-    startIJ = getNearestIntersectionIJ(carRenderer.getCar().position.x, carRenderer.getCar().position.y, verticalRoadXs, horizontalRoadYs);
-  } else {
-    const housePos = getDestinationCenter('house');
-    startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
-  }
+  // Определяем стартовый перекрёсток - всегда начинаем с дома
+  const housePos = getDestinationCenter('house');
+  const startIJ = getNearestIntersectionIJ(housePos.x, housePos.y, verticalRoadXs, horizontalRoadYs);
 
   const destCenter = getDestinationCenter(currentDestination.location);
   const graphPath = buildGraphPathToBuilding(startIJ, destCenter, verticalRoadXs, horizontalRoadYs);
 
-  // Если машина не стоит ровно на перекрёстке старта, добавляем первый короткий сегмент до перекрёстка
+  // Если мы начинаем с дома, машина должна стоять рядом с домом, а не в здании
   const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, verticalRoadXs, horizontalRoadYs);
-  const carPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
-  const needsPrefix = carRenderer && (Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1);
-  const path = needsPrefix ? [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath] : graphPath;
+  let path;
+  
+  if (currentDestination.location === 'house') {
+    // Если цель - дом, машина стоит рядом с домом (на перекрёстке)
+    path = [startIntersection, ...graphPath];
+  } else {
+    // Если цель - другое здание, машина стоит рядом с домом и едет к цели
+    const carPos = carRenderer ? carRenderer.getCar().position : startIntersection;
+    const needsPrefix = carRenderer && (Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1);
+    path = needsPrefix ? [{ x: carPos.x, y: carPos.y }, startIntersection, ...graphPath] : [startIntersection, ...graphPath];
+  }
 
   // Если у нас есть сохраненное состояние и мы начинаем с текущей позиции машины,
   // добавляем промежуточную точку в направлении движения для плавного старта
+  const needsPrefix = currentDestination.location !== 'house' && carRenderer && (Math.abs(carRenderer.getCar().position.x - startIntersection.x) > 1 || Math.abs(carRenderer.getCar().position.y - startIntersection.y) > 1);
   if (needsPrefix && savedCarState && savedCarState.direction !== 0 && path.length >= 2) {
     const currentPos = path[0];
     const nextPos = path[1];
@@ -649,9 +656,9 @@ function createCar () {
   // Инициализируем контроллер светофоров
   carTrafficController = new CarTrafficController();
 
-  // Начинаем с первого пункта назначения (работа)
-  currentRouteIndex = 1; // работа, а не дом
-  stayTimer = 0;
+  // Начинаем с дома
+  currentRouteIndex = 0; // дом
+  stayTimer = CONFIG.ROUTE_SCHEDULE[0].stayHours; // устанавливаем таймер для дома
   
   // Обновляем индекс маршрута в UIRenderer
   if (uiRenderer) {
@@ -667,7 +674,19 @@ function createCar () {
   // Если carEntity уже создан, обновляем его путь
   if (carEntity) {
     carEntity.setPath(carPath);
+    // Устанавливаем, что машина уже в пункте назначения (дома)
+    carEntity.setAtDestination(true);
+    carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   }
+  
+  // Устанавливаем, что машина уже в пункте назначения (дома)
+  carRenderer.setAtDestination(true);
+  carRenderer.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
+  
+  // Инициализируем таймер пребывания
+  const gameTime = timeManager.getGameTime();
+  lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
+  lastStayTimerDay = gameTime.day;
 
   decorLayer.addChild(car);
   app.ticker.add(updateCar);
@@ -841,6 +860,8 @@ function checkArrival () {
     // Завершаем дорогу в журнале при входе в здание
     if (journalManager && currentDest) {
       journalManager.endTrip(currentDest.name);
+      // Устанавливаем время начала пребывания в месте
+      journalManager.setLocationStartTime(currentDest.name);
     }
 
     // Сохраняем состояние машины для плавного продолжения движения
