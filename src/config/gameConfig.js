@@ -35,7 +35,7 @@ export const CONFIG = {
   },
   ZONE_LAYOUT: {
     // индексы блоков: 0..(кол-во-1) слева-направо и сверху-вниз
-    house: { block: { i: 0, j: 0 }, cells: [[0, 0]] },           // 1x1
+    house: { block: { i: 2, j: 1 }, cells: [[0, 0]] }, // 1x1 квадрат в блоке c2-c3-d2-d3
     relatives: { block: { i: 5, j: 0 }, cells: [[1, 0]] },       // 1x1
     work: { block: { i: 3, j: 1 }, cells: [[0, 1], [1, 1]] },    // 2x1 (две колонки в одном ряду)
     box: { block: { i: 1, j: 2 }, cells: [[0, 1], [0, 2]] },     // 1x2 (две строки в одном столбце)
