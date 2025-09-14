@@ -60,7 +60,7 @@ let lastStayTimerUpdate = 0;
 let lastStayTimerDay = 0;
 
 function updateStayTimer() {
-  if (carRenderer && carRenderer.isAtDestination()) {
+  if (carEntity && carEntity.isAtDestination()) {
     // Получаем игровое время из timeManager
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
@@ -79,8 +79,8 @@ function updateStayTimer() {
         timeDiff = currentTime - lastStayTimerUpdate;
       }
       
-      const newStayTimer = carRenderer.getStayTimer() - timeDiff / 60; // переводим в игровые часы
-      carRenderer.setStayTimer(newStayTimer);
+      const newStayTimer = carEntity.getStayTimer() - timeDiff / 60; // переводим в игровые часы
+      carEntity.setStayTimer(newStayTimer);
       lastStayTimerUpdate = currentTime;
       lastStayTimerDay = currentDay;
       
@@ -445,9 +445,9 @@ function setupWorld () {
   // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
-    if (carRenderer) {
+    if (carEntity) {
       const newPath = buildCarPath();
-      carRenderer.setPath(newPath);
+      carEntity.setPath(newPath);
     }
   }, 0);
 }
@@ -570,9 +570,9 @@ function buildCarPath () {
 
   // Определяем стартовый перекрёсток
   let startIJ;
-  if (carRenderer && carRenderer.getCar() && currentRouteIndex !== 0) {
-    // Если машина уже существует И это не первый запуск (не дом), начинаем с её текущей позиции
-    const carPos = carRenderer.getCar().position;
+  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
+    // Если машина уже существует, имеет позицию И это не первый запуск (не дом), начинаем с её текущей позиции
+    const carPos = carEntity.getPosition();
     startIJ = getNearestIntersectionIJ(carPos.x, carPos.y, verticalRoadXs, horizontalRoadYs);
   } else {
     // Иначе начинаем с дома (первый запуск или нет машины)
@@ -587,9 +587,9 @@ function buildCarPath () {
   const startIntersection = getIntersectionCoord(startIJ.i, startIJ.j, verticalRoadXs, horizontalRoadYs);
   let path;
   
-  if (carRenderer && carRenderer.getCar() && currentRouteIndex !== 0) {
-    // Если машина уже существует И это не первый запуск, проверяем, нужно ли добавить префикс
-    const carPos = carRenderer.getCar().position;
+  if (carEntity && carEntity.getPosition() && (carEntity.getPosition().x !== 0 || carEntity.getPosition().y !== 0) && currentRouteIndex !== 0) {
+    // Если машина уже существует, имеет позицию И это не первый запуск, проверяем, нужно ли добавить префикс
+    const carPos = carEntity.getPosition();
     const needsPrefix = Math.abs(carPos.x - startIntersection.x) > 1 || Math.abs(carPos.y - startIntersection.y) > 1;
     
     if (needsPrefix) {
@@ -606,7 +606,7 @@ function buildCarPath () {
 
   // Если у нас есть сохраненное состояние и мы начинаем с текущей позиции машины,
   // добавляем промежуточную точку в направлении движения для плавного старта
-  const needsPrefix = currentDestination.location !== 'house' && carRenderer && (Math.abs(carRenderer.getCar().position.x - startIntersection.x) > 1 || Math.abs(carRenderer.getCar().position.y - startIntersection.y) > 1);
+  const needsPrefix = carEntity && carEntity.getPosition() && (Math.abs(carEntity.getPosition().x - startIntersection.x) > 1 || Math.abs(carEntity.getPosition().y - startIntersection.y) > 1);
   if (needsPrefix && savedCarState && savedCarState.direction !== 0 && path.length >= 2) {
     const currentPos = path[0];
     const nextPos = path[1];
@@ -684,7 +684,6 @@ function createCar () {
 
   // Теперь строим путь и устанавливаем его
   carPath = buildCarPath();
-  carRenderer.setPath(carPath);
   
   // Если carEntity уже создан, обновляем его путь
   if (carEntity) {
@@ -693,10 +692,6 @@ function createCar () {
     carEntity.setAtDestination(true);
     carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   }
-  
-  // Устанавливаем, что машина уже в пункте назначения (дома)
-  carRenderer.setAtDestination(true);
-  carRenderer.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   
   // Инициализируем таймер пребывания
   const gameTime = timeManager.getGameTime();
@@ -716,13 +711,13 @@ function createCar () {
     
     // Обновляем UI с текущим состоянием машины
     if (uiRenderer) {
-      uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
+      uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
       // Обновляем весь UI (включая журнал)
       uiRenderer.update();
     }
   });
 
-  uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
+  uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
 }
 
 function updateGameTime () {
@@ -746,7 +741,7 @@ function updateGameTime () {
   }
 
   // Если находимся в пункте назначения, уменьшаем таймер ожидания
-  if (carRenderer && carRenderer.isAtDestination()) {
+  if (carEntity && carEntity.isAtDestination()) {
     // Получаем время из TimeManager для расчета таймера
     const gameTime = timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes;
@@ -777,35 +772,15 @@ function nextDestination () {
     uiRenderer.setCurrentRouteIndex(currentRouteIndex);
   }
   
-  if (carRenderer) {
-    carRenderer.setAtDestination(false);
-    carRenderer.setStayTimer(0);
-
-    // Восстанавливаем сохраненное состояние машины
-    if (savedCarState) {
-      carRenderer.setRotation(savedCarState.direction);
-
-      if (savedCarState.nextIntersection) {
-        console.log(`🔄 Восстановлено направление к перекрестку: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к перекрестку (${savedCarState.nextIntersection.x}, ${savedCarState.nextIntersection.y})`);
-      } else {
-        console.log(`🔄 Восстановлено направление к пункту назначения: ${savedCarState.direction.toFixed(3)} радиан (${(savedCarState.direction * 180 / Math.PI).toFixed(1)}°) к ${savedCarState.nextDestination.name} (${savedCarState.nextDestCenter.x}, ${savedCarState.nextDestCenter.y})`);
-      }
-
-      // Очищаем сохраненное состояние после использования
-      savedCarState = null;
-    }
-
+  // Синхронизируем с carEntity
+  if (carEntity) {
+    carEntity.setCurrentRouteIndex(currentRouteIndex);
+    carEntity.setAtDestination(false);
+    carEntity.setStayTimer(0);
+    
     // Обновляем путь к новому пункту назначения
     const newPath = buildCarPath();
-    carRenderer.setPath(newPath);
-    
-    // Синхронизируем с carEntity
-    if (carEntity) {
-      carEntity.setCurrentRouteIndex(currentRouteIndex);
-      carEntity.setPath(newPath);
-      carEntity.setAtDestination(false);
-      carEntity.setStayTimer(0);
-    }
+    carEntity.setPath(newPath);
   }
 
   // Начинаем новую дорогу в журнале при выходе из здания
@@ -814,7 +789,7 @@ function nextDestination () {
     journalManager.startTrip(newDest.name, newDest.location);
   }
 
-  uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
+  uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
 }
 
 // Сохраняем состояние машины для плавного продолжения движения к следующему пункту
@@ -871,7 +846,7 @@ function saveCarStateForNextDestination () {
 // Фиксируем прибытие: вызывается только при достижении последней точки пути (обочины)
 function checkArrival () {
   const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-  if (carRenderer && !carRenderer.isAtDestination()) {
+  if (carEntity && !carEntity.isAtDestination()) {
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
 
     // Завершаем дорогу в журнале при входе в здание
@@ -885,9 +860,6 @@ function checkArrival () {
     savedCarState = saveCarStateForNextDestination();
     debugLogAlways(`💾 Сохранено состояние машины:`, savedCarState);
 
-    carRenderer.setAtDestination(true);
-    carRenderer.setStayTimer(currentDest.stayHours);
-    
     // Синхронизируем с carEntity
     if (carEntity) {
       carEntity.setAtDestination(true);
@@ -898,7 +870,7 @@ function checkArrival () {
     const gameTime = timeManager.getGameTime();
     lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
     lastStayTimerDay = gameTime.day; // инициализируем день
-    uiRenderer.updateRouteDisplay(carRenderer ? carRenderer.isAtDestination() : false);
+    uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
     // Показываем маленькую аватарку в здании
     showBuildingAvatar(currentDest.location);
   }
@@ -988,18 +960,8 @@ function updateCar (delta) {
   
   // Синхронизируем carEntity с carRenderer для визуального представления
   if (carEntity && carRenderer) {
-    // Синхронизируем позицию и поворот
-    const carSprite = carRenderer.getCar();
-    if (carSprite) {
-      carSprite.position.set(carEntity.getPosition().x, carEntity.getPosition().y);
-      carSprite.rotation = carEntity.getRotation();
-    }
-    
-    // Синхронизируем аватарку
-    const avatar = carRenderer.getAvatar();
-    if (avatar) {
-      avatar.rotation = -carEntity.getRotation();
-    }
+    // Обновляем визуальное представление
+    carRenderer.updateVisuals(carEntity);
     
     // Синхронизируем глобальные переменные с carEntity
     carPath = carEntity.getPath();

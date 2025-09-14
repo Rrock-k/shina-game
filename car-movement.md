@@ -95,10 +95,25 @@ function buildGraphPathToBuilding(startIJ, buildingPos) {
 
 ### Этап 2: Устранение дублирования (3 шага)
 
-#### Шаг 2.1: Убрать логику движения из CarRenderer
+#### Шаг 2.1: Убрать логику движения из CarRenderer ✅
 - **Файл**: `src/rendering/CarRenderer.js`
 - **Действие**: Удалить метод `updateCar()` и оставить только рендеринг
 - **Проверка**: CarRenderer должен только отрисовывать машину
+- **Статус**: ✅ ВЫПОЛНЕНО - Удален метод updateCar() и все связанные с движением методы
+- **Изменения**: 
+  - ✅ Удален метод `updateCar()` (162 строки кода)
+  - ✅ Удалены методы: `setPath()`, `setAtDestination()`, `isAtDestination()`, `getCurrentSegment()`, `getProgress()`, `getPath()`, `setStayTimer()`, `getStayTimer()`, `updateStayTimer()`
+  - ✅ Упрощен конструктор - убраны свойства движения
+  - ✅ Упрощен метод `createCar()` - убрана логика инициализации пути
+  - ✅ Добавлен новый метод `updateVisuals(car)` для обновления визуального представления
+  - ✅ Обновлен `main.js` - убраны все вызовы методов движения из carRenderer
+  - ✅ Заменена ручная синхронизация на `carRenderer.updateVisuals(carEntity)`
+  - ✅ Исправлены все оставшиеся вызовы `carRenderer.isAtDestination()` на `carEntity.isAtDestination()`
+  - ✅ Исправлены все оставшиеся вызовы `carRenderer.getStayTimer()` на `carEntity.getStayTimer()`
+  - ✅ Оставлены только методы рендеринга: `getCar()`, `getAvatar()`, `createCar()`, `setAvatarVisible()`, `updateVisuals()`
+  - ✅ ИСПРАВЛЕНА ПРОБЛЕМА С ДИАГОНАЛЬНЫМ ДВИЖЕНИЕМ - восстановлена логика определения стартового перекрестка:
+    - При первом запуске (currentRouteIndex === 0) - начинаем с дома
+    - При переходе к следующему пункту (currentRouteIndex !== 0) - начинаем от текущей позиции машины
 
 #### Шаг 2.2: Оставить логику движения только в Car
 - **Файл**: `src/entities/Car.js`
