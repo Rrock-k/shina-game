@@ -49,8 +49,6 @@ export class JournalManager {
     this.journal.push({
       type: 'road',
       destination: this.currentTrip.destination,
-      startTime: this.currentTrip.startTime,
-      endTime: this.currentTrip.endTime,
       duration: this.currentTrip.duration
     });
 
@@ -93,10 +91,8 @@ export class JournalManager {
 
     // Добавляем завершение пребывания в месте (в конец)
     this.journal.push({
-      type: 'departure',
+      type: 'work',
       destination: location,
-      startTime: this.locationStartTime,
-      endTime: currentTime,
       duration: stayDuration
     });
 

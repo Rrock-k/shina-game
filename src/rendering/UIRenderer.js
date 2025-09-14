@@ -911,16 +911,14 @@ export class UIRenderer {
         // Завершенная дорога
         html += `
           <div class="journal-entry">
-            <div class="journal-entry-header">Работа ${entry.startTime}-${entry.endTime}</div>
-            <div class="journal-entry-details">${entry.duration}</div>
+            <div class="journal-entry-text">🚗 Дорога -> ${entry.destination} ${entry.duration}</div>
           </div>
         `;
-      } else if (entry.type === 'departure') {
-        // Завершение пребывания в месте
+      } else if (entry.type === 'work') {
+        // Работа в месте
         html += `
           <div class="journal-entry">
-            <div class="journal-entry-header">${entry.destination} ${entry.startTime}-${entry.endTime}</div>
-            <div class="journal-entry-details">${entry.duration}</div>
+            <div class="journal-entry-text">Работа: ${entry.duration}</div>
           </div>
         `;
       }
@@ -933,8 +931,7 @@ export class UIRenderer {
       
       html += `
         <div class="journal-entry current">
-          <div class="journal-entry-header">Работа ${currentTrip.startTime}-${currentTime}</div>
-          <div class="journal-entry-details">${currentDuration}</div>
+          <div class="journal-entry-text">🚗 Дорога -> ${currentTrip.destination} ${currentDuration}</div>
         </div>
       `;
     }
