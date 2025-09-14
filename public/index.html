@@ -47,26 +47,107 @@
     <!-- Canvas будет добавлен сюда через JavaScript -->
   </div>
 
-  <!-- Модальное окно меню -->
-  <div class="modal-overlay" id="menu-modal">
+  <!-- Единое модальное окно -->
+  <div class="modal-overlay" id="unified-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <button class="modal-back-btn" id="modal-back-btn">&lt;</button>
-        <h2 class="modal-title">Журнал</h2>
+        <button class="modal-back-btn" id="modal-back-btn" style="display: none;">&lt;</button>
+        <h2 class="modal-title" id="modal-title">Меню</h2>
         <button class="modal-close" id="modal-close">&times;</button>
       </div>
-      <div class="menu-items">
-        <div class="menu-item" id="menu-pause">⏸️ Пауза: <span id="pause-mode-text">Выключена</span></div>
-        <div class="menu-item" id="menu-speed">⚡ Скорость: <span id="speed-display">x1</span></div>
-        <div class="menu-item" id="menu-daynight">🌅 Режим дня/ночи: <span id="daynight-mode-text">Авто</span>
-        </div>
-        <div class="menu-item" id="menu-car-lights">🚗 Фары машины: <span id="car-lights-status">ВЫКЛ</span></div>
-        <div class="menu-item" id="menu-schedule">📅 Расписание</div>
-        <div class="menu-item" id="menu-journal">📝 Журнал поездок</div>
-        <div class="menu-item" id="menu-help">❓ Помощь</div>
-        <div class="menu-item" id="menu-about">ℹ️ О игре</div>
-      </div>
 
+      <!-- Контейнер для переключения контента -->
+      <div class="modal-body" id="modal-body">
+        <!-- Главное меню -->
+        <div class="modal-content-page" id="main-menu-content">
+          <div class="menu-items">
+            <div class="menu-item" id="menu-pause">⏸️ Пауза: <span id="pause-mode-text">Выключена</span></div>
+            <div class="menu-item" id="menu-speed">⚡ Скорость: <span id="speed-display">x1</span></div>
+            <div class="menu-item" id="menu-daynight">🌅 Режим дня/ночи: <span id="daynight-mode-text">Авто</span></div>
+            <div class="menu-item" id="menu-car-lights">🚗 Фары машины: <span id="car-lights-status">ВЫКЛ</span></div>
+            <div class="menu-item" id="menu-schedule">📅 Расписание</div>
+            <div class="menu-item" id="menu-journal">📝 Журнал поездок</div>
+            <div class="menu-item" id="menu-help">❓ Помощь</div>
+            <div class="menu-item" id="menu-about">ℹ️ О игре</div>
+          </div>
+        </div>
+
+        <!-- Контент журнала -->
+        <div class="modal-content-page" id="journal-content" style="display: none;">
+          <div class="journal-container">
+            <div class="journal-entries" id="journal-entries"></div>
+          </div>
+        </div>
+
+        <!-- Контент расписания -->
+        <div class="modal-content-page" id="schedule-content" style="display: none;">
+          <div class="schedule-container">
+            <div class="schedule-list" id="schedule-list"></div>
+          </div>
+        </div>
+
+        <!-- Контент помощи -->
+        <div class="modal-content-page" id="help-content" style="display: none;">
+          <div class="help-container">
+            <h3>Управление игрой</h3>
+            <div class="help-section">
+              <h4>Основные действия:</h4>
+              <ul>
+                <li><strong>Клик по машине</strong> - переключение скорости (x1 → x2 → x5 → x1)</li>
+                <li><strong>Клик по светофору</strong> - переключение режима дня/ночи</li>
+                <li><strong>Клик по фаре</strong> - включение/выключение фар</li>
+                <li><strong>Клик по кнопке паузы</strong> - пауза/возобновление игры</li>
+              </ul>
+            </div>
+            <div class="help-section">
+              <h4>Горячие клавиши:</h4>
+              <ul>
+                <li><strong>J</strong> - открыть журнал поездок</li>
+                <li><strong>Escape</strong> - закрыть меню</li>
+              </ul>
+            </div>
+            <div class="help-section">
+              <h4>Особенности:</h4>
+              <ul>
+                <li>Игра автоматически сохраняет прогресс</li>
+                <li>Время в игре ускоряется в зависимости от выбранной скорости</li>
+                <li>Режим дня/ночи влияет на освещение и поведение светофоров</li>
+                <li>Фары включаются автоматически в ночное время</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Контент "О игре" -->
+        <div class="modal-content-page" id="about-content" style="display: none;">
+          <div class="about-container">
+            <h3>О игре "Карта Шины"</h3>
+            <div class="about-section">
+              <h4>Описание:</h4>
+              <p>Интерактивная карта с движущейся машиной, светофорами и системой управления временем. Игра симулирует
+                поездку по городу с реалистичными элементами дорожного движения.</p>
+            </div>
+            <div class="about-section">
+              <h4>Особенности:</h4>
+              <ul>
+                <li>Динамическая система времени (день/ночь)</li>
+                <li>Интерактивные светофоры</li>
+                <li>Система управления скоростью</li>
+                <li>Журнал поездок</li>
+                <li>Адаптивный интерфейс</li>
+              </ul>
+            </div>
+            <div class="about-section">
+              <h4>Технологии:</h4>
+              <p>JavaScript, PIXI.js, HTML5 Canvas, CSS3</p>
+            </div>
+            <div class="about-section">
+              <h4>Версия:</h4>
+              <p>1.0.0</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

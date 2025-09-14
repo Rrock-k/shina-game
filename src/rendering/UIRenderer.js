@@ -23,7 +23,8 @@ export class UIRenderer {
     this.isInitialized = false;
     this.currentRouteIndex = 0;
     this.journalUpdateInterval = null;
-    this.currentMenuState = 'main'; // 'main', 'journal'
+    this.currentMenuState = 'main'; // 'main', 'journal', 'schedule', 'help', 'about'
+    this.modalStack = []; // Стек для навигации по модальным окнам
   }
 
   /**
@@ -61,13 +62,14 @@ export class UIRenderer {
    */
   initMenu() {
     const burgerButton = document.getElementById('burger-button');
-    const menuModal = document.getElementById('menu-modal');
+    const unifiedModal = document.getElementById('unified-modal');
     const modalClose = document.getElementById('modal-close');
+    const modalBackBtn = document.getElementById('modal-back-btn');
     const menuItems = document.querySelectorAll('.menu-item');
 
     // Функция для обновления состояния панорамирования
     const updatePanningState = () => {
-      const isMenuOpen = menuModal.classList.contains('active');
+      const isMenuOpen = unifiedModal.classList.contains('active');
       if (this.panningController) {
         this.panningController.setMenuOpen(isMenuOpen);
       }
@@ -75,47 +77,36 @@ export class UIRenderer {
 
     // Открытие/закрытие меню по клику на бургер
     burgerButton.addEventListener('click', () => {
-      menuModal.classList.toggle('active');
-      burgerButton.classList.toggle('active');
+      this.toggleUnifiedModal();
       updatePanningState();
     });
 
     // Закрытие меню по клику на крестик
     modalClose.addEventListener('click', () => {
-      menuModal.classList.remove('active');
-      burgerButton.classList.remove('active');
+      this.closeUnifiedModal();
       updatePanningState();
     });
 
     // Закрытие меню по клику на фон
-    menuModal.addEventListener('click', (e) => {
-      if (e.target === menuModal) {
-        menuModal.classList.remove('active');
-        burgerButton.classList.remove('active');
+    unifiedModal.addEventListener('click', (e) => {
+      if (e.target === unifiedModal) {
+        this.closeUnifiedModal();
         updatePanningState();
       }
     });
 
     // Закрытие меню по нажатию Escape
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && menuModal.classList.contains('active')) {
-        menuModal.classList.remove('active');
-        burgerButton.classList.remove('active');
+      if (e.key === 'Escape' && unifiedModal.classList.contains('active')) {
+        this.closeUnifiedModal();
         updatePanningState();
       }
     });
 
-    // Обработчик для кнопки "Назад" в заголовке
-    const modalBackBtn = document.getElementById('modal-back-btn');
+    // Обработчик для кнопки "Назад"
     if (modalBackBtn) {
       modalBackBtn.addEventListener('click', () => {
-        // Возвращаем меню в основное состояние
-        this.currentMenuState = 'main';
-        this.updateMenuTitle();
-        
-        menuModal.classList.remove('active');
-        burgerButton.classList.remove('active');
-        updatePanningState();
+        this.goBack();
       });
     }
 
@@ -123,55 +114,195 @@ export class UIRenderer {
     menuItems.forEach(item => {
       item.addEventListener('click', () => {
         const itemId = item.id;
-
-        // Выполняем действие в зависимости от выбранного пункта
-        switch (itemId) {
-          case 'menu-pause':
-            // Переключаем паузу
-            this.pauseManager.togglePause();
-            this.timeManager.setPaused(this.pauseManager.isPaused());
-            this.updatePauseModeDisplay();
-            break;
-          case 'menu-speed':
-            // Переключаем скорость
-            if (this.speedButton) {
-              this.speedButton.click();
-            }
-            // Обновляем отображение скорости в меню
-            this.updateSpeedDisplay();
-            this.showMenuNotification('⚡ Скорость переключена');
-            break;
-          case 'menu-daynight':
-            // Переключаем режим дня/ночи (не закрываем меню)
-            this.dayNightManager.toggleDayNightMode();
-            this.updateDayNightModeDisplay();
-            break;
-          case 'menu-car-lights':
-            // Переключаем фары машины (не закрываем меню)
-            if (window.carEntity && typeof window.carEntity.toggleHeadlights === 'function') {
-              window.carEntity.toggleHeadlights();
-              this.updateCarLightsDisplay();
-            }
-            break;
-          case 'menu-schedule':
-            // Переключаем отображение расписания
-            this.toggleSchedule();
-            break;
-          case 'menu-help':
-            // Переключаем отображение помощи
-            this.toggleHelp();
-            break;
-          case 'menu-journal':
-            // Переключаем отображение журнала
-            this.toggleJournal();
-            break;
-          case 'menu-about':
-            // Переключаем отображение "О игре"
-            this.toggleAbout();
-            break;
-        }
+        this.handleMenuClick(itemId);
       });
     });
+  }
+
+  /**
+   * Переключение единого модального окна
+   */
+  toggleUnifiedModal() {
+    const unifiedModal = document.getElementById('unified-modal');
+    const burgerButton = document.getElementById('burger-button');
+    
+    if (unifiedModal.classList.contains('active')) {
+      this.closeUnifiedModal();
+    } else {
+      this.openUnifiedModal();
+    }
+  }
+
+  /**
+   * Открытие единого модального окна
+   */
+  openUnifiedModal() {
+    const unifiedModal = document.getElementById('unified-modal');
+    const burgerButton = document.getElementById('burger-button');
+    
+    unifiedModal.classList.add('active');
+    burgerButton.classList.add('active');
+    
+    // Сбрасываем состояние на главное меню
+    this.currentMenuState = 'main';
+    this.modalStack = [];
+    this.showContentPage('main-menu-content');
+    this.updateMenuTitle();
+    this.updateBackButton();
+  }
+
+  /**
+   * Закрытие единого модального окна
+   */
+  closeUnifiedModal() {
+    const unifiedModal = document.getElementById('unified-modal');
+    const burgerButton = document.getElementById('burger-button');
+    
+    unifiedModal.classList.remove('active');
+    burgerButton.classList.remove('active');
+    
+    // Сбрасываем состояние
+    this.currentMenuState = 'main';
+    this.modalStack = [];
+  }
+
+  /**
+   * Обработка клика по пункту меню
+   */
+  handleMenuClick(itemId) {
+    switch (itemId) {
+      case 'menu-pause':
+        // Переключаем паузу
+        this.pauseManager.togglePause();
+        this.timeManager.setPaused(this.pauseManager.isPaused());
+        this.updatePauseModeDisplay();
+        break;
+      case 'menu-speed':
+        // Переключаем скорость
+        if (this.speedButton) {
+          this.speedButton.click();
+        }
+        this.updateSpeedDisplay();
+        break;
+      case 'menu-daynight':
+        // Переключаем режим дня/ночи
+        this.dayNightManager.toggleDayNightMode();
+        this.updateDayNightModeDisplay();
+        break;
+      case 'menu-car-lights':
+        // Переключаем фары машины
+        if (window.carEntity && typeof window.carEntity.toggleHeadlights === 'function') {
+          window.carEntity.toggleHeadlights();
+          this.updateCarLightsDisplay();
+        }
+        break;
+      case 'menu-schedule':
+        // Переходим к расписанию
+        this.navigateToContent('schedule', 'Расписание');
+        break;
+      case 'menu-journal':
+        // Переходим к журналу
+        this.navigateToContent('journal', 'Журнал поездок');
+        break;
+      case 'menu-help':
+        // Переходим к помощи
+        this.navigateToContent('help', 'Помощь');
+        break;
+      case 'menu-about':
+        // Переходим к "О игре"
+        this.navigateToContent('about', 'О игре');
+        break;
+    }
+  }
+
+  /**
+   * Навигация к контенту
+   */
+  navigateToContent(contentType, title) {
+    // Добавляем текущее состояние в стек
+    this.modalStack.push(this.currentMenuState);
+    
+    // Обновляем состояние
+    this.currentMenuState = contentType;
+    
+    // Показываем соответствующий контент
+    this.showContentPage(`${contentType}-content`);
+    
+    // Обновляем заголовок и кнопку "Назад"
+    this.updateMenuTitle();
+    this.updateBackButton();
+    
+    // Обновляем данные контента
+    this.updateContentData(contentType);
+  }
+
+  /**
+   * Возврат назад
+   */
+  goBack() {
+    if (this.modalStack.length > 0) {
+      const previousState = this.modalStack.pop();
+      this.currentMenuState = previousState;
+      
+      if (previousState === 'main') {
+        this.showContentPage('main-menu-content');
+      } else {
+        this.showContentPage(`${previousState}-content`);
+      }
+      
+      this.updateMenuTitle();
+      this.updateBackButton();
+    } else {
+      // Если стек пуст, закрываем модальное окно
+      this.closeUnifiedModal();
+    }
+  }
+
+  /**
+   * Показ страницы контента
+   */
+  showContentPage(pageId) {
+    // Скрываем все страницы
+    const allPages = document.querySelectorAll('.modal-content-page');
+    allPages.forEach(page => {
+      page.classList.remove('active');
+      page.style.display = 'none';
+    });
+    
+    // Показываем нужную страницу
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+      targetPage.style.display = 'block';
+      targetPage.classList.add('active');
+    }
+  }
+
+  /**
+   * Обновление кнопки "Назад"
+   */
+  updateBackButton() {
+    const backBtn = document.getElementById('modal-back-btn');
+    if (backBtn) {
+      backBtn.style.display = this.modalStack.length > 0 ? 'block' : 'none';
+    }
+  }
+
+  /**
+   * Обновление данных контента
+   */
+  updateContentData(contentType) {
+    switch (contentType) {
+      case 'journal':
+        this.updateJournalDisplay();
+        break;
+      case 'schedule':
+        this.updateScheduleDisplay();
+        break;
+      case 'help':
+      case 'about':
+        // Контент статичный, обновления не требуются
+        break;
+    }
   }
 
   /**
@@ -196,7 +327,11 @@ export class UIRenderer {
         case 'о':  // русская раскладка
         case 'О':
           e.preventDefault();
-          this.toggleJournal();
+          // Открываем модальное окно и переходим к журналу
+          if (!document.getElementById('unified-modal').classList.contains('active')) {
+            this.openUnifiedModal();
+          }
+          this.navigateToContent('journal', 'Журнал поездок');
           break;
         // Здесь можно добавить другие горячие клавиши в будущем
       }
@@ -386,89 +521,6 @@ export class UIRenderer {
 
 
 
-  /**
-   * Переключить отображение журнала
-   */
-  toggleJournal() {
-    // Изменяем состояние меню на журнал
-    this.currentMenuState = 'journal';
-    this.updateMenuTitle();
-    
-    let journalModal = document.getElementById('journal-modal');
-    if (!journalModal) {
-      this.createJournalModal();
-      journalModal = document.getElementById('journal-modal');
-    }
-    
-    if (journalModal.classList.contains('active')) {
-      this.hideJournal();
-    } else {
-      this.showJournal();
-    }
-  }
-
-  /**
-   * Переключить отображение расписания
-   */
-  toggleSchedule() {
-    // Изменяем состояние меню на расписание
-    this.currentMenuState = 'schedule';
-    this.updateMenuTitle();
-    
-    let scheduleModal = document.getElementById('schedule-modal');
-    if (!scheduleModal) {
-      this.createScheduleModal();
-      scheduleModal = document.getElementById('schedule-modal');
-    }
-    
-    if (scheduleModal.classList.contains('active')) {
-      this.hideSchedule();
-    } else {
-      this.showSchedule();
-    }
-  }
-
-  /**
-   * Переключить отображение помощи
-   */
-  toggleHelp() {
-    // Изменяем состояние меню на помощь
-    this.currentMenuState = 'help';
-    this.updateMenuTitle();
-    
-    let helpModal = document.getElementById('help-modal');
-    if (!helpModal) {
-      this.createHelpModal();
-      helpModal = document.getElementById('help-modal');
-    }
-    
-    if (helpModal.classList.contains('active')) {
-      this.hideHelp();
-    } else {
-      this.showHelp();
-    }
-  }
-
-  /**
-   * Переключить отображение "О игре"
-   */
-  toggleAbout() {
-    // Изменяем состояние меню на "О игре"
-    this.currentMenuState = 'about';
-    this.updateMenuTitle();
-    
-    let aboutModal = document.getElementById('about-modal');
-    if (!aboutModal) {
-      this.createAboutModal();
-      aboutModal = document.getElementById('about-modal');
-    }
-    
-    if (aboutModal.classList.contains('active')) {
-      this.hideAbout();
-    } else {
-      this.showAbout();
-    }
-  }
 
   /**
    * Создать модальное окно журнала
@@ -841,7 +893,7 @@ export class UIRenderer {
   updateJournalDisplay() {
     if (!this.journalManager) return;
 
-    const tripList = document.getElementById('journal-trip-list');
+    const tripList = document.getElementById('journal-entries');
     if (!tripList) return;
 
     const journal = this.journalManager.getJournal();
@@ -858,17 +910,17 @@ export class UIRenderer {
       if (entry.type === 'road') {
         // Завершенная дорога
         html += `
-          <div class="trip-item">
-            <div class="trip-destination">Работа ${entry.startTime}-${entry.endTime}</div>
-            <div class="trip-duration">${entry.duration}</div>
+          <div class="journal-entry">
+            <div class="journal-entry-header">Работа ${entry.startTime}-${entry.endTime}</div>
+            <div class="journal-entry-details">${entry.duration}</div>
           </div>
         `;
       } else if (entry.type === 'departure') {
         // Завершение пребывания в месте
         html += `
-          <div class="trip-item departure">
-            <div class="trip-destination">${entry.destination} ${entry.startTime}-${entry.endTime}</div>
-            <div class="trip-duration">${entry.duration}</div>
+          <div class="journal-entry">
+            <div class="journal-entry-header">${entry.destination} ${entry.startTime}-${entry.endTime}</div>
+            <div class="journal-entry-details">${entry.duration}</div>
           </div>
         `;
       }
@@ -880,9 +932,9 @@ export class UIRenderer {
       const currentDuration = this.calculateCurrentTripDuration(currentTrip.startTime, currentTime);
       
       html += `
-        <div class="trip-item current">
-          <div class="trip-destination">Работа ${currentTrip.startTime}-${currentTime}</div>
-          <div class="trip-duration">${currentDuration}</div>
+        <div class="journal-entry current">
+          <div class="journal-entry-header">Работа ${currentTrip.startTime}-${currentTime}</div>
+          <div class="journal-entry-details">${currentDuration}</div>
         </div>
       `;
     }
@@ -891,27 +943,8 @@ export class UIRenderer {
       html = '<div class="no-trips">Записей пока нет</div>';
     }
     
-    // Если есть новые записи, добавляем анимацию
-    if (newJournalLength > currentJournalLength) {
-      // Сначала обновляем содержимое
-      tripList.innerHTML = html;
-      
-      // Затем анимируем новые элементы
-      const newItems = Array.from(tripList.children).slice(-(newJournalLength - currentJournalLength));
-      newItems.forEach((item, index) => {
-        item.style.opacity = '0';
-        item.style.transform = 'translateY(20px)';
-        
-        setTimeout(() => {
-          item.style.transition = 'all 0.5s ease-out';
-          item.style.opacity = '1';
-          item.style.transform = 'translateY(0)';
-        }, index * 100); // Задержка для каждого элемента
-      });
-    } else {
-      // Просто обновляем содержимое без анимации
-      tripList.innerHTML = html;
-    }
+    // Просто обновляем содержимое
+    tripList.innerHTML = html;
   }
 
   /**
@@ -966,15 +999,14 @@ export class UIRenderer {
     this.updatePauseModeDisplay();
     this.updateDayNightModeDisplay();
     
-    // Обновляем журнал, если он открыт
-    const journalModal = document.getElementById('journal-modal');
-    if (journalModal && journalModal.classList.contains('active')) {
+    // Обновляем журнал, если он открыт в едином модальном окне
+    const unifiedModal = document.getElementById('unified-modal');
+    if (unifiedModal && unifiedModal.classList.contains('active') && this.currentMenuState === 'journal') {
       this.updateJournalDisplay();
     }
     
-    // Обновляем расписание, если оно открыто
-    const scheduleModal = document.getElementById('schedule-modal');
-    if (scheduleModal && scheduleModal.classList.contains('active')) {
+    // Обновляем расписание, если оно открыто в едином модальном окне
+    if (unifiedModal && unifiedModal.classList.contains('active') && this.currentMenuState === 'schedule') {
       this.updateScheduleDisplay();
     }
   }
