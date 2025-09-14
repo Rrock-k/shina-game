@@ -43,6 +43,9 @@ export class UIRenderer {
     // Инициализируем меню
     this.initMenu();
     
+    // Инициализируем горячие клавиши
+    this.initKeyboardShortcuts();
+    
     // Инициализируем дисплеи
     this.updateRouteDisplay();
     this.updateDateTimeDisplay();
@@ -166,6 +169,35 @@ export class UIRenderer {
             break;
         }
       });
+    });
+  }
+
+  /**
+   * Инициализация горячих клавиш
+   */
+  initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Проверяем, что пользователь не находится в поле ввода
+      const activeElement = document.activeElement;
+      const isInputField = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.contentEditable === 'true'
+      );
+      
+      if (isInputField) return;
+      
+      // Обработка горячих клавиш
+      switch (e.key) {
+        case 'j':
+        case 'J':
+        case 'о':  // русская раскладка
+        case 'О':
+          e.preventDefault();
+          this.toggleJournal();
+          break;
+        // Здесь можно добавить другие горячие клавиши в будущем
+      }
     });
   }
 
