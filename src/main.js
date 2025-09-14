@@ -28,7 +28,7 @@ let pathBuilder;
 let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
 
 // Менеджеры
-let worldRenderer, carRenderer, uiRenderer;
+let carRenderer;
 
 // Новые сущности
 let carEntity, shinaEntity;
@@ -216,9 +216,11 @@ const dayNightManager = game.dayNightManager;
 
 let panningController;
 
-setupWorld();
+// Получаем рендереры из экземпляра игры
+let worldRenderer = game.worldRenderer;
+let uiRenderer = game.uiRenderer;
 
-uiRenderer = new UIRenderer(CONFIG, timeManager, pauseManager, dayNightManager, panningController, journalManager);
+setupWorld();
 
 uiRenderer.init();
 
@@ -274,7 +276,7 @@ function setupWorld () {
   lightingLayer = game.lightingLayer;
   uiLayer = game.uiLayer;
 
-  worldRenderer = new WorldRenderer(CONFIG, game.app);
+  // Инициализируем WorldRenderer с слоями
   worldRenderer.init(world, {
     grid: gridLayer,
     roads: roadsLayer,

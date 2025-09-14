@@ -2,6 +2,8 @@ import { TimeManager } from './TimeManager.js';
 import { PauseManager } from './PauseManager.js';
 import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
+import { WorldRenderer } from '../rendering/WorldRenderer.js';
+import { UIRenderer } from '../rendering/UIRenderer.js';
 import { CONFIG } from '../config/gameConfig.js';
 
 /**
@@ -61,6 +63,10 @@ class Game {
         
         // Устанавливаем начальное время в журнале
         this.journalManager.setLocationStartTime('Дом');
+        
+        // Создаем рендереры
+        this.worldRenderer = new WorldRenderer(CONFIG, this.app);
+        this.uiRenderer = new UIRenderer(CONFIG, this.timeManager, this.pauseManager, this.dayNightManager, null, this.journalManager);
     }
 
     /**
