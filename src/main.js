@@ -1,5 +1,5 @@
 
-import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator } from './systems/trafficLights.js';
+import { initTrafficLightsForIntersection, getDirectionForSegment, Direction, TrafficLightCoordinator, keyForIntersection } from './systems/trafficLights.js';
 import { CarTrafficController } from './systems/carTrafficControl.js';
 import { PanningController } from './systems/panning.js';
 import { CONFIG } from './config/gameConfig.js';
@@ -10,6 +10,10 @@ import { JournalManager } from './game/JournalManager.js';
 import { WorldRenderer } from './rendering/WorldRenderer.js';
 import { CarRenderer } from './rendering/CarRenderer.js';
 import { UIRenderer } from './rendering/UIRenderer.js';
+// Новые сущности
+import { Car } from './entities/Car.js';
+import { TrafficLight } from './entities/TrafficLight.js';
+import { Shina } from './entities/Shina.js';
 
 // globals
 let app, world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
@@ -20,6 +24,10 @@ let buildingAvatars = new Map(); // карта зданий -> маленьки�
 
 // Менеджеры
 let timeManager, pauseManager, dayNightManager, journalManager, worldRenderer, carRenderer, uiRenderer;
+
+// Новые сущности
+let carEntity, shinaEntity;
+let trafficLights = new Map(); // карта светофоров по ключу перекрестка
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -84,7 +92,147 @@ function updateStayTimer() {
   }
 }
 
+// Инициализация новых сущностей
+function initEntities() {
+  // Создаем сущность машины
+  carEntity = new Car(CONFIG, pauseManager);
+  carEntity.init({
+    currentRouteIndex: currentRouteIndex,
+    savedState: savedCarState,
+    onArrival: (destination) => {
+      console.log(`🚗 Машина прибыла в ${destination.name}`);
+      checkArrival();
+    },
+    onStateChange: (event, data) => {
+      console.log(`🚗 Машина: ${event}`, data);
+    }
+  });
 
+  // Связываем carEntity с carRenderer
+  if (carRenderer) {
+    const carSprite = carRenderer.getCar();
+    const avatar = carRenderer.getAvatar();
+    
+    if (carSprite) {
+      carEntity.setSprite(carSprite);
+    }
+    if (avatar) {
+      carEntity.setAvatar(avatar);
+    }
+    
+    // Устанавливаем начальную позицию из carRenderer
+    if (carSprite) {
+      carEntity.setPosition({ x: carSprite.position.x, y: carSprite.position.y });
+      carEntity.setRotation(carSprite.rotation);
+    }
+  }
+
+  // Создаем сущность Шины
+  shinaEntity = new Shina(CONFIG);
+  shinaEntity.init({
+    position: { x: 0, y: 0 },
+    initialState: 'available',
+    onStateChange: (oldState, newState, shina) => {
+      console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
+    },
+    onAvailabilityChange: (isAvailable, shina) => {
+      console.log(`👤 Шина ${isAvailable ? 'доступна' : 'недоступна'}`);
+    },
+    onMessageReceived: (message, shina) => {
+      console.log(`💬 Шина получила сообщение:`, message);
+    }
+  });
+
+  // Создаем светофоры для всех перекрестков
+  createTrafficLightEntities();
+}
+
+// Создание сущностей светофоров
+function createTrafficLightEntities() {
+  const { maxVerticalPos } = worldRenderer ? worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
+  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = getHorizontalRoadYs();
+
+  for (let i = 0; i < verticalRoadXs.length; i++) {
+    for (let j = 0; j < horizontalRoadYs.length; j++) {
+      const x = verticalRoadXs[i];
+      const y = horizontalRoadYs[j];
+
+      // Проверяем, должен ли быть светофор на этом перекрестке
+      if (!shouldHaveTrafficLight(i, j)) {
+        continue;
+      }
+
+      const key = keyForIntersection(x, y);
+      
+      // Создаем сущность светофора
+      const trafficLight = new TrafficLight(CONFIG, {
+        position: { x, y },
+        direction: 'EW', // можно определить по контексту
+        cycleTime: 10000,
+        redTime: 4000,
+        yellowTime: 1000,
+        greenTime: 5000,
+        onPhaseChange: (phase, light) => {
+          console.log(`🚦 Светофор ${key} изменил фазу: ${phase}`);
+        },
+        onStateChange: (event, light) => {
+          console.log(`🚦 Светофор ${key}: ${event}`);
+        }
+      });
+
+      // Создаем визуальное представление
+      const visual = trafficLight.createVisual({
+        PIXI,
+        roadWidth: 48,
+        lampRadius: 8,
+        roadConnections: { north: true, south: true, east: true, west: true }
+      });
+
+      if (visual) {
+        trafficLightsLayer.addChild(visual);
+      }
+
+      // Сохраняем светофор
+      trafficLights.set(key, trafficLight);
+      
+      // Регистрируем в координаторе зеленой волны
+      trafficCoordinator.addTrafficLight(key, trafficLight, x, y);
+    }
+  }
+}
+
+// Обновление сущностей
+function updateEntities(delta) {
+  // Обновляем машину
+  if (carEntity) {
+    carEntity.update(delta, {
+      checkArrival: checkArrival,
+      debugLog: debugLog,
+      debugLogAlways: debugLogAlways,
+      carTrafficController: carTrafficController,
+      intersectionKeyToTL: trafficLights,
+      getVerticalRoadXs: getVerticalRoadXs,
+      getHorizontalRoadYs: getHorizontalRoadYs,
+      buildCarPath: buildCarPath,
+      updateLightBeams: undefined,
+      debugInfo: debugInfo
+    });
+  }
+
+  // Обновляем Шину
+  if (shinaEntity) {
+    shinaEntity.update({
+      timeManager: timeManager,
+      debugLog: debugLog
+    });
+  }
+
+  // Обновляем светофоры
+  trafficLights.forEach((trafficLight, key) => {
+    trafficLight.update(delta);
+  });
+}
 
 // Геометрия зон, вычисленная при отрисовке
 const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
@@ -430,6 +578,9 @@ function layout () {
   });
 
   // Светофоры теперь внутри world, поэтому синхронизация не нужна
+  
+  // Инициализируем новые сущности
+  initEntities();
 }
 
 // ======= Новая логика движения по графу перекрёстков и зданий =======
@@ -656,6 +807,11 @@ function createCar () {
   // Теперь строим путь и устанавливаем его
   carPath = buildCarPath();
   carRenderer.setPath(carPath);
+  
+  // Если carEntity уже создан, обновляем его путь
+  if (carEntity) {
+    carEntity.setPath(carPath);
+  }
 
   decorLayer.addChild(car);
   app.ticker.add(updateCar);
@@ -750,6 +906,14 @@ function nextDestination () {
     // Обновляем путь к новому пункту назначения
     const newPath = buildCarPath();
     carRenderer.setPath(newPath);
+    
+    // Синхронизируем с carEntity
+    if (carEntity) {
+      carEntity.setCurrentRouteIndex(currentRouteIndex);
+      carEntity.setPath(newPath);
+      carEntity.setAtDestination(false);
+      carEntity.setStayTimer(0);
+    }
   }
 
   // Начинаем новую дорогу в журнале при выходе из здания
@@ -827,6 +991,12 @@ function checkArrival () {
 
     carRenderer.setAtDestination(true);
     carRenderer.setStayTimer(currentDest.stayHours);
+    
+    // Синхронизируем с carEntity
+    if (carEntity) {
+      carEntity.setAtDestination(true);
+      carEntity.setStayTimer(currentDest.stayHours);
+    }
     
     // Получаем текущее игровое время
     const gameTime = timeManager.getGameTime();
@@ -917,26 +1087,34 @@ function hideBuildingAvatar () {
 }
 
 function updateCar (delta) {
-  // Используем CarRenderer для обновления машины
-  if (carRenderer) {
-    carRenderer.updateCar(delta, {
-      checkArrival: checkArrival,
-      debugLog: debugLog,
-      debugLogAlways: debugLogAlways,
-      carTrafficController: carTrafficController,
-      intersectionKeyToTL: intersectionKeyToTL,
-      getVerticalRoadXs: getVerticalRoadXs,
-      getHorizontalRoadYs: getHorizontalRoadYs,
-      buildCarPath: buildCarPath,
-      updateLightBeams: undefined, // Функция не реализована
-      debugInfo: debugInfo
-    });
+  // Обновляем новые сущности
+  updateEntities(delta);
+  
+  // Синхронизируем carEntity с carRenderer для визуального представления
+  if (carEntity && carRenderer) {
+    // Синхронизируем позицию и поворот
+    const carSprite = carRenderer.getCar();
+    if (carSprite) {
+      carSprite.position.set(carEntity.getPosition().x, carEntity.getPosition().y);
+      carSprite.rotation = carEntity.getRotation();
+    }
     
-    // Синхронизируем глобальные переменные с CarRenderer
-    carPath = carRenderer.getPath();
-    carSegment = carRenderer.getCurrentSegment();
-    carProgress = carRenderer.getProgress();
-    stayTimer = carRenderer.getStayTimer();
+    // Синхронизируем аватарку
+    const avatar = carRenderer.getAvatar();
+    if (avatar) {
+      avatar.rotation = -carEntity.getRotation();
+    }
+    
+    // Синхронизируем глобальные переменные с carEntity
+    carPath = carEntity.getPath();
+    carSegment = carEntity.getCurrentSegment();
+    carProgress = carEntity.getProgress();
+    stayTimer = carEntity.getStayTimer();
+  }
+  
+  // Обновляем UI
+  if (uiRenderer) {
+    uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
   }
 }
 
