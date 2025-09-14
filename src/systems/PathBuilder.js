@@ -19,6 +19,11 @@ export class PathBuilder {
     this.horizontalRoadYs = horizontalRoadYs;
     this.config = config;
     this.validator = new PathValidator(verticalRoadXs, horizontalRoadYs);
+    
+    // Оптимизация: отключаем валидацию в production режиме
+    if (config && config.disableValidation) {
+      this.validator.validationEnabled = false;
+    }
   }
 
   /**

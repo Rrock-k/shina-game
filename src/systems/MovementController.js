@@ -9,6 +9,45 @@ export class MovementController {
       BASE_CAR_SPEED: 200,
       ...config
     };
+    
+    // Кэш для оптимизации производительности
+    // ВАЖНО: Кэш работает только при полной замене пути (новый массив).
+    // Если путь мутирует (добавляются/удаляются точки), кэш НЕ будет сброшен!
+    this._segmentCache = new Map(); // кэш длин сегментов
+    this._lastPathHash = null; // хэш последнего пути для инвалидации кэша
+  }
+
+
+  /**
+   * Получить длину сегмента с кэшированием
+   * @param {number} segmentIndex - индекс сегмента
+   * @param {Object} p1 - первая точка
+   * @param {Object} p2 - вторая точка
+   * @returns {number} - длина сегмента
+   * @private
+   */
+  _getSegmentLength(segmentIndex, p1, p2) {
+    const cacheKey = `${segmentIndex}_${p1.x}_${p1.y}_${p2.x}_${p2.y}`;
+    
+    if (this._segmentCache.has(cacheKey)) {
+      return this._segmentCache.get(cacheKey);
+    }
+    
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const length = Math.hypot(dx, dy);
+    
+    this._segmentCache.set(cacheKey, length);
+    return length;
+  }
+
+  /**
+   * Инвалидировать кэш при изменении пути
+   * @private
+   */
+  _invalidateCache() {
+    this._segmentCache.clear();
+    this._lastPathHash = null;
   }
 
   /**
@@ -83,11 +122,18 @@ export class MovementController {
       return;
     }
 
+    // Проверяем, изменился ли путь (для инвалидации кэша)
+    const currentPathHash = this.car.path ? this.car.path.length + '_' + this.car.path[0]?.x + '_' + this.car.path[0]?.y : 'null';
+    if (this._lastPathHash !== currentPathHash) {
+      this._invalidateCache();
+      this._lastPathHash = currentPathHash;
+    }
+
     let p1 = this.car.path[this.car.currentSegment];
     let p2 = this.car.path[this.car.currentSegment + 1];
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
-    let segLen = Math.hypot(dx, dy);
+    let segLen = this._getSegmentLength(this.car.currentSegment, p1, p2);
 
     // Если текущий сегмент имеет нулевую длину, переходим к следующему
     if (segLen < 0.1) {
@@ -144,7 +190,7 @@ export class MovementController {
       p2 = this.car.path[this.car.currentSegment + 1];
       dx = p2.x - p1.x;
       dy = p2.y - p1.y;
-      segLen = Math.hypot(dx, dy);
+      segLen = this._getSegmentLength(this.car.currentSegment, p1, p2);
     }
 
     // Вычисляем текущую позицию на сегменте

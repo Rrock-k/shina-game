@@ -7,6 +7,9 @@ export class PathValidator {
   constructor(verticalRoadXs, horizontalRoadYs) {
     this.verticalRoadXs = verticalRoadXs;
     this.horizontalRoadYs = horizontalRoadYs;
+    
+    // Флаг для включения/выключения валидации в production
+    this.validationEnabled = true; // можно отключить для production
   }
 
   /**
@@ -26,6 +29,11 @@ export class PathValidator {
    * @returns {Object} - результат валидации {isValid: boolean, errors: string[]}
    */
   validatePath(path, context = 'unknown') {
+    // Быстрая проверка - если валидация отключена, возвращаем успех
+    if (!this.validationEnabled) {
+      return { isValid: true, errors: [] };
+    }
+    
     const errors = [];
     
     // Проверка базовых условий
@@ -44,43 +52,41 @@ export class PathValidator {
       console.warn(`⚠️ Путь содержит только одну точку (${context}):`, path[0]);
     }
     
-    // Проверка структуры точек
+    // Оптимизированная проверка структуры точек
     for (let i = 0; i < path.length; i++) {
       const point = path[i];
       if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
         errors.push(`Точка ${i} должна иметь числовые координаты x, y. Получено: ${JSON.stringify(point)}`);
+        continue; // пропускаем дальнейшие проверки для невалидной точки
       }
       
-      if (isNaN(point.x) || isNaN(point.y)) {
-        errors.push(`Точка ${i} содержит NaN координаты: (${point.x}, ${point.y})`);
-      }
+      const x = point.x;
+      const y = point.y;
       
-      if (!isFinite(point.x) || !isFinite(point.y)) {
-        errors.push(`Точка ${i} содержит бесконечные координаты: (${point.x}, ${point.y})`);
+      // Объединенная проверка NaN и Infinity
+      if (isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) {
+        errors.push(`Точка ${i} содержит недопустимые координаты: (${x}, ${y})`);
       }
     }
     
-    // Проверка на диагональное движение (запрещено)
+    // Оптимизированная проверка на диагональное движение и длинные сегменты
     for (let i = 0; i < path.length - 1; i++) {
       const current = path[i];
       const next = path[i + 1];
       const dx = Math.abs(next.x - current.x);
       const dy = Math.abs(next.y - current.y);
       
+      // Проверка на диагональное движение (запрещено)
       // Если есть значительное движение и по X и по Y одновременно, это диагональное движение
       // Учитываем небольшие погрешности округления (до 5 пикселей)
       if (dx > 5 && dy > 5) {
         errors.push(`Обнаружено диагональное движение между точками ${i} и ${i + 1}: (${current.x}, ${current.y}) -> (${next.x}, ${next.y})`);
       }
-    }
-    
-    // Проверка на слишком длинные сегменты (возможная ошибка)
-    for (let i = 0; i < path.length - 1; i++) {
-      const current = path[i];
-      const next = path[i + 1];
+      
+      // Проверка на слишком длинные сегменты
       const distance = Math.hypot(next.x - current.x, next.y - current.y);
       
-      if (distance > 600) { // Максимальная разумная длина сегмента (увеличено для реальных дорог)
+      if (distance > 600) { // Максимальная разумная длина сегмента
         errors.push(`Слишком длинный сегмент между точками ${i} и ${i + 1}: ${distance.toFixed(1)} пикселей`);
       }
     }
