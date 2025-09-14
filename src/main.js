@@ -12,7 +12,6 @@ import { CarRenderer } from './rendering/CarRenderer.js';
 import { UIRenderer } from './rendering/UIRenderer.js';
 // Новые сущности
 import { Car } from './entities/Car.js';
-import { Shina } from './entities/Shina.js';
 // Утилиты
 import { PathBuilder } from './systems/PathBuilder.js';
 import { randInt } from './utils/math.js';
@@ -129,20 +128,8 @@ function initEntities() {
     }
   }
 
-  shinaEntity = new Shina(CONFIG);
-  shinaEntity.init({
-    position: { x: 0, y: 0 },
-    initialState: 'atWork', // Шина дома в начале игры
-    onStateChange: (oldState, newState, shina) => {
-      console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
-    },
-    onAvailabilityChange: (isAvailable, shina) => {
-      console.log(`👤 Шина ${isAvailable ? 'доступна' : 'недоступна'}`);
-    },
-    onMessageReceived: (message, shina) => {
-      console.log(`💬 Шина получила сообщение:`, message);
-    }
-  });
+  // shinaEntity теперь создается в Game.js, получаем его из экземпляра игры
+  shinaEntity = game.shinaEntity;
 
 }
 

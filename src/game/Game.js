@@ -5,6 +5,7 @@ import { JournalManager } from './JournalManager.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
 import { Car } from '../entities/Car.js';
+import { Shina } from '../entities/Shina.js';
 import { CONFIG } from '../config/gameConfig.js';
 
 /**
@@ -71,6 +72,7 @@ class Game {
         
         // Создаем сущности
         this.carEntity = new Car(CONFIG, this.pauseManager);
+        this.shinaEntity = new Shina(CONFIG);
         
         // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
         window.carEntity = this.carEntity;
@@ -85,6 +87,21 @@ class Game {
             },
             onStateChange: (event, data) => {
                 console.log(`🚗 Машина: ${event}`, data);
+            }
+        });
+
+        // Инициализируем shinaEntity
+        this.shinaEntity.init({
+            position: { x: 0, y: 0 },
+            initialState: 'atWork', // Шина дома в начале игры
+            onStateChange: (oldState, newState, shina) => {
+                console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
+            },
+            onAvailabilityChange: (isAvailable, shina) => {
+                console.log(`👤 Шина ${isAvailable ? 'доступна' : 'недоступна'}`);
+            },
+            onMessageReceived: (message, shina) => {
+                console.log(`💬 Шина получила сообщение:`, message);
             }
         });
     }
