@@ -95,10 +95,10 @@ function updateStayTimer() {
 
 // Инициализация новых сущностей
 function initEntities() {
-  carEntity = new Car(CONFIG, pauseManager);
+  // carEntity теперь создается в Game.js, получаем его из экземпляра игры
+  carEntity = game.carEntity;
   
-  // Делаем carEntity глобально доступным для UI
-  window.carEntity = carEntity;
+  // Обновляем инициализацию с актуальными параметрами
   carEntity.init({
     currentRouteIndex: currentRouteIndex,
     savedState: savedCarState,

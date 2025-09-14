@@ -4,6 +4,7 @@ import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
+import { Car } from '../entities/Car.js';
 import { CONFIG } from '../config/gameConfig.js';
 
 /**
@@ -67,6 +68,25 @@ class Game {
         // Создаем рендереры
         this.worldRenderer = new WorldRenderer(CONFIG, this.app);
         this.uiRenderer = new UIRenderer(CONFIG, this.timeManager, this.pauseManager, this.dayNightManager, null, this.journalManager);
+        
+        // Создаем сущности
+        this.carEntity = new Car(CONFIG, this.pauseManager);
+        
+        // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
+        window.carEntity = this.carEntity;
+        
+        // Инициализируем carEntity (базовая инициализация, полная будет в main.js)
+        this.carEntity.init({
+            currentRouteIndex: 0, // будет обновлено в main.js
+            savedState: null, // будет обновлено в main.js
+            onArrival: (destination) => {
+                console.log(`🚗 Машина прибыла в ${destination.name}`);
+                // TODO: будет перенесено в Game.js позже
+            },
+            onStateChange: (event, data) => {
+                console.log(`🚗 Машина: ${event}`, data);
+            }
+        });
     }
 
     /**
