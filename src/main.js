@@ -61,7 +61,7 @@ let lastStayTimerDay = 0;
 
 function updateStayTimer() {
   if (carEntity && carEntity.isAtDestination()) {
-    const gameTime = timeManager.getGameTime();
+    const gameTime = game.timeManager.getGameTime();
     const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
     const currentDay = gameTime.day; // день месяца
     
@@ -155,7 +155,7 @@ function updateEntities(delta) {
   // Обновляем Шину
   if (shinaEntity) {
     shinaEntity.update({
-      timeManager: timeManager,
+      timeManager: game.timeManager,
       debugLog: debugLog
     });
   }
@@ -315,7 +315,7 @@ function setupWorld () {
   // Настраиваем кнопку паузы
   pauseButton.addEventListener('click', () => {
     pauseManager.togglePause();
-    timeManager.setPaused(pauseManager.isPaused());
+    game.timeManager.setPaused(pauseManager.isPaused());
     pauseManager.showSpeedNotification(pauseManager.isPaused() ? 'ПАУЗА' : 'ВОЗОБНОВЛЕНО');
   });
 
@@ -335,7 +335,7 @@ function setupWorld () {
     
     pauseManager.setSpeedBoosted(newSpeed > 1);
     pauseManager.setSpeedMultiplier(newSpeed);
-    timeManager.setSpeedMultiplier(newSpeed);
+    game.timeManager.setSpeedMultiplier(newSpeed);
 
     // Обновляем внешний вид кнопки
     speedButton.textContent = `x${newSpeed}`;
@@ -551,19 +551,13 @@ function createCar () {
     carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   }
   
-  const gameTime = timeManager.getGameTime();
+  const gameTime = game.timeManager.getGameTime();
   lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
   lastStayTimerDay = gameTime.day;
 
   decorLayer.addChild(car);
   game.app.ticker.add(updateCar);
   game.app.ticker.add(() => {
-    timeManager.update();
-    if (uiRenderer) {
-      uiRenderer.updateDateTimeDisplay();
-    }
-    const gameTime = timeManager.getGameTime();
-    dayNightManager.updateNightMode(gameTime);
     updateStayTimer();
     
     // Обновляем UI с текущим состоянием машины
@@ -577,36 +571,6 @@ function createCar () {
   uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
 }
 
-function updateGameTime () {
-  // Обновляем время через TimeManager
-  timeManager.setPaused(pauseManager.isPaused());
-  timeManager.setSpeedMultiplier(pauseManager.getSpeedMultiplier());
-  timeManager.update();
-
-  // Обновляем дисплей даты и времени
-  updateDateTimeDisplay();
-
-  // Обновляем ночной режим
-  const gameTime = timeManager.getGameTime();
-  dayNightManager.updateNightMode(gameTime);
-
-  // Применяем или сбрасываем цветовые фильтры
-  if (dayNightManager.isNightModeActive()) {
-    dayNightManager.applyNightColorFilter();
-  } else {
-    dayNightManager.resetDayColorFilter();
-  }
-
-  // Если находимся в пункте назначения, уменьшаем таймер ожидания
-  if (carEntity && carEntity.isAtDestination()) {
-    const gameTime = timeManager.getGameTime();
-    const currentTime = gameTime.hours * 60 + gameTime.minutes;
-    const currentDay = gameTime.day;
-    
-    // Обновляем таймер пребывания
-    updateStayTimer();
-  }
-}
 
 // Переход к следующему пункту маршрута
 function nextDestination () {
@@ -718,7 +682,7 @@ function checkArrival () {
       carEntity.setStayTimer(currentDest.stayHours);
     }
     
-    const gameTime = timeManager.getGameTime();
+    const gameTime = game.timeManager.getGameTime();
     lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
     lastStayTimerDay = gameTime.day; // инициализируем день
     uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
@@ -832,4 +796,7 @@ const gameContainer = document.querySelector('.game-container');
 gameContainer.style.width = '1200px';
 gameContainer.style.height = '800px';
 gameContainer.style.overflow = 'auto';
+
+// Запускаем игровой цикл
+game.start();
 

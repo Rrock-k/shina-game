@@ -104,14 +104,17 @@ class Game {
                 console.log(`💬 Шина получила сообщение:`, message);
             }
         });
+
     }
 
     /**
      * Запускает игровой цикл
      */
     start() {
-        // TODO: Здесь будет запуск игрового цикла
         console.log('Game start() called');
+        
+        // Запускаем игровой цикл
+        this.app.ticker.add((delta) => this.update(delta));
     }
 
     /**
@@ -119,9 +122,19 @@ class Game {
      * @param {number} delta - Время, прошедшее с предыдущего кадра
      */
     update(delta) {
-        // TODO: Здесь будет вся логика обновления игры
-        console.log('Game update() called with delta:', delta);
+        // Обновляем время
+        this.timeManager.update();
+        
+        // Обновляем UI с датой и временем
+        if (this.uiRenderer) {
+            this.uiRenderer.updateDateTimeDisplay();
+        }
+        
+        // Обновляем ночной режим
+        const gameTime = this.timeManager.getGameTime();
+        this.dayNightManager.updateNightMode(gameTime);
     }
+
 }
 
 export default Game;
