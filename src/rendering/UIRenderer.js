@@ -330,8 +330,14 @@ export class UIRenderer {
           // Открываем модальное окно и переходим к журналу
           if (!document.getElementById('unified-modal').classList.contains('active')) {
             this.openUnifiedModal();
+            this.navigateToContent('journal', 'Журнал поездок');
+          } else if (this.currentMenuState !== 'journal') {
+            // Если модальное окно уже открыто, но мы не в журнале, переходим к журналу
+            this.navigateToContent('journal', 'Журнал поездок');
+          } else {
+            // Если уже в журнале, закрываем модальное окно (toggle поведение)
+            this.closeUnifiedModal();
           }
-          this.navigateToContent('journal', 'Журнал поездок');
           break;
         // Здесь можно добавить другие горячие клавиши в будущем
       }
