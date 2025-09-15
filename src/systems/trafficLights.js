@@ -126,6 +126,17 @@ class IntersectionTrafficLight {
     return true;
   }
 
+  getState () {
+    return {
+      position: this.position,
+      phase: this.phase,
+      isDelayActive: this.isDelayActive,
+      roadConnections: this.roadConnections,
+      roadWidth: this.roadWidth,
+      lampRadius: this.lampRadius
+    };
+  }
+
   _onTick () {
     // Если активна задержка запуска, ждем ее завершения
     if (this.isDelayActive) {
