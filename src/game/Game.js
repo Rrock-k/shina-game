@@ -74,6 +74,9 @@ class Game {
         this.carEntity = new Car(CONFIG, this.pauseManager);
         this.shinaEntity = new Shina(CONFIG);
         
+        // Инициализируем геометрию зон
+        this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
+        
         // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
         window.carEntity = this.carEntity;
         
@@ -169,7 +172,7 @@ class Game {
                 intersectionKeyToTL: intersectionKeyToTL,
                 getVerticalRoadXs: () => this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [],
                 getHorizontalRoadYs: () => this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [],
-                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, window.getDestinationCenter, debugLogAlways) : [],
+                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), debugLogAlways) : [],
                 updateLightBeams: undefined,
                 debugInfo: debugInfo
             });
@@ -263,7 +266,7 @@ class Game {
             // Обновляем путь к новому пункту назначения
             const pathBuilder = window.pathBuilder;
             if (pathBuilder) {
-                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, window.savedCarState, window.getDestinationCenter, window.debugLogAlways);
+                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), window.debugLogAlways);
                 this.carEntity.setPath(newPath);
             }
         }
@@ -325,7 +328,7 @@ class Game {
 
         if (!nextDestination) return null;
 
-        const nextDestCenter = window.getDestinationCenter ? window.getDestinationCenter(nextDestination.location) : { x: 0, y: 0 };
+        const nextDestCenter = this._getDestinationCenter(nextDestination.location);
 
         // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
         const carRenderer = window.carRenderer;
@@ -373,7 +376,7 @@ class Game {
      * Показать маленькую аватарку в здании
      */
     showBuildingAvatar(locationKey) {
-        const buildingCenter = window.getDestinationCenter ? window.getDestinationCenter(locationKey) : { x: 0, y: 0 };
+        const buildingCenter = this._getDestinationCenter(locationKey);
         if (!buildingCenter) return;
 
         // Скрываем аватарку из машинки
@@ -459,6 +462,40 @@ class Game {
         if (carRenderer) {
             carRenderer.setAvatarVisible(true);
         }
+    }
+
+    /**
+     * Получить Y координаты горизонтальных дорог
+     * @returns {Array} массив Y координат
+     */
+    _getHorizontalRoadYs() {
+        return this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
+    }
+
+    /**
+     * Получить X координаты вертикальных дорог
+     * @returns {Array} массив X координат
+     */
+    _getVerticalRoadXs() {
+        return this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
+    }
+
+    /**
+     * Получить центр назначения по ключу локации
+     * @param {string} locationKey - ключ локации
+     * @returns {Object} координаты центра {x, y}
+     */
+    _getDestinationCenter(locationKey) {
+        const z = this.zoneGeometry.get(locationKey);
+        if (z && z.center) return z.center;
+        // fallback: из статического конфига
+        const def = CONFIG.ZONES[locationKey];
+        const verticalRoadXs = this._getVerticalRoadXs();
+        const horizontalRoadYs = this._getHorizontalRoadYs();
+        if (!def) return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+        if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
+        if (def.type === 'circle') return { x: def.x, y: def.y };
+        return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
     }
 
 }

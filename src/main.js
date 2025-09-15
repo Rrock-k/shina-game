@@ -106,9 +106,9 @@ function updateEntities(delta) {
       debugLogAlways: debugLogAlways,
       carTrafficController: window.carTrafficController,
       intersectionKeyToTL: intersectionKeyToTL,
-      getVerticalRoadXs: getVerticalRoadXs,
-      getHorizontalRoadYs: getHorizontalRoadYs,
-      buildCarPath: () => window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways),
+      getVerticalRoadXs: () => game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [],
+      getHorizontalRoadYs: () => game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [],
+      buildCarPath: () => window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways),
       updateLightBeams: undefined,
       debugInfo: debugInfo
     });
@@ -126,8 +126,7 @@ function updateEntities(delta) {
   });
 }
 
-// Геометрия зон, вычисленная при отрисовке
-const zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
+// Геометрия зон теперь в game.zoneGeometry
 
 let currentRouteIndex = 0;
 let stayTimer = 0; // таймер пребывания в текущем месте
@@ -164,7 +163,7 @@ window.debugLogAlways = debugLogAlways;
 window.debugInfo = debugInfo;
 window.currentRouteIndex = currentRouteIndex;
 window.savedCarState = savedCarState;
-window.zoneGeometry = zoneGeometry;
+window.zoneGeometry = game.zoneGeometry;
 
 // Получаем менеджеры из экземпляра игры
 const timeManager = game.timeManager;
@@ -257,7 +256,7 @@ function setupWorld () {
   world.addChild(borderLayer);
 
   // Используем WorldRenderer для отрисовки базовых элементов
-  worldRenderer.render(zoneGeometry);
+  worldRenderer.render(game.zoneGeometry);
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
   createTrafficLightsForAllIntersections(game.trafficLightsLayer);
 
@@ -366,7 +365,7 @@ function setupWorld () {
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
     if (carEntity) {
-      const newPath = window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
+      const newPath = window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
       carEntity.setPath(newPath);
     }
   }, 0);
@@ -374,20 +373,13 @@ function setupWorld () {
 
 
 // Функции-обертки для получения позиций дорог из WorldRenderer
-function getHorizontalRoadYs() {
-  return worldRenderer ? worldRenderer.getHorizontalRoadYs() : [];
-}
-
-function getVerticalRoadXs() {
-  return worldRenderer ? worldRenderer.getVerticalRoadXs() : [];
-}
 
 
 function createTrafficLightsForAllIntersections (layer) {
   intersectionKeyToTL.clear();
   const { maxVerticalPos } = worldRenderer ? worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
-  const horizontalRoadYs = getHorizontalRoadYs();
-  const verticalRoadXs = getVerticalRoadXs();
+  const horizontalRoadYs = game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [];
+  const verticalRoadXs = game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [];
 
   for (let j = 0; j < horizontalRoadYs.length; j++) {
     for (let i = 0; i < verticalRoadXs.length; i++) {
@@ -463,18 +455,6 @@ function layout () {
 
 
 
-function getDestinationCenter (locationKey) {
-  const z = zoneGeometry.get(locationKey);
-  if (z && z.center) return z.center;
-  // fallback: из статического конфига
-  const def = CONFIG.ZONES[locationKey];
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
-  if (!def) return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
-  if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
-  if (def.type === 'circle') return { x: def.x, y: def.y };
-  return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
-}
 
 // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
 
@@ -485,15 +465,15 @@ function createCar () {
     carPath: [],
     currentRouteIndex: currentRouteIndex,
     savedCarState: savedCarState,
-    getDestinationCenter: getDestinationCenter
+    getDestinationCenter: game._getDestinationCenter.bind(game)
   });
   
   const avatar = carRenderer.getAvatar();
   
   const carTrafficController = new CarTrafficController();
 
-  const verticalRoadXs = getVerticalRoadXs();
-  const horizontalRoadYs = getHorizontalRoadYs();
+  const verticalRoadXs = game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [];
+  const horizontalRoadYs = game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [];
   console.log('🔧 Инициализация PathBuilder:', {
     verticalRoads: verticalRoadXs.length,
     horizontalRoads: horizontalRoadYs.length,
@@ -507,7 +487,7 @@ function createCar () {
   window.pathBuilder = pathBuilder;
   window.carRenderer = carRenderer;
   window.intersectionKeyToTL = intersectionKeyToTL;
-  window.getDestinationCenter = getDestinationCenter;
+  window.getDestinationCenter = game._getDestinationCenter.bind(game);
 
   // Начинаем с дома
   currentRouteIndex = 0; // дом
@@ -520,7 +500,7 @@ function createCar () {
 
   // Не начинаем поездку сразу - она начнется при выходе из здания
 
-  const carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
+  const carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
   
   // Если carEntity уже создан, обновляем его путь
   if (carEntity) {
