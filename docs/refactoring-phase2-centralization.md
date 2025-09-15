@@ -52,8 +52,8 @@ let buildingAvatars = new Map();
 - ✅ Обновлены ссылки на `decorLayer` → `game.decorLayer`
 
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
-- ⏳ **В ПРОЦЕССЕ**: main.js содержит 579 строк (было 808)
-- ⏳ **В ПРОЦЕССЕ**: Перенесена функция `getDestinationCenter()` в Game.js
+- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~550 строк (было 808)
+- ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()` и `initEntities()` в Game.js
 - **Файлы**: `src/main.js`, `src/game/Game.js`
 - **Проверка**: Функция `getDestinationCenter()` успешно перенесена, все ссылки обновлены.
 
@@ -65,6 +65,9 @@ let buildingAvatars = new Map();
 - ✅ Обновлены все ссылки на эти функции в main.js
 - ✅ **ИСПРАВЛЕНО**: Добавлена инициализация `this.zoneGeometry` в конструктор Game.js
 - ✅ **ИСПРАВЛЕНО**: Обновлены все ссылки на `zoneGeometry` в main.js → `game.zoneGeometry`
+- ✅ **НОВОЕ**: Перенесена функция `initEntities()` в `Game.js` как `_initEntities()`
+- ✅ **НОВОЕ**: Обновлены все ссылки на `carEntity` и `shinaEntity` в main.js → `game.carEntity` и `game.shinaEntity`
+- ✅ **НОВОЕ**: Удалена функция `initEntities()` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 

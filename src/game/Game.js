@@ -498,6 +498,47 @@ class Game {
         return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
     }
 
+    /**
+     * Инициализировать сущности игры
+     * @param {number} currentRouteIndex - текущий индекс маршрута
+     * @param {Object} savedCarState - сохраненное состояние машины
+     * @param {Object} carRenderer - рендерер машины
+     */
+    _initEntities(currentRouteIndex, savedCarState, carRenderer) {
+        // Обновляем инициализацию carEntity с актуальными параметрами
+        this.carEntity.init({
+            currentRouteIndex: currentRouteIndex,
+            savedState: savedCarState,
+            onArrival: (destination) => {
+                console.log(`🚗 Машина прибыла в ${destination.name}`);
+                this.checkArrival();
+            },
+            onStateChange: (event, data) => {
+                console.log(`🚗 Машина: ${event}`, data);
+            }
+        });
+
+        // Связываем carEntity с carRenderer
+        if (carRenderer) {
+            const carSprite = carRenderer.getCar();
+            const avatar = carRenderer.getAvatar();
+            
+            if (carSprite) {
+                this.carEntity.setSprite(carSprite);
+            }
+            if (avatar) {
+                this.carEntity.setAvatar(avatar);
+            }
+            
+            if (carSprite) {
+                this.carEntity.setPosition({ x: carSprite.position.x, y: carSprite.position.y });
+                this.carEntity.setRotation(carSprite.rotation);
+            }
+        }
+
+        // shinaEntity уже создан в конструкторе, дополнительная инициализация не требуется
+    }
+
 }
 
 export default Game;

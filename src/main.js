@@ -23,8 +23,7 @@ import Game from './game/Game.js';
 // Менеджеры
 let carRenderer;
 
-// Новые сущности
-let carEntity, shinaEntity;
+// Новые сущности теперь в game.game.carEntity и game.game.shinaEntity
 
 // ДЕБАГ МОД
 let DEBUG_MODE = true; // теперь можно изменять
@@ -54,53 +53,14 @@ let lastStayTimerUpdate = 0;
 let lastStayTimerDay = 0;
 
 
-// Инициализация новых сущностей
-function initEntities() {
-  // carEntity теперь создается в Game.js, получаем его из экземпляра игры
-  carEntity = game.carEntity;
-  
-  // Обновляем инициализацию с актуальными параметрами
-  carEntity.init({
-    currentRouteIndex: currentRouteIndex,
-    savedState: savedCarState,
-    onArrival: (destination) => {
-      console.log(`🚗 Машина прибыла в ${destination.name}`);
-      game.checkArrival();
-    },
-    onStateChange: (event, data) => {
-      console.log(`🚗 Машина: ${event}`, data);
-    }
-  });
-
-  // Связываем carEntity с carRenderer
-  if (carRenderer) {
-    const carSprite = carRenderer.getCar();
-    const avatar = carRenderer.getAvatar();
-    
-    if (carSprite) {
-      carEntity.setSprite(carSprite);
-    }
-    if (avatar) {
-      carEntity.setAvatar(avatar);
-    }
-    
-    if (carSprite) {
-      carEntity.setPosition({ x: carSprite.position.x, y: carSprite.position.y });
-      carEntity.setRotation(carSprite.rotation);
-    }
-  }
-
-  // shinaEntity теперь создается в Game.js, получаем его из экземпляра игры
-  shinaEntity = game.shinaEntity;
-
-}
+// Инициализация новых сущностей теперь в Game.js
 
 
 // Обновление сущностей
 function updateEntities(delta) {
   // Обновляем машину
-  if (carEntity) {
-    carEntity.update(delta, {
+  if (game.carEntity) {
+    game.carEntity.update(delta, {
       checkArrival: () => game.checkArrival(),
       debugLog: debugLog,
       debugLogAlways: debugLogAlways,
@@ -108,15 +68,15 @@ function updateEntities(delta) {
       intersectionKeyToTL: intersectionKeyToTL,
       getVerticalRoadXs: () => game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [],
       getHorizontalRoadYs: () => game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [],
-      buildCarPath: () => window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways),
+      buildCarPath: () => window.pathBuilder.buildCarPath(game.carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways),
       updateLightBeams: undefined,
       debugInfo: debugInfo
     });
   }
 
   // Обновляем Шину
-  if (shinaEntity) {
-    shinaEntity.update({
+  if (game.shinaEntity) {
+    game.shinaEntity.update({
       timeManager: game.timeManager,
       debugLog: debugLog
     });
@@ -364,9 +324,9 @@ function setupWorld () {
   // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
-    if (carEntity) {
-      const newPath = window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
-      carEntity.setPath(newPath);
+    if (game.carEntity) {
+      const newPath = window.pathBuilder.buildCarPath(game.carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
+      game.carEntity.setPath(newPath);
     }
   }, 0);
 }
@@ -446,7 +406,7 @@ function layout () {
 
   // Светофоры теперь внутри world, поэтому синхронизация не нужна
   
-  initEntities();
+  game._initEntities(currentRouteIndex, savedCarState, carRenderer);
 }
 
 // ======= Новая логика движения по графу перекрёстков и зданий =======
@@ -500,13 +460,13 @@ function createCar () {
 
   // Не начинаем поездку сразу - она начнется при выходе из здания
 
-  const carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
+  const carPath = pathBuilder.buildCarPath(game.carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
   
-  // Если carEntity уже создан, обновляем его путь
-  if (carEntity) {
-    carEntity.setPath(carPath);
-    carEntity.setAtDestination(true);
-    carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
+  // Если game.carEntity уже создан, обновляем его путь
+  if (game.carEntity) {
+    game.carEntity.setPath(carPath);
+    game.carEntity.setAtDestination(true);
+    game.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
   }
   
   const gameTime = game.timeManager.getGameTime();
@@ -515,7 +475,7 @@ function createCar () {
 
   game.decorLayer.addChild(car);
 
-  uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
+  uiRenderer.updateRouteDisplay(game.carEntity ? game.carEntity.isAtDestination() : false);
 }
 
 
@@ -528,21 +488,21 @@ function updateCar (delta) {
   // Обновляем новые сущности
   updateEntities(delta);
   
-  // Синхронизируем carEntity с carRenderer для визуального представления
-  if (carEntity && carRenderer) {
+  // Синхронизируем game.carEntity с carRenderer для визуального представления
+  if (game.carEntity && carRenderer) {
     // Обновляем визуальное представление
-    carRenderer.updateVisuals(carEntity);
+    carRenderer.updateVisuals(game.carEntity);
     
-    // Синхронизируем локальные переменные с carEntity (глобальные переменные удалены)
-    const carPath = carEntity.getPath();
-    const carSegment = carEntity.getCurrentSegment();
-    const carProgress = carEntity.getProgress();
-    const stayTimer = carEntity.getStayTimer();
+    // Синхронизируем локальные переменные с game.carEntity (глобальные переменные удалены)
+    const carPath = game.carEntity.getPath();
+    const carSegment = game.carEntity.getCurrentSegment();
+    const carProgress = game.carEntity.getProgress();
+    const stayTimer = game.carEntity.getStayTimer();
   }
   
   // Обновляем UI
   if (uiRenderer) {
-    uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
+    uiRenderer.updateRouteDisplay(game.carEntity ? game.carEntity.isAtDestination() : false);
   }
 }
 
