@@ -173,9 +173,8 @@ export class MovementController {
         segLen: segLen.toFixed(1)
       });
 
-      // ИСПРАВЛЕНИЕ: Зажимаем позицию к концу текущего сегмента перед переходом
-      // Это предотвращает "проскакивание" на высоких скоростях
-      this.car.progress = segLen; // принудительно устанавливаем точную длину сегмента
+      // ИСПРАВЛЕНИЕ: Вычисляем избыточный прогресс и сохраняем его
+      const remainingProgress = this.car.progress - segLen;
       
       // Обновляем позицию машины к концу текущего сегмента
       const t = 1.0; // используем полную длину сегмента
@@ -184,8 +183,10 @@ export class MovementController {
       this._updatePosition(clampedX, clampedY);
 
       // Переходим к следующему сегменту
-      this.car.progress = 0; // сбрасываем прогресс для нового сегмента
       this.car.currentSegment++;
+      
+      // Применяем избыточный прогресс к новому сегменту
+      this.car.progress = remainingProgress;
 
       if (this.car.currentSegment >= this.car.path.length - 1) {
         this._finishPath();
