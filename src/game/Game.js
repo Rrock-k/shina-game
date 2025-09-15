@@ -458,7 +458,7 @@ class Game {
         const nextDestCenter = this._getDestinationCenter(nextDestination.location);
 
         // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
-        const carRenderer = window.carRenderer;
+        const carRenderer = this.carRenderer;
         const pathBuilder = window.pathBuilder;
         if (!carRenderer || !pathBuilder) return null;
         
@@ -507,7 +507,7 @@ class Game {
         if (!buildingCenter) return;
 
         // Скрываем аватарку из машинки
-        const carRenderer = window.carRenderer;
+        const carRenderer = this.carRenderer;
         if (carRenderer) {
             carRenderer.setAvatarVisible(false);
         }
@@ -585,7 +585,7 @@ class Game {
         }
 
         // Показываем аватарку обратно в машинке
-        const carRenderer = window.carRenderer;
+        const carRenderer = this.carRenderer;
         if (carRenderer) {
             carRenderer.setAvatarVisible(true);
         }
@@ -928,7 +928,7 @@ class Game {
 
         // Светофоры теперь внутри world, поэтому синхронизация не нужна
         
-        this._initEntities(window.currentRouteIndex, window.savedCarState, window.carRenderer);
+        this._initEntities(window.currentRouteIndex, window.savedCarState, this.carRenderer);
     }
 
     /**
@@ -967,7 +967,6 @@ class Game {
         // Делаем дополнительные переменные глобально доступными для совместимости (временно)
         window.carTrafficController = carTrafficController;
         window.pathBuilder = pathBuilder;
-        window.carRenderer = carRenderer;
         // window.intersectionKeyToTL уже установлена в _setupWorld
         window.getDestinationCenter = this._getDestinationCenter.bind(this);
 
