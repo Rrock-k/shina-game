@@ -85,6 +85,14 @@ class Game {
         this.lastStayTimerUpdate = 0;
         this.lastStayTimerDay = 0;
         
+        // Переменные отладки
+        this.DEBUG_MODE = true; // теперь можно изменять
+        this.debugInfo = {
+            frameCount: 0,
+            lastLogTime: 0,
+            logInterval: 1000 // логировать каждую секунду
+        };
+        
         // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
         window.carEntity = this.carEntity;
         
@@ -116,6 +124,80 @@ class Game {
             }
         });
 
+    }
+
+    /**
+     * Инициализирует игру (настройка светофоров, создание машины, настройка UI)
+     */
+    init() {
+        // Инициализируем переменные для светофоров
+        this.currentRouteIndex = 0;
+        this.savedCarState = null;
+        this.intersectionKeyToTL = new Map();
+        
+        // Создаем координатор светофоров
+        this.trafficCoordinator = new TrafficLightCoordinator(45); // скорость машин ~45 км/ч
+        window.trafficCoordinator = this.trafficCoordinator;
+        
+        // Конфигурация светофоров
+        this.TRAFFIC_LIGHTS_CONFIG = [
+            'A2',              // левый столбец (въезд в город) - убран A3
+            'B2',              // второй столбец - убран B4
+            'C3',              // третий столбец - убран C1
+            'D2', 'D4',        // четвертый столбец
+            'E1',              // пятый столбец - убран E3
+            'F2', 'F4',        // шестой столбец
+            'G1', 'G3', 'G4'   // правый столбец (выезд из города) - убран G2
+        ];
+        window.TRAFFIC_LIGHTS_CONFIG = this.TRAFFIC_LIGHTS_CONFIG;
+        
+        // Определяем мобильное устройство
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Делаем необходимые переменные глобально доступными (временно)
+        window.CONFIG = CONFIG;
+        window.debugLog = this.debugLog.bind(this);
+        window.debugLogAlways = this.debugLogAlways.bind(this);
+        window.debugInfo = this.debugInfo;
+        window.currentRouteIndex = this.currentRouteIndex;
+        window.savedCarState = this.savedCarState;
+        window.zoneGeometry = this.zoneGeometry;
+        
+        // Настраиваем мир
+        this._setupWorld(this.intersectionKeyToTL);
+        
+        // Инициализируем UI
+        this.uiRenderer.init();
+        
+        // Обновляем текст режима дня/ночи и паузы в меню после инициализации
+        setTimeout(() => {
+            this.dayNightManager.updateDayNightModeText();
+            this.pauseManager.updatePauseModeText();
+        }, 100);
+        
+        // Создаем машину
+        const carData = this._createCar(this.currentRouteIndex, this.savedCarState, this.intersectionKeyToTL, this.uiRenderer, this.debugLogAlways.bind(this));
+        this.carRenderer = carData.carRenderer;
+        
+        // Настраиваем компоновку
+        this._layout(null, this.currentRouteIndex, this.savedCarState, this.carRenderer);
+        
+        // Настраиваем обработчик изменения размера окна
+        window.addEventListener('resize', () => {
+            this._layout(null, this.currentRouteIndex, this.savedCarState, this.carRenderer);
+            
+            // Если включен полноэкранный режим, обновляем его при изменении размера окна
+            if (typeof window.panningController !== 'undefined' && window.panningController && window.panningController.isFullscreenMode()) {
+                window.panningController.toggleFullscreen(); // выключаем
+                window.panningController.toggleFullscreen(); // включаем с новыми размерами
+            }
+        });
+        
+        // Настраиваем игровую область для панорамирования
+        const gameContainer = document.querySelector('.game-container');
+        gameContainer.style.width = '1200px';
+        gameContainer.style.height = '800px';
+        gameContainer.style.overflow = 'auto';
     }
 
     /**
@@ -194,8 +276,8 @@ class Game {
             const carTrafficController = window.carTrafficController;
             const intersectionKeyToTL = window.intersectionKeyToTL;
             const pathBuilder = window.pathBuilder;
-            const debugLog = window.debugLog;
-            const debugLogAlways = window.debugLogAlways;
+            const debugLog = this.debugLog.bind(this);
+            const debugLogAlways = this.debugLogAlways.bind(this);
             const debugInfo = window.debugInfo;
             
             this.carEntity.update(delta, {
@@ -216,7 +298,7 @@ class Game {
         if (this.shinaEntity) {
             this.shinaEntity.update({
                 timeManager: this.timeManager,
-                debugLog: window.debugLog
+                debugLog: this.debugLog.bind(this)
             });
         }
 
@@ -311,7 +393,7 @@ class Game {
             // Обновляем путь к новому пункту назначения
             const pathBuilder = window.pathBuilder;
             if (pathBuilder) {
-                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), window.debugLogAlways);
+                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }
@@ -736,7 +818,7 @@ class Game {
         setTimeout(() => {
             // перестроим путь, когда геометрия зон уже известна
             if (this.carEntity) {
-                const newPath = window.pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), window.debugLogAlways);
+                const newPath = window.pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }, 0);
@@ -980,6 +1062,29 @@ class Game {
         this._initEntities(currentRouteIndex, savedCarState, carRenderer);
     }
 
+    /**
+     * Функция отладки с интервалом
+     * @param {string} message - сообщение для вывода
+     * @param {*} data - дополнительные данные
+     */
+    debugLog(message, data = null) {
+        if (!this.DEBUG_MODE) return;
+        const now = Date.now();
+        if (now - this.debugInfo.lastLogTime > this.debugInfo.logInterval) {
+            console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
+            this.debugInfo.lastLogTime = now;
+        }
+    }
+
+    /**
+     * Функция отладки без интервала (всегда выводит)
+     * @param {string} message - сообщение для вывода
+     * @param {*} data - дополнительные данные
+     */
+    debugLogAlways(message, data = null) {
+        if (!this.DEBUG_MODE) return;
+        console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
+    }
 
 }
 
