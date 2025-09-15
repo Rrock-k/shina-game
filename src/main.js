@@ -48,9 +48,7 @@ function debugLogAlways (message, data = null) {
   console.log(`🐛 DEBUG [${new Date().toLocaleTimeString()}]: ${message}`, data || '');
 }
 
-// Обновление таймера пребывания в здании
-let lastStayTimerUpdate = 0;
-let lastStayTimerDay = 0;
+// Обновление таймера пребывания в здании теперь в Game.js
 
 
 // Инициализация новых сущностей теперь в Game.js

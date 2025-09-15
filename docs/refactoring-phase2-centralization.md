@@ -54,6 +54,7 @@ let buildingAvatars = new Map();
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
 - ⏳ **В ПРОЦЕССЕ**: main.js содержит ~500 строк (было 808)
 - ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()` и `createCar()` в Game.js
+- ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js
 - **Файлы**: `src/main.js`, `src/game/Game.js`
 - **Проверка**: Функция `getDestinationCenter()` успешно перенесена, все ссылки обновлены.
 
@@ -72,6 +73,9 @@ let buildingAvatars = new Map();
 - ✅ **НОВОЕ**: Добавлены импорты `CarRenderer`, `CarTrafficController`, `PathBuilder` в Game.js
 - ✅ **НОВОЕ**: Обновлен вызов в main.js на `game._createCar()` с получением `carRenderer`
 - ✅ **НОВОЕ**: Удалена функция `createCar()` из main.js
+- ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js как свойства класса
+- ✅ **НОВОЕ**: Обновлен метод `updateStayTimer()` для использования `this.lastStayTimerUpdate` и `this.lastStayTimerDay`
+- ✅ **НОВОЕ**: Удалены глобальные переменные `lastStayTimerUpdate` и `lastStayTimerDay` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 

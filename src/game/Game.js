@@ -80,6 +80,10 @@ class Game {
         // Инициализируем геометрию зон
         this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
         
+        // Переменные для таймера пребывания в здании
+        this.lastStayTimerUpdate = 0;
+        this.lastStayTimerDay = 0;
+        
         // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
         window.carEntity = this.carEntity;
         
@@ -200,7 +204,7 @@ class Game {
             const currentDay = gameTime.day; // день месяца
             
             // Инициализируем переменные для отслеживания времени
-            if (!this.lastStayTimerUpdate) {
+            if (this.lastStayTimerUpdate === 0) {
                 this.lastStayTimerUpdate = currentTime;
                 this.lastStayTimerDay = currentDay;
                 return;
@@ -601,6 +605,7 @@ class Game {
             this.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
         }
         
+        // Инициализируем переменные таймера пребывания
         const gameTime = this.timeManager.getGameTime();
         this.lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
         this.lastStayTimerDay = gameTime.day;
