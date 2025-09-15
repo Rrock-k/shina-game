@@ -75,26 +75,16 @@ export class MovementController {
 
     // Если игра на паузе, не обновляем машину
     if (this.car.pauseManager.isPaused()) {
-      debugLog('🚗 Игра на паузе, машина не двигается');
       return;
     }
 
     // Если находимся в пункте назначения, не двигаемся
     if (this.car._isAtDestination) {
-      debugLog('🚗 Машина в пункте назначения, не двигается');
       if (checkArrival) checkArrival(); // обновляем статус
       return;
     }
 
     const speed = this.config.BASE_CAR_SPEED * this.car.pauseManager.getSpeedMultiplier() * delta;
-    debugLog('🚗 Состояние машины', {
-      speed: speed.toFixed(2),
-      delta: delta.toFixed(3),
-      position: `(${this.car.position.x.toFixed(1)}, ${this.car.position.y.toFixed(1)})`,
-      rotation: `${(this.car.rotation * 180 / Math.PI).toFixed(1)}°`,
-      segment: `${this.car.currentSegment}/${this.car.path.length - 1}`,
-      isAtDestination: this.car._isAtDestination
-    });
 
     if (this.car.path.length < 2) {
       console.log('No valid path, rebuilding...');
@@ -159,12 +149,6 @@ export class MovementController {
 
     // Обновляем прогресс по текущему сегменту
     this.car.progress += speed;
-    debugLog('🚗 Движение по сегменту', {
-      segment: this.car.currentSegment,
-      progress: this.car.progress.toFixed(1),
-      segLen: segLen.toFixed(1),
-      speed: speed.toFixed(2)
-    });
 
     if (this.car.progress >= segLen) {
       debugLogAlways('🚗 Завершен сегмент', {

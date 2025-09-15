@@ -19,6 +19,7 @@ class StateManager {
         // Таймеры пребывания в локациях
         this.lastStayTimerUpdate = 0;
         this.lastStayTimerDay = 0;
+        this.stayStartTimeAbs = null; // Абсолютное игровое время начала пребывания
     }
 
     // === Методы для управления currentRouteIndex ===
@@ -112,6 +113,29 @@ class StateManager {
         this.lastStayTimerDay = day;
     }
 
+    /**
+     * Получить абсолютное время начала пребывания
+     * @returns {Object|null} Объект с игровым временем начала пребывания
+     */
+    getStayStartTimeAbs() {
+        return this.stayStartTimeAbs;
+    }
+
+    /**
+     * Установить абсолютное время начала пребывания
+     * @param {Object} gameTime - Объект с игровым временем {hours, minutes, day}
+     */
+    setStayStartTimeAbs(gameTime) {
+        this.stayStartTimeAbs = { ...gameTime };
+    }
+
+    /**
+     * Очистить абсолютное время начала пребывания
+     */
+    clearStayStartTimeAbs() {
+        this.stayStartTimeAbs = null;
+    }
+
     // === Утилитарные методы ===
     
     /**
@@ -123,17 +147,56 @@ class StateManager {
             currentRouteIndex: this.currentRouteIndex,
             savedCarState: this.savedCarState,
             lastStayTimerUpdate: this.lastStayTimerUpdate,
-            lastStayTimerDay: this.lastStayTimerDay
+            lastStayTimerDay: this.lastStayTimerDay,
+            stayStartTimeAbs: this.stayStartTimeAbs
         };
     }
 
     /**
-     * Обновляет таймер пребывания в здании
+     * Обновляет таймер пребывания в здании на основе абсолютного времени
      * @param {Object} gameTime - Объект с игровым временем {hours, minutes, day}
      * @param {number} currentStayDuration - Текущая продолжительность пребывания
      * @returns {number} Новая продолжительность пребывания
      */
     updateStayTimer(gameTime, currentStayDuration) {
+        // Если нет сохраненного времени начала пребывания, используем старую логику
+        if (!this.stayStartTimeAbs) {
+            console.warn('⚠️ stayStartTimeAbs не установлено, используем старую логику');
+            return this._updateStayTimerLegacy(gameTime, currentStayDuration);
+        }
+        
+        const currentTime = gameTime.hours * 60 + gameTime.minutes; // текущее время в минутах
+        const currentDay = gameTime.day; // текущий день
+        
+        const startTime = this.stayStartTimeAbs.hours * 60 + this.stayStartTimeAbs.minutes; // время начала в минутах
+        const startDay = this.stayStartTimeAbs.day; // день начала
+        
+        let timeDiff;
+        
+        // Если день изменился, это переход через полночь
+        if (currentDay !== startDay) {
+            // Время с начала пребывания до полуночи + время с полуночи до текущего момента
+            timeDiff = (24 * 60 - startTime) + currentTime;
+            console.log(`🌙 Переход через полночь: ${timeDiff} минут с начала пребывания`);
+        } else {
+            timeDiff = currentTime - startTime;
+        }
+        
+        // Рассчитываем новое время пребывания
+        const newStayTimer = currentStayDuration - timeDiff / 60; // переводим в игровые часы
+        
+        console.log(`⏱️ Таймер пребывания: ${timeDiff} минут прошло, осталось ${newStayTimer.toFixed(2)} часов`);
+        
+        return newStayTimer;
+    }
+    
+    /**
+     * Старая логика обновления таймера (для обратной совместимости)
+     * @param {Object} gameTime - Объект с игровым временем {hours, minutes, day}
+     * @param {number} currentStayDuration - Текущая продолжительность пребывания
+     * @returns {number} Новая продолжительность пребывания
+     */
+    _updateStayTimerLegacy(gameTime, currentStayDuration) {
         const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
         const currentDay = gameTime.day; // день месяца
         
@@ -175,6 +238,7 @@ class StateManager {
         this.savedCarState = null;
         this.lastStayTimerUpdate = 0;
         this.lastStayTimerDay = 0;
+        this.stayStartTimeAbs = null;
     }
 }
 

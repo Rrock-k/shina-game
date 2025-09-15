@@ -182,7 +182,6 @@ export class Shina {
     
     if (newState !== this.currentState) {
       this.setState(newState);
-      debugLog(`🕐 Шина изменила состояние: ${this.currentState} (${currentHour}:${gameTime.minutes.toString().padStart(2, '0')})`);
     }
   }
 

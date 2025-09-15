@@ -440,6 +440,9 @@ class Game {
             this.carEntity.setAtDestination(false);
             this.carEntity.setStayTimer(0);
             
+            // Очищаем абсолютное время начала пребывания при начале новой поездки
+            this.stateManager.clearStayStartTimeAbs();
+            
             // Обновляем путь к новому пункту назначения
             const pathBuilder = this.dependencies.get('pathBuilder');
             if (pathBuilder) {
@@ -498,7 +501,12 @@ class Game {
         this.carEntity.setAtDestination(true);
         this.carEntity.setStayTimer(currentDest.stayHours);
         
-        // 4. Обновляем UI (атомарно)
+        // 4. Сохраняем абсолютное время начала пребывания
+        const gameTime = this.timeManager.getGameTime();
+        this.stateManager.setStayStartTimeAbs(gameTime);
+        console.log(`⏰ Сохранено время начала пребывания: ${gameTime.hours}:${Math.floor(gameTime.minutes)}`);
+        
+        // 5. Обновляем UI (атомарно)
         this.uiRenderer.updateRouteDisplay(true);
         this.showBuildingAvatar(currentDest.location);
         
