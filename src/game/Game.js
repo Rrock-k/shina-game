@@ -134,7 +134,7 @@ class Game {
     init() {
         // Инициализируем переменные для светофоров
         // currentRouteIndex теперь управляется через stateManager
-        this.savedCarState = null;
+        // savedCarState теперь управляется через stateManager
         this.intersectionKeyToTL = new Map();
         
         // Создаем координатор светофоров
@@ -162,7 +162,7 @@ class Game {
         window.debugLogAlways = this.debugLogAlways.bind(this);
         window.debugInfo = this.debugInfo;
         // currentRouteIndex теперь управляется через stateManager
-        window.savedCarState = this.savedCarState;
+        window.savedCarState = this.stateManager.getSavedCarState();
         window.zoneGeometry = this.zoneGeometry;
         
         // Настраиваем мир
@@ -178,15 +178,15 @@ class Game {
         }, 100);
         
         // Создаем машину
-        const carData = this._createCar(this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.intersectionKeyToTL, this.uiRenderer, this.debugLogAlways.bind(this));
+        const carData = this._createCar(this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this.intersectionKeyToTL, this.uiRenderer, this.debugLogAlways.bind(this));
         this.carRenderer = carData.carRenderer;
         
         // Настраиваем компоновку
-        this._layout(null, this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.carRenderer);
+        this._layout(null, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this.carRenderer);
         
         // Настраиваем обработчик изменения размера окна
         window.addEventListener('resize', () => {
-            this._layout(null, this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.carRenderer);
+            this._layout(null, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this.carRenderer);
             
             // Если включен полноэкранный режим, обновляем его при изменении размера окна
             if (typeof window.panningController !== 'undefined' && window.panningController && window.panningController.isFullscreenMode()) {
@@ -428,6 +428,7 @@ class Game {
 
             // Сохраняем состояние машины для плавного продолжения движения
             const savedCarState = this.saveCarStateForNextDestination();
+            this.stateManager.setSavedCarState(savedCarState);
             window.savedCarState = savedCarState;
             console.log(`💾 Сохранено состояние машины:`, savedCarState);
 
@@ -930,7 +931,7 @@ class Game {
 
         // Светофоры теперь внутри world, поэтому синхронизация не нужна
         
-        this._initEntities(this.stateManager.getCurrentRouteIndex(), window.savedCarState, this.carRenderer);
+        this._initEntities(this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this.carRenderer);
     }
 
     /**

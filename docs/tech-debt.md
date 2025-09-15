@@ -8,6 +8,14 @@
   - Созданы get/set методы для всех свойств
   - Интегрирован в `Game.js` как `this.stateManager`
 
+- **Миграция currentRouteIndex**: ✅ Перенесен из Game.js в StateManager
+  - Удалено свойство `this.currentRouteIndex` из Game.js
+  - Заменены все использования на `this.stateManager.getCurrentRouteIndex()` и `this.stateManager.setCurrentRouteIndex()`
+
+- **Миграция savedCarState**: ✅ Перенесен из Game.js в StateManager  
+  - Удалено свойство `this.savedCarState` из Game.js
+  - Заменены все использования на `this.stateManager.getSavedCarState()` и `this.stateManager.setSavedCarState()`
+
 
 ### 🟡 Потенциальные улучшения для будущего
 
