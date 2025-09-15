@@ -45,14 +45,35 @@ export const CONFIG = {
     relatives: { block: { i: 5, j: 0 }, cells: [[1, 0]] },       // 1x1
     work: { block: { i: 3, j: 1 }, cells: [[0, 1], [1, 1]] },    // 2x1 (две колонки в одном ряду)
     box: { block: { i: 1, j: 2 }, cells: [[0, 1], [0, 2]] },     // 1x2 (две строки в одном столбце)
-    institute: { block: { i: 5, j: 2 }, cells: [[0, 0], [1, 0], [1, 1]] } // Г-образно 3 ячейки
+    institute: { block: { i: 5, j: 2 }, cells: [[0, 0], [1, 0], [1, 1]] }, // Г-образно 3 ячейки
+    // Новые локации для Шина 2.0
+    redberry: { block: { i: 3, j: 2 }, cells: [[1, 2]] },
+    shop: { block: { i: 0, j: 1 }, cells: [[0, 1], [1, 1]] },
+    market: { block: { i: 0, j: 0 }, cells: [[0,0],[1,0],[0,1],[1,1],[0,2],[1,2]] },
+    barber: { block: { i: 6, j: 1 }, cells: [[0, 0]] },
+    construction1: { block: { i: 4, j: 0 }, cells: [[0, 0]] },
+    construction2: { block: { i: 2, j: 2 }, cells: [[1, 0]] },
+    park_large1: { block: { i: 1, j: 0 }, cells: [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]] },
+    park_large2: { block: { i: 4, j: 1 }, cells: [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [1, 2]] },
+    park_medium1: { block: { i: 6, j: 0 }, cells: [[0, 0], [1, 0], [0, 1], [1, 1]] }
   },
   ZONES: {
-    house: { type: 'rect', x: 200, y: 200, w: 440, h: 750, label: 'Дом Шины' },
-    relatives: { type: 'rect', x: 1300, y: 200, w: 440, h: 750, label: 'Родственники' },
-    work: { type: 'rect', x: 1840, y: 1100, w: 440, h: 700, label: 'Работа' },
-    box: { type: 'rect', x: 200, y: 1100, w: 440, h: 700, label: 'Бокс' },
+    // Метки зон - координаты вычисляются динамически из ZONE_LAYOUT
+    house: { label: 'Дом Шины' },
+    relatives: { label: 'Родственники' },
+    work: { label: 'Работа' },
+    box: { label: 'Бокс' },
     institute: { type: 'circle', x: 2550, y: 1425, r: 200, label: 'Институт', alpha: 0.6 },
+    // Новые локации для Шина 2.0
+    redberry: { label: 'Редбери' },
+    shop: { label: 'Магазин' },
+    market: { label: 'Рынок' },
+    barber: { label: 'Барбершоп' },
+    construction1: { label: 'Стройка 1' },
+    construction2: { label: 'Стройка 2' },
+    park_large1: { label: 'Большой парк 1' },
+    park_large2: { label: 'Большой парк 2' },
+    park_medium1: { label: 'Средний парк' }
   },
   TRAFFIC_LIGHTS: [
     { x: 600, y: 1283 },

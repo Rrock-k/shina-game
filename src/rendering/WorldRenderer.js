@@ -585,11 +585,24 @@ export class WorldRenderer {
     const verticalRoadXs = this.getVerticalRoadXs();
     if (!horizontalRoadYs.length || !verticalRoadXs.length) return;
 
-    this.drawZoneFromCells('house', 'house', layer, zoneGeometry);
-    this.drawZoneFromCells('relatives', 'relatives', layer, zoneGeometry);
-    this.drawZoneFromCells('work', 'work', layer, zoneGeometry);
-    this.drawZoneFromCells('box', 'box', layer, zoneGeometry);
-    this.drawZoneFromCells('institute', 'institute', layer, zoneGeometry);
+    // Динамически рендерим все зоны из ZONE_LAYOUT
+    for (const zoneName in this.config.ZONE_LAYOUT) {
+      const zoneConfig = this.config.ZONE_LAYOUT[zoneName];
+      const zoneInfo = this.config.ZONES[zoneName];
+      
+      if (zoneConfig && zoneInfo) {
+        // Определяем цвет зоны
+        let colorKey = zoneName;
+        if (zoneName === 'redberry') colorKey = 'redberry';
+        else if (zoneName === 'shop') colorKey = 'shop';
+        else if (zoneName === 'market') colorKey = 'market';
+        else if (zoneName === 'barber') colorKey = 'barber';
+        else if (zoneName.startsWith('construction')) colorKey = 'construction';
+        else if (zoneName.startsWith('park')) colorKey = 'park';
+        
+        this.drawZoneFromCells(zoneName, colorKey, layer, zoneGeometry);
+      }
+    }
     
     // Для круга сохранить центр и радиус (только если не была установлена Г-образная зона)
     const inst = this.config.ZONES.institute;
