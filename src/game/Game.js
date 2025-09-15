@@ -992,7 +992,7 @@ class Game {
         // window.carTrafficController больше не нужен - доступен через контейнер зависимостей
         // window.pathBuilder больше не нужен - доступен через контейнер зависимостей
         // window.intersectionKeyToTL больше не нужен - доступен через контейнер зависимостей
-        window.getDestinationCenter = this._getDestinationCenter.bind(this);
+        // window.getDestinationCenter больше не нужен - метод доступен через this._getDestinationCenter
 
         // Начинаем с дома
         const routeIndex = 0; // дом
