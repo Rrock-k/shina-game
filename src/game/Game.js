@@ -2,6 +2,7 @@ import { TimeManager } from './TimeManager.js';
 import { PauseManager } from './PauseManager.js';
 import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
+import StateManager from './StateManager.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
 import { CarRenderer } from '../rendering/CarRenderer.js';
@@ -58,6 +59,7 @@ class Game {
         window.trafficLightsLayer = this.trafficLightsLayer;
         
         // Создаем менеджеры
+        this.stateManager = new StateManager();
         this.timeManager = new TimeManager();
         this.pauseManager = new PauseManager();
         this.journalManager = new JournalManager(this.timeManager);
