@@ -3,6 +3,7 @@ import { PauseManager } from './PauseManager.js';
 import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
 import StateManager from './StateManager.js';
+import DependencyContainer from './DependencyContainer.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
 import { CarRenderer } from '../rendering/CarRenderer.js';
@@ -19,6 +20,15 @@ import { initTrafficLightsForIntersection, TrafficLightCoordinator } from '../sy
 class Game {
     constructor() {
         console.log('Game constructor called');
+        
+        // Создаем контейнер зависимостей
+        this.dependencies = new DependencyContainer();
+        
+        // Регистрируем базовые зависимости
+        this.dependencies.register('config', CONFIG);
+        this.dependencies.register('debugLog', () => this.debugLog.bind(this));
+        this.dependencies.register('debugLogAlways', () => this.debugLogAlways.bind(this));
+        this.dependencies.register('debugInfo', () => this.debugInfo);
         
         // Создаем PIXI приложение
         this.app = new PIXI.Application({
@@ -64,7 +74,7 @@ class Game {
         this.timeManager = new TimeManager();
         this.pauseManager = new PauseManager();
         this.journalManager = new JournalManager(this.timeManager);
-        this.dayNightManager = new DayNightManager(PIXI, CONFIG);
+        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'));
         
         // Синхронизируем менеджеры
         this.timeManager.setSpeedMultiplier(this.pauseManager.getSpeedMultiplier());
@@ -74,12 +84,12 @@ class Game {
         this.journalManager.setLocationStartTime('Дом');
         
         // Создаем рендереры
-        this.worldRenderer = new WorldRenderer(CONFIG, this.app);
-        this.uiRenderer = new UIRenderer(CONFIG, this.timeManager, this.pauseManager, this.dayNightManager, null, this.journalManager);
+        this.worldRenderer = new WorldRenderer(this.dependencies.get('config'), this.app);
+        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, null, this.journalManager);
         
         // Создаем сущности
-        this.carEntity = new Car(CONFIG, this.pauseManager);
-        this.shinaEntity = new Shina(CONFIG);
+        this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
+        this.shinaEntity = new Shina(this.dependencies.get('config'));
         
         // Инициализируем геометрию зон
         this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
@@ -137,8 +147,13 @@ class Game {
         // savedCarState теперь управляется через stateManager
         this.intersectionKeyToTL = new Map();
         
+        // Регистрируем intersectionKeyToTL в контейнере зависимостей
+        this.dependencies.register('intersectionKeyToTL', this.intersectionKeyToTL);
+        
         // Создаем координатор светофоров
         this.trafficCoordinator = new TrafficLightCoordinator(45); // скорость машин ~45 км/ч
+        this.dependencies.register('trafficCoordinator', this.trafficCoordinator);
+        // TODO: убрать window.trafficCoordinator после рефакторинга всех систем
         window.trafficCoordinator = this.trafficCoordinator;
         
         // Конфигурация светофоров
@@ -157,17 +172,28 @@ class Game {
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         // Делаем необходимые переменные глобально доступными (временно)
-        window.CONFIG = CONFIG;
-        window.debugLog = this.debugLog.bind(this);
-        window.debugLogAlways = this.debugLogAlways.bind(this);
-        window.debugInfo = this.debugInfo;
+        // TODO: убрать после полного рефакторинга всех систем
+        window.CONFIG = this.dependencies.get('config');
+        window.debugLog = this.dependencies.get('debugLog');
+        window.debugLogAlways = this.dependencies.get('debugLogAlways');
+        window.debugInfo = this.dependencies.get('debugInfo');
         // currentRouteIndex теперь управляется через stateManager
         // TODO: убрать дублирование savedCarState в window
         window.savedCarState = this.stateManager.getSavedCarState();
         window.zoneGeometry = this.zoneGeometry;
         
+        // Создаем CarTrafficController и регистрируем в контейнере зависимостей
+        const carTrafficController = new CarTrafficController();
+        this.dependencies.register('carTrafficController', carTrafficController);
+        
         // Настраиваем мир
         this._setupWorld(this.intersectionKeyToTL);
+        
+        // Создаем PathBuilder после инициализации WorldRenderer
+        const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
+        const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
+        const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, this.dependencies.get('config'));
+        this.dependencies.register('pathBuilder', pathBuilder);
         
         // Инициализируем UI
         this.uiRenderer.init();
@@ -275,11 +301,10 @@ class Game {
     updateEntities(delta) {
         // Обновляем машину
         if (this.carEntity) {
-            // Получаем необходимые зависимости из глобальной области (временно)
-            // TODO: убрать после полного рефакторинга систем
-            const carTrafficController = window.carTrafficController;
-            const intersectionKeyToTL = window.intersectionKeyToTL;
-            const pathBuilder = window.pathBuilder;
+            // Получаем необходимые зависимости из контейнера зависимостей
+            const carTrafficController = this.dependencies.get('carTrafficController');
+            const intersectionKeyToTL = this.dependencies.get('intersectionKeyToTL');
+            const pathBuilder = this.dependencies.get('pathBuilder');
             const debugLog = this.debugLog.bind(this);
             const debugLogAlways = this.debugLogAlways.bind(this);
             const debugInfo = this.debugInfo;
@@ -307,8 +332,9 @@ class Game {
         }
 
         // Обновляем светофоры (пустой цикл из main.js)
-        if (window.intersectionKeyToTL) {
-            window.intersectionKeyToTL.forEach((trafficLight, key) => {
+        const intersectionKeyToTL = this.dependencies.get('intersectionKeyToTL');
+        if (intersectionKeyToTL) {
+            intersectionKeyToTL.forEach((trafficLight, key) => {
                 // Пустой цикл - светофоры обновляются автоматически через app.ticker
                 // Но проверим, что светофоры работают
                 if (trafficLight && typeof trafficLight.isPassAllowed === 'function') {
@@ -346,7 +372,7 @@ class Game {
         
         // Получаем текущий индекс маршрута из stateManager
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
+        const CONFIG = this.dependencies.get('config');
         
         // Завершаем пребывание в текущем месте
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
@@ -372,7 +398,7 @@ class Game {
             this.carEntity.setStayTimer(0);
             
             // Обновляем путь к новому пункту назначения
-            const pathBuilder = window.pathBuilder; // TODO: убрать после рефакторинга
+            const pathBuilder = this.dependencies.get('pathBuilder');
             if (pathBuilder) {
                 const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
@@ -393,7 +419,7 @@ class Game {
      */
     checkArrival() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
+        const CONFIG = this.dependencies.get('config');
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
         if (this.carEntity && !this.carEntity.isAtDestination()) {
@@ -430,7 +456,7 @@ class Game {
      */
     saveCarStateForNextDestination() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
+        const CONFIG = this.dependencies.get('config');
         const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
         const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
 
@@ -440,7 +466,7 @@ class Game {
 
         // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
         const carRenderer = this.carRenderer;
-        const pathBuilder = window.pathBuilder; // TODO: убрать после рефакторинга
+        const pathBuilder = this.dependencies.get('pathBuilder');
         if (!carRenderer || !pathBuilder) return null;
         
         const currentPos = carRenderer.getCar().position;
@@ -553,7 +579,7 @@ class Game {
      */
     hideBuildingAvatar() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
+        const CONFIG = this.dependencies.get('config');
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
         if (this.buildingAvatars) {
@@ -597,6 +623,7 @@ class Game {
         const z = this.zoneGeometry.get(locationKey);
         if (z && z.center) return z.center;
         // fallback: из статического конфига
+        const CONFIG = this.dependencies.get('config');
         const def = CONFIG.ZONES[locationKey];
         const verticalRoadXs = this._getVerticalRoadXs();
         const horizontalRoadYs = this._getHorizontalRoadYs();
@@ -799,7 +826,8 @@ class Game {
         setTimeout(() => {
             // перестроим путь, когда геометрия зон уже известна
             if (this.carEntity) {
-                const newPath = window.pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
+                const pathBuilder = this.dependencies.get('pathBuilder');
+                const newPath = pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }, 0);
@@ -815,9 +843,8 @@ class Game {
         // Очищаем переданную карту
         intersectionKeyToTL.clear();
         
-        // Делаем карту глобально доступной (временно, до полного рефакторинга)
-        // TODO: убрать после рефакторинга систем светофоров
-        window.intersectionKeyToTL = intersectionKeyToTL;
+        // intersectionKeyToTL теперь доступен через контейнер зависимостей
+        // window.intersectionKeyToTL больше не нужен
         const { maxVerticalPos } = this.worldRenderer ? this.worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
         const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
         const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
@@ -839,6 +866,7 @@ class Game {
                     east: i < verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
                 };
 
+                const CONFIG = this.dependencies.get('config');
                 const tl = initTrafficLightsForIntersection({
                     PIXI,
                     app: this.app,
@@ -855,8 +883,9 @@ class Game {
                 intersectionKeyToTL.set(key, tl);
 
                 // Регистрируем светофор в координаторе зеленой волны
-                if (window.trafficCoordinator) {
-                    window.trafficCoordinator.addTrafficLight(key, tl, x, y);
+                const trafficCoordinator = this.dependencies.get('trafficCoordinator');
+                if (trafficCoordinator) {
+                    trafficCoordinator.addTrafficLight(key, tl, x, y);
                 } else {
                     console.warn('🚦 trafficCoordinator не найден при добавлении светофора');
                 }
@@ -864,10 +893,11 @@ class Game {
         }
 
         if (verticalRoadXs.length > 0 && horizontalRoadYs.length > 0) {
-            if (window.trafficCoordinator) {
-                window.trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
+            const trafficCoordinator = this.dependencies.get('trafficCoordinator');
+            if (trafficCoordinator) {
+                trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
             } else {
-                console.warn('🚦 trafficCoordinator не найден в window');
+                console.warn('🚦 trafficCoordinator не найден в контейнере зависимостей');
             }
         }
         
@@ -894,6 +924,7 @@ class Game {
     _layout() {
         const w = 1200;
         const h = 800;
+        const CONFIG = this.dependencies.get('config');
         const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
 
         if (!window.panningController || window.panningController.getCurrentScale() === 1) {
@@ -924,6 +955,7 @@ class Game {
      */
     _createCar(currentRouteIndex, savedCarState, intersectionKeyToTL, uiRenderer, debugLogAlways) {
         // Создаем рендерер машины
+        const CONFIG = this.dependencies.get('config');
         const carRenderer = new CarRenderer(CONFIG, this.pauseManager);
         
         const car = carRenderer.createCar({
@@ -935,22 +967,14 @@ class Game {
         
         const avatar = carRenderer.getAvatar();
         
-        const carTrafficController = new CarTrafficController();
-
-        const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
-        const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
-        console.log('🔧 Инициализация PathBuilder:', {
-            verticalRoads: verticalRoadXs.length,
-            horizontalRoads: horizontalRoadYs.length,
-            verticalRoadXs: verticalRoadXs.slice(0, 5), // первые 5 для примера
-            horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
-        });
-        const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
+        // CarTrafficController и PathBuilder теперь создаются в init() и доступны через контейнер зависимостей
+        const carTrafficController = this.dependencies.get('carTrafficController');
+        const pathBuilder = this.dependencies.get('pathBuilder');
         
         // Делаем дополнительные переменные глобально доступными для совместимости (временно)
-        window.carTrafficController = carTrafficController;
-        window.pathBuilder = pathBuilder;
-        // window.intersectionKeyToTL уже установлена в _setupWorld
+        // window.carTrafficController больше не нужен - доступен через контейнер зависимостей
+        // window.pathBuilder больше не нужен - доступен через контейнер зависимостей
+        // window.intersectionKeyToTL больше не нужен - доступен через контейнер зависимостей
         window.getDestinationCenter = this._getDestinationCenter.bind(this);
 
         // Начинаем с дома
@@ -1021,6 +1045,7 @@ class Game {
     _layout(panningController, currentRouteIndex, savedCarState, carRenderer) {
         const w = 1200;
         const h = 800;
+        const CONFIG = this.dependencies.get('config');
         const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
 
         if (!panningController || panningController.getCurrentScale() === 1) {

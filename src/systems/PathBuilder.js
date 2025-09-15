@@ -240,7 +240,7 @@ export class PathBuilder {
     }
 
     if (debugLogAlways) {
-      debugLogAlways(`🗺️ Graph path to ${currentDestination.name}:`, finalPath.map(p => `(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' -> '));
+      debugLogAlways(`🗺️ Graph path to ${currentDestination.name}:`, finalPath.map(p => p && p.x !== undefined && p.y !== undefined ? `(${p.x.toFixed(0)},${p.y.toFixed(0)})` : '(undefined)').join(' -> '));
       debugLogAlways(`🚗 Car will start from segment 0: (${finalPath[0]?.x?.toFixed(0) || 'N/A'},${finalPath[0]?.y?.toFixed(0) || 'N/A'}) to (${finalPath[1]?.x?.toFixed(0) || 'N/A'},${finalPath[1]?.y?.toFixed(0) || 'N/A'})`);
 
       // Дополнительная отладочная информация о сохраненном состоянии
