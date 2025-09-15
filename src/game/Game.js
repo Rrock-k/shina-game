@@ -149,13 +149,39 @@ class Game {
             this.uiRenderer.update();
         }
         
-        // Обновляем сущности (машина и шина)
-        this.updateEntities(delta);
+        // Обновляем машину (включая сущности)
+        this._updateCar(delta);
         
         // Обновляем таймер пребывания в здании
         this.updateStayTimer();
     }
     
+    /**
+     * Обновляет машину и связанные компоненты
+     * @param {number} delta - Время, прошедшее с предыдущего кадра
+     */
+    _updateCar(delta) {
+        // Обновляем новые сущности
+        this.updateEntities(delta);
+        
+        // Синхронизируем game.carEntity с carRenderer для визуального представления
+        if (this.carEntity && window.carRenderer) {
+            // Обновляем визуальное представление
+            window.carRenderer.updateVisuals(this.carEntity);
+            
+            // Синхронизируем локальные переменные с game.carEntity (глобальные переменные удалены)
+            const carPath = this.carEntity.getPath();
+            const carSegment = this.carEntity.getCurrentSegment();
+            const carProgress = this.carEntity.getProgress();
+            const stayTimer = this.carEntity.getStayTimer();
+        }
+        
+        // Обновляем UI
+        if (this.uiRenderer) {
+            this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
+        }
+    }
+
     /**
      * Обновляет сущности игры
      * @param {number} delta - Время, прошедшее с предыдущего кадра

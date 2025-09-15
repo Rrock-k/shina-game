@@ -397,27 +397,7 @@ function layout () {
 
 
 
-function updateCar (delta) {
-  // Обновляем новые сущности
-  game.updateEntities(delta);
-  
-  // Синхронизируем game.carEntity с carRenderer для визуального представления
-  if (game.carEntity && carRenderer) {
-    // Обновляем визуальное представление
-    carRenderer.updateVisuals(game.carEntity);
-    
-    // Синхронизируем локальные переменные с game.carEntity (глобальные переменные удалены)
-    const carPath = game.carEntity.getPath();
-    const carSegment = game.carEntity.getCurrentSegment();
-    const carProgress = game.carEntity.getProgress();
-    const stayTimer = game.carEntity.getStayTimer();
-  }
-  
-  // Обновляем UI
-  if (uiRenderer) {
-    uiRenderer.updateRouteDisplay(game.carEntity ? game.carEntity.isAtDestination() : false);
-  }
-}
+// Функция updateCar() перенесена в Game.js как _updateCar()
 
 
 // Настраиваем игровую область для панорамирования
