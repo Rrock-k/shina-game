@@ -138,20 +138,9 @@ window.addEventListener('resize', () => {
 
 
 
-// Функция для парсинга буквенно-цифровых координат в индексы
-function parseIntersectionCoordinate (coord) {
-  const letter = coord.charAt(0);
-  const number = parseInt(coord.slice(1));
-  const i = letter.charCodeAt(0) - 65; // A=0, B=1, C=2...
-  const j = number - 1; // 1=0, 2=1, 3=2...
-  return { i, j };
-}
+// Функция для парсинга буквенно-цифровых координат в индексы перенесена в Game.js как _parseIntersectionCoordinate
 
-// Проверка, есть ли светофор на данном перекрестке
-function shouldHaveTrafficLight (i, j) {
-  const coord = String.fromCharCode(65 + i) + (j + 1);
-  return TRAFFIC_LIGHTS_CONFIG.includes(coord);
-}
+// Проверка, есть ли светофор на данном перекрестке перенесена в Game.js как _shouldHaveTrafficLight
 
 
 function setupWorld () {
@@ -322,7 +311,7 @@ function createTrafficLightsForAllIntersections (layer) {
       const x = verticalRoadXs[i];
       const y = horizontalRoadYs[j];
 
-      if (!shouldHaveTrafficLight(i, j)) {
+      if (!game._shouldHaveTrafficLight(i, j)) {
         continue; // пропускаем этот перекресток
       }
 

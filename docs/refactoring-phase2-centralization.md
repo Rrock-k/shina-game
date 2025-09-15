@@ -54,6 +54,7 @@ let buildingAvatars = new Map();
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
 - ⏳ **В ПРОЦЕССЕ**: main.js содержит ~300 строк (было 808)
 - ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()`, `createCar()`, `updateEntities()`, `updateCar()`, `setupWorld()`, `layout()` в Game.js
+- ✅ **НОВОЕ**: Перенесены функции `parseIntersectionCoordinate()` и `shouldHaveTrafficLight()` в Game.js как приватные методы
 - ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js
 - ✅ **НОВОЕ**: Перенесена функция `updateEntities()` в Game.js как метод класса
 - ✅ **НОВОЕ**: Перенесена функция `updateCar()` в Game.js как метод `_updateCar()`

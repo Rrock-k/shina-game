@@ -926,6 +926,30 @@ class Game {
         };
     }
 
+    /**
+     * Парсит буквенно-цифровые координаты в индексы
+     * @param {string} coord - координата в формате 'A1', 'B2', etc.
+     * @returns {Object} объект с индексами {i, j}
+     */
+    _parseIntersectionCoordinate(coord) {
+        const letter = coord.charAt(0);
+        const number = parseInt(coord.slice(1));
+        const i = letter.charCodeAt(0) - 65; // A=0, B=1, C=2...
+        const j = number - 1; // 1=0, 2=1, 3=2...
+        return { i, j };
+    }
+
+    /**
+     * Проверяет, есть ли светофор на данном перекрестке
+     * @param {number} i - индекс столбца
+     * @param {number} j - индекс ряда
+     * @returns {boolean} true, если на перекрестке должен быть светофор
+     */
+    _shouldHaveTrafficLight(i, j) {
+        const coord = String.fromCharCode(65 + i) + (j + 1);
+        return window.TRAFFIC_LIGHTS_CONFIG.includes(coord);
+    }
+
 }
 
 export default Game;
