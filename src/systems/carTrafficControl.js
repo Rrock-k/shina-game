@@ -9,7 +9,9 @@ export class CarTrafficController {
     this.isWaitingAtTrafficLight = false;
     this.waitingAtPosition = null;
     this.lastCheckedIntersection = null;
-    this.intersectionThreshold = 50; // увеличили расстояние до перекрестка для остановки
+    this.intersectionThreshold = 50; // расстояние до перекрестка для остановки
+    // ИЗМЕНЕНО: Уменьшено расстояние для более реалистичной остановки.
+    this.minStopDistance = 35; // минимальное расстояние остановки от перекрестка.
   }
 
   /**
@@ -26,26 +28,33 @@ export class CarTrafficController {
     const dy = targetIntersection.y - carPosition.y;
     const direction = getDirectionForSegment(dx, dy);
 
-    const intersectionKey = `${targetIntersection.x},${targetIntersection.y}`;
-    const trafficLight = intersectionMap.get(intersectionKey);
-
-    console.log(`🚦 intersectionMap size: ${intersectionMap.size}, keys:`, Array.from(intersectionMap.keys()));
-    console.log(`🚦 Looking for intersection: ${intersectionKey}, found:`, trafficLight ? 'YES' : 'NO');
+    // Округляем координаты для точного совпадения с ключами светофоров
+    const roundedX = Math.round(targetIntersection.x);
+    const roundedY = Math.round(targetIntersection.y);
+    const intersectionKey = `${roundedX},${roundedY}`;
+    
+    // Ищем светофор
+    let trafficLight = intersectionMap.get(intersectionKey);
+    
+    // Если не нашли, попробуем найти с небольшим допуском
+    if (!trafficLight) {
+      const tolerance = 1;
+      for (const [key, light] of intersectionMap) {
+        const [keyX, keyY] = key.split(',').map(Number);
+        if (Math.abs(keyX - roundedX) <= tolerance && Math.abs(keyY - roundedY) <= tolerance) {
+          trafficLight = light;
+          break;
+        }
+      }
+    }
 
     if (!trafficLight) {
       // Нет светофора на этом перекрестке - можем ехать
-      console.log(`🚦 Нет светофора на перекрестке ${intersectionKey} - можем ехать`);
       this.clearWaitingState();
       return { canMove: true, shouldStop: false };
     }
 
     const isPassAllowed = trafficLight.isPassAllowed(direction);
-    const distanceToIntersection = Math.hypot(
-      carPosition.x - targetIntersection.x,
-      carPosition.y - targetIntersection.y
-    );
-
-    console.log(`🚦 Traffic check: distance=${distanceToIntersection.toFixed(1)}, direction=${direction}, allowed=${isPassAllowed}, intersection=${intersectionKey}, phase=${trafficLight.phase || 'unknown'}`);
 
     // Если уже ждем на этом перекрестке
     if (this.isWaitingAtTrafficLight && this.lastCheckedIntersection === intersectionKey) {
@@ -59,7 +68,7 @@ export class CarTrafficController {
       }
     }
 
-    // Если не ждем и приближаемся к красному свету
+    // Если не ждем и красный свет
     if (!isPassAllowed && !this.isWaitingAtTrafficLight) {
       // Красный свет - начинаем ждать
       const stopPosition = this.calculateStopPosition(carPosition, targetIntersection, direction);
@@ -73,7 +82,7 @@ export class CarTrafficController {
       };
     }
 
-    // По умолчанию можем ехать (зеленый свет или не ждем)
+    // Зеленый свет - можем ехать
     return { canMove: true, shouldStop: false };
   }
 
@@ -101,7 +110,10 @@ export class CarTrafficController {
         
         if (isAhead) {
           const distance = Math.abs(roadX - carPosition.x);
-          candidateIntersections.push({ x: roadX, y: currentRoadY, distance });
+          // Округляем координаты для точного совпадения с ключами светофоров
+          const roundedX = Math.round(roadX);
+          const roundedY = Math.round(currentRoadY);
+          candidateIntersections.push({ x: roundedX, y: roundedY, distance });
         }
       }
     } else {
@@ -113,13 +125,18 @@ export class CarTrafficController {
         
         if (isAhead) {
           const distance = Math.abs(roadY - carPosition.y);
-          candidateIntersections.push({ x: currentRoadX, y: roadY, distance });
+          // Округляем координаты для точного совпадения с ключами светофоров
+          const roundedX = Math.round(currentRoadX);
+          const roundedY = Math.round(roadY);
+          candidateIntersections.push({ x: roundedX, y: roundedY, distance });
         }
       }
     }
 
     // Возвращаем ближайший перекресток
-    if (candidateIntersections.length === 0) return null;
+    if (candidateIntersections.length === 0) {
+      return null;
+    }
     
     candidateIntersections.sort((a, b) => a.distance - b.distance);
     return candidateIntersections[0];
@@ -129,6 +146,8 @@ export class CarTrafficController {
    * Находит ближайшую горизонтальную дорогу (Y координата)
    */
   findNearestRoadY(y, horizontalRoadYs) {
+    if (horizontalRoadYs.length === 0) return y;
+    
     let nearestY = horizontalRoadYs[0];
     let minDistance = Math.abs(y - nearestY);
     
@@ -140,6 +159,12 @@ export class CarTrafficController {
       }
     }
     
+    // ИСПРАВЛЕНИЕ: Если машина слишком далеко от любой дороги, возвращаем исходную координату
+    if (minDistance > 100) {
+      console.log(`🔍 findNearestRoadY: Машина слишком далеко от дорог (distance=${minDistance.toFixed(1)}), используем исходную Y=${y}`);
+      return y;
+    }
+    
     return nearestY;
   }
 
@@ -147,6 +172,8 @@ export class CarTrafficController {
    * Находит ближайшую вертикальную дорогу (X координата)
    */
   findNearestRoadX(x, verticalRoadXs) {
+    if (verticalRoadXs.length === 0) return x;
+    
     let nearestX = verticalRoadXs[0];
     let minDistance = Math.abs(x - nearestX);
     
@@ -158,37 +185,66 @@ export class CarTrafficController {
       }
     }
     
+    // ИСПРАВЛЕНИЕ: Если машина слишком далеко от любой дороги, возвращаем исходную координату
+    if (minDistance > 100) {
+      console.log(`🔍 findNearestRoadX: Машина слишком далеко от дорог (distance=${minDistance.toFixed(1)}), используем исходную X=${x}`);
+      return x;
+    }
+    
     return nearestX;
   }
 
   /**
-   * Рассчитывает позицию остановки перед перекрестком
+   * ИСПРАВЛЕНО: Рассчитывает позицию остановки перед перекрестком.
+   * Логика упрощена для большей ясности и надежности.
    */
   calculateStopPosition(carPosition, intersection, direction) {
-    const stopDistance = 35; // расстояние до линии остановки
-    const carLength = 120; // длина машины
+    const stopDistance = this.minStopDistance; // Используем уменьшенное значение
+    const carLength = 120; // Длина машины
+
+    // carPosition - это позиция ПЕРЕДНЕЙ части машины.
+    // Функция должна вернуть позицию ЦЕНТРА машины.
     
+    let stopLineX = intersection.x;
+    let stopLineY = intersection.y;
+
+    // Определяем положение стоп-линии в зависимости от направления движения.
+    if (direction === Direction.EW) {
+        // Движение по горизонтали
+        if (carPosition.x < intersection.x) {
+            // Подъезжаем с запада (слева), стоп-линия слева от перекрестка
+            stopLineX = intersection.x - stopDistance;
+        } else {
+            // Подъезжаем с востока (справа), стоп-линия справа от перекрестка
+            stopLineX = intersection.x + stopDistance;
+        }
+    } else { // Direction.NS
+        // Движение по вертикали
+        if (carPosition.y < intersection.y) {
+            // Подъезжаем с севера (сверху), стоп-линия сверху от перекрестка
+            stopLineY = intersection.y - stopDistance;
+        } else {
+            // Подъезжаем с юга (снизу), стоп-линия снизу от перекрестка
+            stopLineY = intersection.y + stopDistance;
+        }
+    }
+
+    // `stopLineX`, `stopLineY` - это целевая позиция для ПЕРЕДНЕЙ части машины.
+    // Теперь вычислим позицию ЦЕНТРА машины.
+    // Вектор ориентации машины (от центра к переду) примерно равен вектору от машины к перекрестку.
     const dx = intersection.x - carPosition.x;
     const dy = intersection.y - carPosition.y;
     const distance = Math.hypot(dx, dy);
     
-    // Учитываем, что carPosition теперь указывает на переднюю часть машины
-    // Нужно остановиться так, чтобы передняя часть была на расстоянии stopDistance от перекрестка
-    const totalStopDistance = stopDistance;
-    
-    if (distance <= totalStopDistance) {
-      // Уже очень близко к перекрестку
-      return { x: carPosition.x, y: carPosition.y };
-    }
-    
-    // Позиция остановки на расстоянии totalStopDistance от перекрестка
-    const normalizedDx = dx / distance;
-    const normalizedDy = dy / distance;
-    
-    return {
-      x: intersection.x - normalizedDx * totalStopDistance,
-      y: intersection.y - normalizedDy * totalStopDistance
-    };
+    // Нормализованный вектор направления (ориентация машины)
+    const normDx = distance > 0 ? dx / distance : 0;
+    const normDy = distance > 0 ? dy / distance : 0;
+
+    // Центр машины находится на полкорпуса позади ее передней части.
+    const centerX = stopLineX - normDx * (carLength / 2);
+    const centerY = stopLineY - normDy * (carLength / 2);
+
+    return { x: centerX, y: centerY };
   }
 
   /**

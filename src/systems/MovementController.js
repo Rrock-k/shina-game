@@ -139,9 +139,9 @@ export class MovementController {
       return;
     }
 
-    // 🚦 ПРОВЕРКА СВЕТОФОРА ПЕРЕД ПРИБЛИЖЕНИЕМ К ПЕРЕКРЕСТКУ 🚦
+    // 🚦 ПРОВЕРКА СВЕТОФОРА НА ГРАНИЦЕ С ПЕРЕКРЕСТКОМ 🚦
     if (carTrafficController && getVerticalRoadXs && getHorizontalRoadYs) {
-      const canMove = this._checkTrafficLights(p1, p2, {
+      const canMove = this._checkTrafficLightsAtIntersection(p1, p2, {
         carTrafficController,
         intersectionKeyToTL,
         getVerticalRoadXs,
@@ -150,9 +150,12 @@ export class MovementController {
       });
 
       if (!canMove) {
+        // Останавливаем машину в правильной позиции
+        this._stopAtTrafficLight();
         return; // не обновляем progress - машина стоит
       }
     }
+
 
     // Обновляем прогресс по текущему сегменту
     this.car.progress += speed;
@@ -240,14 +243,14 @@ export class MovementController {
   }
 
   /**
-   * Проверка светофоров перед перекрестком
+   * Проверка светофоров на границе с перекрестком
    * @param {Object} p1 - начальная точка сегмента
    * @param {Object} p2 - конечная точка сегмента
    * @param {Object} options - опции для проверки
    * @returns {boolean} можно ли двигаться
    * @private
    */
-  _checkTrafficLights(p1, p2, options) {
+  _checkTrafficLightsAtIntersection(p1, p2, options) {
     const {
       carTrafficController,
       intersectionKeyToTL,
@@ -264,7 +267,8 @@ export class MovementController {
       x: this.car.position.x + offsetX,
       y: this.car.position.y + offsetY
     };
-    // Находим реальный перекресток впереди по направлению движения
+
+    // Находим перекресток впереди по направлению движения
     const targetIntersection = carTrafficController.findNextIntersection(
       currentPos,
       { x: p2.x, y: p2.y },
@@ -276,42 +280,90 @@ export class MovementController {
     if (!targetIntersection) {
       return true;
     }
-    
+
+    // Проверяем, находимся ли мы достаточно близко к перекрестку для проверки
+    const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
+    const speed = this.config.BASE_CAR_SPEED * this.car.pauseManager.getSpeedMultiplier();
+    const intersectionThreshold = Math.max(80, speed * 0.2); // более разумная зона проверки
+
+    if (distanceToIntersection > intersectionThreshold) {
+      return true; // Еще далеко от перекрестка
+    }
+
+    // Мы на границе с перекрестком - проверяем светофор
     const roadPositions = { 
       verticalRoadXs: getVerticalRoadXs(), 
       horizontalRoadYs: getHorizontalRoadYs() 
     };
 
-    const distanceToIntersection = Math.hypot(currentPos.x - targetIntersection.x, currentPos.y - targetIntersection.y);
+    const trafficCheck = carTrafficController.checkTrafficLights(
+      currentPos,
+      targetIntersection,
+      intersectionKeyToTL,
+      roadPositions
+    );
 
-    // ОТЛАДКА: показываем информацию о движении (только первые секунды)
-    if (this.car.currentSegment === 0 && this.car.progress < 20) {
-      console.log(`🚗 DEBUG: segment=${this.car.currentSegment}, progress=${this.car.progress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${this.car.position.x.toFixed(0)},${this.car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
-    }
-    
-    // ОТЛАДКА: показываем информацию о перекрестке
-    if (targetIntersection) {
-      console.log(`🚦 Найден перекресток: (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
-    }
-
-    // 1. Находимся в зоне проверки (50-100 пикселей до перекрестка)
-    // 2. И НЕ стоим прямо на перекрестке старта 
-    if (distanceToIntersection <= 100 && distanceToIntersection > 20) { // зона проверки светофора
-      const trafficCheck = carTrafficController.checkTrafficLights(
-        currentPos,
-        targetIntersection,
-        intersectionKeyToTL,
-        roadPositions
-      );
-
-      if (!trafficCheck.canMove) {
-        // Красный свет - останавливаемся
-        debugLogAlways(`🚦 Остановка перед красным светом на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
-        return false; // не обновляем progress - машина стоит
-      }
+    if (!trafficCheck.canMove) {
+      // Красный свет - останавливаемся
+      debugLogAlways(`🚦 Остановка на красный свет на перекрестке (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
+      return false;
     }
 
     return true;
+  }
+
+  /**
+   * Находит перекресток в конкретной точке
+   * @param {Object} point - точка для проверки {x, y}
+   * @param {Array} verticalRoadXs - массив X координат вертикальных дорог
+   * @param {Array} horizontalRoadYs - массив Y координат горизонтальных дорог
+   * @returns {Object|null} перекресток или null
+   * @private
+   */
+  _findIntersectionAtPoint(point, verticalRoadXs, horizontalRoadYs) {
+    const tolerance = 5; // допуск в пикселях
+    
+    // Проверяем, есть ли перекресток в этой точке
+    for (const roadX of verticalRoadXs) {
+      for (const roadY of horizontalRoadYs) {
+        if (Math.abs(point.x - roadX) <= tolerance && Math.abs(point.y - roadY) <= tolerance) {
+          return { x: Math.round(roadX), y: Math.round(roadY) };
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Останавливает машину в правильной позиции перед светофором
+   * @private
+   */
+  _stopAtTrafficLight() {
+    // Получаем информацию о светофоре от CarTrafficController
+    const carTrafficController = this.car.carTrafficController;
+    if (carTrafficController && carTrafficController.isWaiting()) {
+      const stopPosition = carTrafficController.getWaitingPosition();
+      if (stopPosition) {
+        // stopPosition - это позиция, где должна быть передняя часть машины
+        // Нужно рассчитать позицию центра машины
+        const carLength = 120;
+        const offsetX = -carLength / 2 * Math.cos(this.car.rotation);
+        const offsetY = -carLength / 2 * Math.sin(this.car.rotation);
+        
+        // Устанавливаем позицию центра машины (передняя часть - половина длины назад)
+        this.car.position = {
+          x: stopPosition.x + offsetX,
+          y: stopPosition.y + offsetY
+        };
+        
+        // Обновляем визуальное представление
+        if (this.car.sprite) {
+          this.car.sprite.position.set(this.car.position.x, this.car.position.y);
+          this.car.sprite.rotation = this.car.rotation;
+        }
+      }
+    }
   }
 
   /**
