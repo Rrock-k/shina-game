@@ -39,10 +39,10 @@ export class CarTrafficController {
     // Если не нашли, попробуем найти с небольшим допуском
     if (!trafficLight) {
       const tolerance = 1;
-      for (const [key, light] of intersectionMap) {
+      for (const [key, lightData] of intersectionMap) {
         const [keyX, keyY] = key.split(',').map(Number);
         if (Math.abs(keyX - roundedX) <= tolerance && Math.abs(keyY - roundedY) <= tolerance) {
-          trafficLight = light;
+          trafficLight = lightData;
           break;
         }
       }
@@ -54,7 +54,9 @@ export class CarTrafficController {
       return { canMove: true, shouldStop: false };
     }
 
-    const isPassAllowed = trafficLight.isPassAllowed(direction);
+    // Извлекаем объект логики из новой структуры {logic, renderer}
+    const trafficLightLogic = trafficLight.logic || trafficLight;
+    const isPassAllowed = trafficLightLogic.isPassAllowed(direction);
 
     // Если уже ждем на этом перекрестке
     if (this.isWaitingAtTrafficLight && this.lastCheckedIntersection === intersectionKey) {

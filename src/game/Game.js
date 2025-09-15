@@ -13,7 +13,8 @@ import { Shina } from '../entities/Shina.js';
 import { CarTrafficController } from '../systems/carTrafficControl.js';
 import { PathBuilder } from '../systems/PathBuilder.js';
 import { CONFIG } from '../config/gameConfig.js';
-import { initTrafficLightsForIntersection, TrafficLightCoordinator } from '../systems/trafficLights.js';
+import { TrafficLight, TrafficLightCoordinator } from '../systems/trafficLights.js';
+import { TrafficLightRenderer } from '../rendering/TrafficLightRenderer.js';
 
 /**
  * Главный класс игры - централизует управление игровым состоянием и циклом
@@ -368,14 +369,19 @@ class Game {
             }
         }
 
-        // Обновляем светофоры (пустой цикл из main.js)
+        // Обновляем светофоры
         const intersectionKeyToTL = this.dependencies.get('intersectionKeyToTL');
         if (intersectionKeyToTL) {
-            intersectionKeyToTL.forEach((trafficLight, key) => {
-                // Пустой цикл - светофоры обновляются автоматически через app.ticker
-                // Но проверим, что светофоры работают
-                if (trafficLight && typeof trafficLight.isPassAllowed === 'function') {
-                    // Светофор работает правильно
+            // Преобразуем delta (тики PIXI) в миллисекунды
+            const deltaMs = delta * (1000 / 60); // 60 FPS = 1000ms/60 = 16.67ms per frame
+            
+            intersectionKeyToTL.forEach((trafficLightData, key) => {
+                if (trafficLightData && trafficLightData.logic && trafficLightData.renderer) {
+                    // Обновляем логику светофора
+                    trafficLightData.logic.update(deltaMs);
+                    
+                    // Обновляем визуальное представление
+                    trafficLightData.renderer.updateVisuals(trafficLightData.logic.getState());
                 }
             });
         }
@@ -896,7 +902,19 @@ class Game {
                 };
 
                 const CONFIG = this.dependencies.get('config');
-                const tl = initTrafficLightsForIntersection({
+                
+                // Создаем объект логики светофора (без PIXI-зависимостей)
+                const trafficLight = new TrafficLight({
+                    x,
+                    y,
+                    roadWidth: CONFIG.ROAD_WIDTH,
+                    cycle: { green: 750, yellow: 200 },
+                    roadConnections,
+                    pauseManager: this.pauseManager
+                });
+                
+                // Создаем рендерер светофора (только PIXI-код)
+                const trafficLightRenderer = new TrafficLightRenderer({
                     PIXI,
                     app: this.app,
                     layer,
@@ -904,17 +922,16 @@ class Game {
                     y,
                     roadWidth: CONFIG.ROAD_WIDTH,
                     lampRadius: 9,
-                    cycle: { green: 750, yellow: 200 },
-                    roadConnections,
-                    pauseManager: this.pauseManager
+                    roadConnections
                 });
+                
                 const key = `${x},${y}`;
-                intersectionKeyToTL.set(key, tl);
+                intersectionKeyToTL.set(key, { logic: trafficLight, renderer: trafficLightRenderer });
 
                 // Регистрируем светофор в координаторе зеленой волны
                 const trafficCoordinator = this.dependencies.get('trafficCoordinator');
                 if (trafficCoordinator) {
-                    trafficCoordinator.addTrafficLight(key, tl, x, y);
+                    trafficCoordinator.addTrafficLight(key, trafficLight, x, y);
                 } else {
                     console.warn('🚦 trafficCoordinator не найден при добавлении светофора');
                 }
