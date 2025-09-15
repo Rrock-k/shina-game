@@ -18,13 +18,7 @@ import { randInt } from './utils/math.js';
 // Главный класс игры
 import Game from './game/Game.js';
 
-// globals
-let world, gridLayer, roadsLayer, lotsLayer, zonesLayer, labelsLayer, intersectionsLayer, decorLayer, trafficLightsLayer, borderLayer, uiLayer, lightingLayer, car;
-let carPath = [], carSegment = 0, carProgress = 0;
-let avatar;
-let carTrafficController;
-let pathBuilder;
-let buildingAvatars = new Map(); // карта зданий -> маленькие аватарки
+// globals - УДАЛЕНЫ: теперь используются свойства game
 
 // Менеджеры
 let carRenderer;
@@ -59,38 +53,6 @@ function debugLogAlways (message, data = null) {
 let lastStayTimerUpdate = 0;
 let lastStayTimerDay = 0;
 
-function updateStayTimer() {
-  if (carEntity && carEntity.isAtDestination()) {
-    const gameTime = game.timeManager.getGameTime();
-    const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
-    const currentDay = gameTime.day; // день месяца
-    
-    // Обновляем таймер только при изменении времени
-    if (currentTime !== lastStayTimerUpdate || currentDay !== lastStayTimerDay) {
-      let timeDiff;
-      
-      // Если день изменился, это переход через полночь
-      if (currentDay !== lastStayTimerDay) {
-        // Время с последнего обновления до полуночи + время с полуночи до текущего момента
-        timeDiff = (24 * 60 - lastStayTimerUpdate) + currentTime;
-        console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
-      } else {
-        timeDiff = currentTime - lastStayTimerUpdate;
-      }
-      
-      const newStayTimer = carEntity.getStayTimer() - timeDiff / 60; // переводим в игровые часы
-      carEntity.setStayTimer(newStayTimer);
-      lastStayTimerUpdate = currentTime;
-      lastStayTimerDay = currentDay;
-      
-      if (newStayTimer <= 0) {
-        // Время пребывания закончилось, едем к следующему пункту
-        console.log('🚗 Время пребывания закончилось, продолжаем движение');
-        nextDestination();
-      }
-    }
-  }
-}
 
 // Инициализация новых сущностей
 function initEntities() {
@@ -103,7 +65,7 @@ function initEntities() {
     savedState: savedCarState,
     onArrival: (destination) => {
       console.log(`🚗 Машина прибыла в ${destination.name}`);
-      checkArrival();
+      game.checkArrival();
     },
     onStateChange: (event, data) => {
       console.log(`🚗 Машина: ${event}`, data);
@@ -139,14 +101,14 @@ function updateEntities(delta) {
   // Обновляем машину
   if (carEntity) {
     carEntity.update(delta, {
-      checkArrival: checkArrival,
+      checkArrival: () => game.checkArrival(),
       debugLog: debugLog,
       debugLogAlways: debugLogAlways,
-      carTrafficController: carTrafficController,
+      carTrafficController: window.carTrafficController,
       intersectionKeyToTL: intersectionKeyToTL,
       getVerticalRoadXs: getVerticalRoadXs,
       getHorizontalRoadYs: getHorizontalRoadYs,
-      buildCarPath: () => pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways),
+      buildCarPath: () => window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways),
       updateLightBeams: undefined,
       debugInfo: debugInfo
     });
@@ -258,19 +220,19 @@ function shouldHaveTrafficLight (i, j) {
 
 
 function setupWorld () {
-  // Получаем слои из экземпляра игры
-  world = game.world;
-  gridLayer = game.gridLayer;
-  roadsLayer = game.roadsLayer;
-  lotsLayer = game.lotsLayer;
-  zonesLayer = game.zonesLayer;
-  labelsLayer = game.labelsLayer;
-  intersectionsLayer = game.intersectionsLayer;
-  decorLayer = game.decorLayer;
-  trafficLightsLayer = game.trafficLightsLayer;
-  borderLayer = game.borderLayer;
-  lightingLayer = game.lightingLayer;
-  uiLayer = game.uiLayer;
+  // Получаем слои из экземпляра игры - теперь используем напрямую через game
+  const world = game.world;
+  const gridLayer = game.gridLayer;
+  const roadsLayer = game.roadsLayer;
+  const lotsLayer = game.lotsLayer;
+  const zonesLayer = game.zonesLayer;
+  const labelsLayer = game.labelsLayer;
+  const intersectionsLayer = game.intersectionsLayer;
+  const decorLayer = game.decorLayer;
+  const trafficLightsLayer = game.trafficLightsLayer;
+  const borderLayer = game.borderLayer;
+  const lightingLayer = game.lightingLayer;
+  const uiLayer = game.uiLayer;
 
   // Инициализируем WorldRenderer с слоями
   worldRenderer.init(world, {
@@ -297,7 +259,7 @@ function setupWorld () {
   // Используем WorldRenderer для отрисовки базовых элементов
   worldRenderer.render(zoneGeometry);
   // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
-  createTrafficLightsForAllIntersections(trafficLightsLayer);
+  createTrafficLightsForAllIntersections(game.trafficLightsLayer);
 
   // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
   // Оверлей будет создан позже в updateNightMode
@@ -386,7 +348,7 @@ function setupWorld () {
 
 
   panningController = new PanningController();
-  panningController.setWorld(world);
+  panningController.setWorld(game.world);
   panningController.setOnZoomChange((scale) => {
     if (uiRenderer) {
       uiRenderer.updateZoomButton();
@@ -404,7 +366,7 @@ function setupWorld () {
   setTimeout(() => {
     // перестроим путь, когда геометрия зон уже известна
     if (carEntity) {
-      const newPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
+      const newPath = window.pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
       carEntity.setPath(newPath);
     }
   }, 0);
@@ -478,15 +440,15 @@ function layout () {
   const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
 
   if (!panningController || panningController.getCurrentScale() === 1) {
-    world.scale.set(scale);
-    world.pivot.set(0, 0);
-    world.position.set(
+    game.world.scale.set(scale);
+    game.world.pivot.set(0, 0);
+    game.world.position.set(
       (w - CONFIG.WORLD_WIDTH * scale) / 2,
       (h - CONFIG.WORLD_HEIGHT * scale) / 2
     );
   }
 
-  labelsLayer.children.forEach(label => {
+  game.labelsLayer.children.forEach(label => {
     label.scale.set(1 / scale);
   });
 
@@ -519,16 +481,16 @@ function getDestinationCenter (locationKey) {
 function createCar () {
   carRenderer = new CarRenderer(CONFIG, pauseManager);
   
-  car = carRenderer.createCar({
+  const car = carRenderer.createCar({
     carPath: [],
     currentRouteIndex: currentRouteIndex,
     savedCarState: savedCarState,
     getDestinationCenter: getDestinationCenter
   });
   
-  avatar = carRenderer.getAvatar();
+  const avatar = carRenderer.getAvatar();
   
-  carTrafficController = new CarTrafficController();
+  const carTrafficController = new CarTrafficController();
 
   const verticalRoadXs = getVerticalRoadXs();
   const horizontalRoadYs = getHorizontalRoadYs();
@@ -538,7 +500,7 @@ function createCar () {
     verticalRoadXs: verticalRoadXs.slice(0, 5), // первые 5 для примера
     horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
   });
-  pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
+  const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
   
   // Делаем дополнительные переменные глобально доступными для Game.js (временно)
   window.carTrafficController = carTrafficController;
@@ -558,7 +520,7 @@ function createCar () {
 
   // Не начинаем поездку сразу - она начнется при выходе из здания
 
-  carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
+  const carPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
   
   // Если carEntity уже создан, обновляем его путь
   if (carEntity) {
@@ -571,207 +533,16 @@ function createCar () {
   lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
   lastStayTimerDay = gameTime.day;
 
-  decorLayer.addChild(car);
+  game.decorLayer.addChild(car);
 
   uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
 }
 
 
-// Переход к следующему пункту маршрута
-function nextDestination () {
-  debugLogAlways(`🔄 Переход к следующему пункту назначения`);
 
-  // Завершаем пребывание в текущем месте
-  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-  if (journalManager && currentDest) {
-    journalManager.endLocationStay(currentDest.name);
-  }
 
-  // Скрываем аватарку в текущем здании
-  hideBuildingAvatar();
 
-  currentRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
-  
-  // Обновляем индекс маршрута в UIRenderer
-  if (uiRenderer) {
-    uiRenderer.setCurrentRouteIndex(currentRouteIndex);
-  }
-  
-  // Синхронизируем с carEntity
-  if (carEntity) {
-    carEntity.setCurrentRouteIndex(currentRouteIndex);
-    carEntity.setAtDestination(false);
-    carEntity.setStayTimer(0);
-    
-    // Обновляем путь к новому пункту назначения
-    const newPath = pathBuilder.buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways);
-    carEntity.setPath(newPath);
-  }
 
-  // Начинаем новую дорогу в журнале при выходе из здания
-  const newDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-  if (journalManager && newDest) {
-    journalManager.startTrip(newDest.name, newDest.location);
-  }
-
-  uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
-}
-
-// Сохраняем состояние машины для плавного продолжения движения к следующему пункту
-function saveCarStateForNextDestination () {
-  // Определяем следующий пункт назначения
-  const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
-  const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
-
-  if (!nextDestination) return null;
-
-  const nextDestCenter = getDestinationCenter(nextDestination.location);
-
-  // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
-  const currentPos = carRenderer ? carRenderer.getCar().position : { x: 0, y: 0 };
-  const currentIJ = pathBuilder.getNearestIntersectionIJ(currentPos.x, currentPos.y);
-  const nextPath = pathBuilder.buildPathToBuilding(currentIJ, nextDestCenter);
-
-  // Находим первый перекресток в пути (не точку остановки у здания)
-  let nextIntersection = null;
-  if (nextPath.length >= 2) {
-    // Берем предпоследнюю точку (последняя - это остановка у здания)
-    nextIntersection = nextPath[nextPath.length - 2];
-  } else if (nextPath.length === 1) {
-    // Если путь состоит только из одной точки, используем ее
-    nextIntersection = nextPath[0];
-  }
-
-  // Если не нашли перекресток, используем направление к центру назначения как fallback
-  let direction;
-  if (nextIntersection) {
-    const dx = nextIntersection.x - currentPos.x;
-    const dy = nextIntersection.y - currentPos.y;
-    direction = Math.atan2(dy, dx);
-    debugLogAlways(`🎯 Следующий перекресток: (${nextIntersection.x}, ${nextIntersection.y}), направление: ${direction.toFixed(3)} радиан (${(direction * 180 / Math.PI).toFixed(1)}°)`);
-  } else {
-    const dx = nextDestCenter.x - currentPos.x;
-    const dy = nextDestCenter.y - currentPos.y;
-    direction = Math.atan2(dy, dx);
-    debugLogAlways(`🎯 Fallback к центру назначения: (${nextDestCenter.x}, ${nextDestCenter.y}), направление: ${direction.toFixed(3)} радиан (${(direction * 180 / Math.PI).toFixed(1)}°)`);
-  }
-
-  return {
-    nextDestination: nextDestination,
-    nextDestCenter: nextDestCenter,
-    nextIntersection: nextIntersection,
-    direction: direction,
-    currentPosition: { x: car.position.x, y: car.position.y }
-  };
-}
-
-// Фиксируем прибытие: вызывается только при достижении последней точки пути (обочины)
-function checkArrival () {
-  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-  if (carEntity && !carEntity.isAtDestination()) {
-    debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
-
-    // Завершаем дорогу в журнале при входе в здание
-    if (journalManager && currentDest) {
-      journalManager.endTrip(currentDest.name);
-      journalManager.setLocationStartTime(currentDest.name);
-    }
-
-    // Сохраняем состояние машины для плавного продолжения движения
-    savedCarState = saveCarStateForNextDestination();
-    debugLogAlways(`💾 Сохранено состояние машины:`, savedCarState);
-
-    // Синхронизируем с carEntity
-    if (carEntity) {
-      carEntity.setAtDestination(true);
-      carEntity.setStayTimer(currentDest.stayHours);
-    }
-    
-    const gameTime = game.timeManager.getGameTime();
-    lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
-    lastStayTimerDay = gameTime.day; // инициализируем день
-    uiRenderer.updateRouteDisplay(carEntity ? carEntity.isAtDestination() : false);
-    // Показываем маленькую аватарку в здании
-    showBuildingAvatar(currentDest.location);
-  }
-}
-
-// Показать маленькую аватарку в здании
-function showBuildingAvatar (locationKey) {
-  const buildingCenter = getDestinationCenter(locationKey);
-  if (!buildingCenter) return;
-
-  // Скрываем аватарку из машинки
-  if (carRenderer) {
-    carRenderer.setAvatarVisible(false);
-  }
-
-  const avatarContainer = new PIXI.Container();
-
-  // Квадратный фон (исходный размер без скругления)
-  const background = new PIXI.Graphics();
-  background.beginFill(0xffffff, 0.9);
-  background.lineStyle(2, 0x333333);
-  background.drawRect(-30, -30, 60, 60);
-  background.endFill();
-  avatarContainer.addChild(background);
-
-  // Аватарка Шины (исходный размер без скругления)
-  const buildingAvatar = PIXI.Sprite.from('/public/shina.jpeg');
-  buildingAvatar.anchor.set(0.5);
-  buildingAvatar.width = 60;
-  buildingAvatar.height = 60;
-  avatarContainer.addChild(buildingAvatar);
-
-  // Позиционируем в правом нижнем углу здания
-  const zone = zoneGeometry.get(locationKey);
-  if (zone && zone.bounds) {
-    if (zone.type === 'circle') {
-      // Для круглых зон (институт) - позиционируем справа от центра
-      avatarContainer.position.set(
-        zone.bounds.x + zone.bounds.r - 30,
-        zone.bounds.y + zone.bounds.r - 30
-      );
-    } else {
-      // Для прямоугольных зон
-      avatarContainer.position.set(
-        zone.bounds.x + zone.bounds.w - 30,
-        zone.bounds.y + zone.bounds.h - 30
-      );
-    }
-  } else {
-    // Fallback: используем центр здания
-    avatarContainer.position.set(
-      buildingCenter.x + 150,
-      buildingCenter.y + 150
-    );
-  }
-
-  decorLayer.addChild(avatarContainer);
-  buildingAvatars.set(locationKey, avatarContainer);
-
-  console.log(`🏠 Показана аватарка в здании ${locationKey}`, {
-    zone: zone,
-    buildingCenter: buildingCenter,
-    position: avatarContainer.position
-  });
-}
-
-// Скрыть аватарку в здании
-function hideBuildingAvatar () {
-  const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-  const avatarContainer = buildingAvatars.get(currentDest.location);
-  if (avatarContainer && avatarContainer.parent) {
-    avatarContainer.parent.removeChild(avatarContainer);
-    buildingAvatars.delete(currentDest.location);
-    console.log(`🏠 Скрыта аватарка в здании ${currentDest.location}`);
-  }
-
-  // Показываем аватарку обратно в машинке
-  if (carRenderer) {
-    carRenderer.setAvatarVisible(true);
-  }
-}
 
 function updateCar (delta) {
   // Обновляем новые сущности
@@ -782,11 +553,11 @@ function updateCar (delta) {
     // Обновляем визуальное представление
     carRenderer.updateVisuals(carEntity);
     
-    // Синхронизируем глобальные переменные с carEntity
-    carPath = carEntity.getPath();
-    carSegment = carEntity.getCurrentSegment();
-    carProgress = carEntity.getProgress();
-    stayTimer = carEntity.getStayTimer();
+    // Синхронизируем локальные переменные с carEntity (глобальные переменные удалены)
+    const carPath = carEntity.getPath();
+    const carSegment = carEntity.getCurrentSegment();
+    const carProgress = carEntity.getProgress();
+    const stayTimer = carEntity.getStayTimer();
   }
   
   // Обновляем UI
