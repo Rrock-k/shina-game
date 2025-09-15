@@ -65,11 +65,11 @@ export function getDirectionForSegment (dx, dy) {
 }
 
 export function initTrafficLightsForIntersection ({ PIXI, app, layer, x, y, roadWidth = 48, lampRadius = 8, cycle = { green: 667, yellow: 200 }, roadConnections = { north: true, south: true, east: true, west: true }, pauseManager }) {
-  const tl = new IntersectionTrafficLight({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections, pauseManager });
+  const tl = new TrafficLight({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections, pauseManager });
   return tl;
 }
 
-class IntersectionTrafficLight {
+class TrafficLight {
   constructor ({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections, pauseManager }) {
     this.PIXI = PIXI;
     this.app = app;
