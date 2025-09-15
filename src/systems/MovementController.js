@@ -211,6 +211,13 @@ export class MovementController {
     this._updateRotation(dx, dy, updateLightBeams, debugLogAlways);
 
     this._updatePosition(newX, newY);
+    
+    // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Гарантируем вызов checkArrival даже при "проскакивании"
+    // Проверяем, достигли ли мы конца пути, но не вызвали checkArrival
+    if (this.car.currentSegment >= this.car.path.length - 1 && checkArrival) {
+      debugLogAlways('🚗 ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: Достигли конца пути, вызываем checkArrival');
+      checkArrival();
+    }
   }
 
   /**
