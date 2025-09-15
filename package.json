@@ -6,7 +6,7 @@
   "scripts": {
     "start": "python3 -m http.server 8000",
     "dev": "python3 -m http.server 8000",
-    "collect-full": "node scripts/collect/collect-files.cjs",
+    "collect": "node scripts/collect/collect-files.cjs",
     "manage": "node scripts/collect/manage.cjs"
   },
   "devDependencies": {
