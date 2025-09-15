@@ -15,11 +15,11 @@
   - **Файлы**: `src/config/gameConfig.js` ✅
   - **Проверка**: ✅ Все новые параметры доступны через `CONFIG.BALANCING`
 
-- **0.1.2** Добавить секцию `TASK_PRIORITIES` с приоритетами задач
-  - Добавить `SLEEP: 100`, `WORK: 90`, `CONSTRUCTION_VISIT: 80`
+- **0.1.2** Добавить секцию `TASK_PRIORITIES` с приоритетами задач ✅ (ВЫПОЛНЕНО)
+  - Добавить `SLEEP: 100`, `WORK: 90`, `WORK_WITH_STUDENTS: 85`, `CONSTRUCTION_VISIT: 80`
   - Добавить `RELATIVES_VISIT: 70`, `BARBER: 50`, `SHOPPING: 40`
   - Добавить `PARK_WALK: 30`, `DOMESTIC_TASK: 20`, `FRIENDS_MEETING: 0`
-  - **Файлы**: `src/config/gameConfig.js`
+  - **Файлы**: `src/config/gameConfig.js` ✅
   - **Проверка**: ✅ Приоритеты доступны через `CONFIG.TASK_PRIORITIES`
 
 - **0.1.3** Добавить новые цвета для локаций
