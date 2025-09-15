@@ -54,6 +54,7 @@ class Game {
         this.uiLayer = new PIXI.Container();
         
         // Делаем world и слои глобально доступными для dayNightManager
+        // (временно, до полного рефакторинга dayNightManager)
         window.world = this.world;
         window.decorLayer = this.decorLayer;
         window.trafficLightsLayer = this.trafficLightsLayer;
@@ -94,6 +95,7 @@ class Game {
         };
         
         // Делаем carEntity глобально доступным для UI (временно, до полного рефакторинга)
+        // TODO: убрать после рефакторинга UI
         window.carEntity = this.carEntity;
         
         // Инициализируем carEntity (базовая инициализация, полная будет в main.js)
@@ -160,6 +162,7 @@ class Game {
         window.debugLogAlways = this.debugLogAlways.bind(this);
         window.debugInfo = this.debugInfo;
         // currentRouteIndex теперь управляется через stateManager
+        // TODO: убрать дублирование savedCarState в window
         window.savedCarState = this.stateManager.getSavedCarState();
         window.zoneGeometry = this.zoneGeometry;
         
@@ -273,12 +276,13 @@ class Game {
         // Обновляем машину
         if (this.carEntity) {
             // Получаем необходимые зависимости из глобальной области (временно)
+            // TODO: убрать после полного рефакторинга систем
             const carTrafficController = window.carTrafficController;
             const intersectionKeyToTL = window.intersectionKeyToTL;
             const pathBuilder = window.pathBuilder;
             const debugLog = this.debugLog.bind(this);
             const debugLogAlways = this.debugLogAlways.bind(this);
-            const debugInfo = window.debugInfo;
+            const debugInfo = this.debugInfo;
             
             this.carEntity.update(delta, {
                 checkArrival: () => this.checkArrival(),
@@ -288,7 +292,7 @@ class Game {
                 intersectionKeyToTL: intersectionKeyToTL,
                 getVerticalRoadXs: () => this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [],
                 getHorizontalRoadYs: () => this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [],
-                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), window.savedCarState, this._getDestinationCenter.bind(this), debugLogAlways) : [],
+                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), debugLogAlways) : [],
                 updateLightBeams: undefined,
                 debugInfo: debugInfo
             });
@@ -340,9 +344,9 @@ class Game {
     nextDestination() {
         console.log(`🔄 Переход к следующему пункту назначения`);
         
-        // Получаем текущий индекс маршрута из глобальной области (временно)
+        // Получаем текущий индекс маршрута из stateManager
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG || this.config;
+        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
         
         // Завершаем пребывание в текущем месте
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
@@ -368,9 +372,9 @@ class Game {
             this.carEntity.setStayTimer(0);
             
             // Обновляем путь к новому пункту назначения
-            const pathBuilder = window.pathBuilder;
+            const pathBuilder = window.pathBuilder; // TODO: убрать после рефакторинга
             if (pathBuilder) {
-                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
+                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }
@@ -389,7 +393,7 @@ class Game {
      */
     checkArrival() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG || this.config;
+        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
         if (this.carEntity && !this.carEntity.isAtDestination()) {
@@ -404,6 +408,7 @@ class Game {
             // Сохраняем состояние машины для плавного продолжения движения
             const savedCarState = this.saveCarStateForNextDestination();
             this.stateManager.setSavedCarState(savedCarState);
+            // TODO: убрать дублирование в window после рефакторинга
             window.savedCarState = savedCarState;
             console.log(`💾 Сохранено состояние машины:`, savedCarState);
 
@@ -425,7 +430,7 @@ class Game {
      */
     saveCarStateForNextDestination() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG || this.config;
+        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
         const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
         const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
 
@@ -435,7 +440,7 @@ class Game {
 
         // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
         const carRenderer = this.carRenderer;
-        const pathBuilder = window.pathBuilder;
+        const pathBuilder = window.pathBuilder; // TODO: убрать после рефакторинга
         if (!carRenderer || !pathBuilder) return null;
         
         const currentPos = carRenderer.getCar().position;
@@ -506,7 +511,7 @@ class Game {
         avatarContainer.addChild(buildingAvatar);
 
         // Позиционируем в правом нижнем углу здания
-        const zoneGeometry = window.zoneGeometry;
+        const zoneGeometry = this.zoneGeometry;
         const zone = zoneGeometry ? zoneGeometry.get(locationKey) : null;
         if (zone && zone.bounds) {
             if (zone.type === 'circle') {
@@ -548,7 +553,7 @@ class Game {
      */
     hideBuildingAvatar() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = window.CONFIG || this.config;
+        const CONFIG = window.CONFIG; // TODO: убрать после рефакторинга
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
         if (this.buildingAvatars) {
@@ -686,7 +691,7 @@ class Game {
         // Используем WorldRenderer для отрисовки базовых элементов
         this.worldRenderer.render(this.zoneGeometry);
         // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
-        this._createTrafficLightsForAllIntersections(this.trafficLightsLayer, intersectionKeyToTL, window.TRAFFIC_LIGHTS_CONFIG);
+        this._createTrafficLightsForAllIntersections(this.trafficLightsLayer, intersectionKeyToTL, this.TRAFFIC_LIGHTS_CONFIG);
 
         // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
         // Оверлей будет создан позже в updateNightMode
@@ -794,7 +799,7 @@ class Game {
         setTimeout(() => {
             // перестроим путь, когда геометрия зон уже известна
             if (this.carEntity) {
-                const newPath = window.pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
+                const newPath = window.pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }, 0);
@@ -810,7 +815,8 @@ class Game {
         // Очищаем переданную карту
         intersectionKeyToTL.clear();
         
-        // Делаем карту глобально доступной
+        // Делаем карту глобально доступной (временно, до полного рефакторинга)
+        // TODO: убрать после рефакторинга систем светофоров
         window.intersectionKeyToTL = intersectionKeyToTL;
         const { maxVerticalPos } = this.worldRenderer ? this.worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
         const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
@@ -1002,7 +1008,7 @@ class Game {
      */
     _shouldHaveTrafficLight(i, j) {
         const coord = String.fromCharCode(65 + i) + (j + 1);
-        return window.TRAFFIC_LIGHTS_CONFIG.includes(coord);
+        return this.TRAFFIC_LIGHTS_CONFIG.includes(coord);
     }
 
     /**
