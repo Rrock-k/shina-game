@@ -66,5 +66,12 @@ export const CONFIG = {
     { location: 'work', name: 'Работа', stayHours: 5 },
     { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
     { location: 'box', name: 'Бокс', stayHours: 1 },
-  ]
+  ],
+  BALANCING: {
+    SIMULATION_MESSAGES_PER_3_HOURS: 3,
+    FRIENDSHIP_PRIORITY_START: 0,
+    FRIENDSHIP_PRIORITY_MAX: 100,
+    FATIGUE_GROWTH_RATE: 0.1,
+    FATIGUE_MAX: 100
+  }
 };
