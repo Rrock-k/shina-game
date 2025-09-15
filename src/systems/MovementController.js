@@ -170,8 +170,18 @@ export class MovementController {
         segLen: segLen.toFixed(1)
       });
 
+      // ИСПРАВЛЕНИЕ: Зажимаем позицию к концу текущего сегмента перед переходом
+      // Это предотвращает "проскакивание" на высоких скоростях
+      this.car.progress = segLen; // принудительно устанавливаем точную длину сегмента
+      
+      // Обновляем позицию машины к концу текущего сегмента
+      const t = 1.0; // используем полную длину сегмента
+      const clampedX = p1.x + dx * t;
+      const clampedY = p1.y + dy * t;
+      this._updatePosition(clampedX, clampedY);
+
       // Переходим к следующему сегменту
-      this.car.progress = this.car.progress - segLen; // остаток переносим
+      this.car.progress = 0; // сбрасываем прогресс для нового сегмента
       this.car.currentSegment++;
 
       if (this.car.currentSegment >= this.car.path.length - 1) {
@@ -209,7 +219,24 @@ export class MovementController {
     const carLength = 120;
     const offsetX = -carLength / 2 * Math.cos(this.car.rotation);
     const offsetY = -carLength / 2 * Math.sin(this.car.rotation);
+    
+    // ИСПРАВЛЕНИЕ: Устанавливаем точную финальную позицию
     this.car.position = { x: finalX + offsetX, y: finalY + offsetY };
+    
+    // Сбрасываем прогресс и устанавливаем флаг прибытия
+    this.car.progress = 0;
+    this.car.currentSegment = this.car.path.length - 1;
+    
+    // Обновляем визуальное представление если есть
+    if (this.car.sprite) {
+      this.car.sprite.position.set(this.car.position.x, this.car.position.y);
+      this.car.sprite.rotation = this.car.rotation;
+    }
+    
+    debugLogAlways('🚗 Путь завершен, машина в финальной позиции', {
+      position: this.car.position,
+      rotation: (this.car.rotation * 180 / Math.PI).toFixed(1) + '°'
+    });
   }
 
   /**
