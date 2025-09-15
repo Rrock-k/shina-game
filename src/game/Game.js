@@ -133,7 +133,7 @@ class Game {
      */
     init() {
         // Инициализируем переменные для светофоров
-        this.currentRouteIndex = 0;
+        // currentRouteIndex теперь управляется через stateManager
         this.savedCarState = null;
         this.intersectionKeyToTL = new Map();
         
@@ -161,7 +161,7 @@ class Game {
         window.debugLog = this.debugLog.bind(this);
         window.debugLogAlways = this.debugLogAlways.bind(this);
         window.debugInfo = this.debugInfo;
-        window.currentRouteIndex = this.currentRouteIndex;
+        // currentRouteIndex теперь управляется через stateManager
         window.savedCarState = this.savedCarState;
         window.zoneGeometry = this.zoneGeometry;
         
@@ -178,15 +178,15 @@ class Game {
         }, 100);
         
         // Создаем машину
-        const carData = this._createCar(this.currentRouteIndex, this.savedCarState, this.intersectionKeyToTL, this.uiRenderer, this.debugLogAlways.bind(this));
+        const carData = this._createCar(this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.intersectionKeyToTL, this.uiRenderer, this.debugLogAlways.bind(this));
         this.carRenderer = carData.carRenderer;
         
         // Настраиваем компоновку
-        this._layout(null, this.currentRouteIndex, this.savedCarState, this.carRenderer);
+        this._layout(null, this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.carRenderer);
         
         // Настраиваем обработчик изменения размера окна
         window.addEventListener('resize', () => {
-            this._layout(null, this.currentRouteIndex, this.savedCarState, this.carRenderer);
+            this._layout(null, this.stateManager.getCurrentRouteIndex(), this.savedCarState, this.carRenderer);
             
             // Если включен полноэкранный режим, обновляем его при изменении размера окна
             if (typeof window.panningController !== 'undefined' && window.panningController && window.panningController.isFullscreenMode()) {
@@ -290,7 +290,7 @@ class Game {
                 intersectionKeyToTL: intersectionKeyToTL,
                 getVerticalRoadXs: () => this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [],
                 getHorizontalRoadYs: () => this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [],
-                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), debugLogAlways) : [],
+                buildCarPath: () => pathBuilder ? pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), window.savedCarState, this._getDestinationCenter.bind(this), debugLogAlways) : [],
                 updateLightBeams: undefined,
                 debugInfo: debugInfo
             });
@@ -366,7 +366,7 @@ class Game {
         console.log(`🔄 Переход к следующему пункту назначения`);
         
         // Получаем текущий индекс маршрута из глобальной области (временно)
-        const currentRouteIndex = window.currentRouteIndex || 0;
+        const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const CONFIG = window.CONFIG || this.config;
         
         // Завершаем пребывание в текущем месте
@@ -379,7 +379,7 @@ class Game {
         this.hideBuildingAvatar();
 
         const newRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
-        window.currentRouteIndex = newRouteIndex;
+        this.stateManager.setCurrentRouteIndex(newRouteIndex);
         
         // Обновляем индекс маршрута в UIRenderer
         if (this.uiRenderer) {
@@ -413,7 +413,7 @@ class Game {
      * Проверка прибытия в пункт назначения
      */
     checkArrival() {
-        const currentRouteIndex = window.currentRouteIndex || 0;
+        const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const CONFIG = window.CONFIG || this.config;
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
@@ -450,7 +450,7 @@ class Game {
      * Сохраняет состояние машины для плавного продолжения движения к следующему пункту
      */
     saveCarStateForNextDestination() {
-        const currentRouteIndex = window.currentRouteIndex || 0;
+        const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const CONFIG = window.CONFIG || this.config;
         const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
         const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
@@ -573,7 +573,7 @@ class Game {
      * Скрыть аватарку в здании
      */
     hideBuildingAvatar() {
-        const currentRouteIndex = window.currentRouteIndex || 0;
+        const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const CONFIG = window.CONFIG || this.config;
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
@@ -636,7 +636,7 @@ class Game {
     _initEntities(currentRouteIndex, savedCarState, carRenderer) {
         // Обновляем инициализацию carEntity с актуальными параметрами
         this.carEntity.init({
-            currentRouteIndex: currentRouteIndex,
+            // currentRouteIndex теперь управляется через stateManager
             savedState: savedCarState,
             onArrival: (destination) => {
                 console.log(`🚗 Машина прибыла в ${destination.name}`);
@@ -820,7 +820,7 @@ class Game {
         setTimeout(() => {
             // перестроим путь, когда геометрия зон уже известна
             if (this.carEntity) {
-                const newPath = window.pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
+                const newPath = window.pathBuilder.buildCarPath(this.carEntity, this.stateManager.getCurrentRouteIndex(), window.savedCarState, this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
                 this.carEntity.setPath(newPath);
             }
         }, 0);
@@ -930,7 +930,7 @@ class Game {
 
         // Светофоры теперь внутри world, поэтому синхронизация не нужна
         
-        this._initEntities(window.currentRouteIndex, window.savedCarState, this.carRenderer);
+        this._initEntities(this.stateManager.getCurrentRouteIndex(), window.savedCarState, this.carRenderer);
     }
 
     /**
@@ -947,7 +947,7 @@ class Game {
         
         const car = carRenderer.createCar({
             carPath: [],
-            currentRouteIndex: currentRouteIndex,
+            // currentRouteIndex теперь управляется через stateManager
             savedCarState: savedCarState,
             getDestinationCenter: this._getDestinationCenter.bind(this)
         });
