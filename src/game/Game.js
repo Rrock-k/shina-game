@@ -459,39 +459,50 @@ class Game {
     
     /**
      * Проверка прибытия в пункт назначения
+     * Атомарно выполняет все действия, связанные с прибытием
      */
     checkArrival() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const CONFIG = this.dependencies.get('config');
         const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
         
-        if (this.carEntity && !this.carEntity.isAtDestination()) {
-            console.log(`🏠 Прибытие в ${currentDest.name} (обочина)`);
-
-            // Завершаем дорогу в журнале при входе в здание
-            if (this.journalManager && currentDest) {
-                this.journalManager.endTrip(currentDest.name);
-                this.journalManager.setLocationStartTime(currentDest.name);
-            }
-
-            // Сохраняем состояние машины для плавного продолжения движения
-            const savedCarState = this.saveCarStateForNextDestination();
-            this.stateManager.setSavedCarState(savedCarState);
-            // TODO: убрать дублирование в window после рефакторинга
-            window.savedCarState = savedCarState;
-            console.log(`💾 Сохранено состояние машины:`, savedCarState);
-
-            // Синхронизируем с carEntity
-            if (this.carEntity) {
-                this.carEntity.setAtDestination(true);
-                this.carEntity.setStayTimer(currentDest.stayHours);
-            }
-            
-            // Инициализация таймера теперь происходит в StateManager
-            this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
-            // Показываем маленькую аватарку в здании
-            this.showBuildingAvatar(currentDest.location);
+        // Проверяем, что у нас есть все необходимые компоненты
+        if (!this.carEntity || !currentDest) {
+            console.warn('⚠️ checkArrival: отсутствуют необходимые компоненты');
+            return;
         }
+
+        // Проверяем, что машина еще не в пункте назначения
+        if (this.carEntity.isAtDestination()) {
+            return; // Уже в пункте назначения, ничего не делаем
+        }
+
+        console.log(`🏠 Прибытие в ${currentDest.name} (обочина)`);
+
+        // АТОМАРНО ВЫПОЛНЯЕМ ВСЕ ДЕЙСТВИЯ ПРИБЫТИЯ:
+        
+        // 1. Завершаем дорогу в журнале
+        if (this.journalManager) {
+            this.journalManager.endTrip(currentDest.name);
+            this.journalManager.setLocationStartTime(currentDest.name);
+        }
+
+        // 2. Сохраняем состояние машины для следующего пункта
+        const savedCarState = this.saveCarStateForNextDestination();
+        this.stateManager.setSavedCarState(savedCarState);
+        // TODO: убрать дублирование в window после рефакторинга
+        window.savedCarState = savedCarState;
+        console.log(`💾 Сохранено состояние машины:`, savedCarState);
+
+        // 3. Устанавливаем состояние машины (атомарно)
+        this.carEntity.setAtDestination(true);
+        this.carEntity.setStayTimer(currentDest.stayHours);
+        
+        // 4. Обновляем UI (атомарно)
+        this.uiRenderer.updateRouteDisplay(true);
+        this.showBuildingAvatar(currentDest.location);
+        
+        console.log(`✅ Прибытие в ${currentDest.name} обработано атомарно`);
     }
     
     /**
