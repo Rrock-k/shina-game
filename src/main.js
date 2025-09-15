@@ -149,52 +149,7 @@ window.addEventListener('resize', () => {
 // Функции-обертки для получения позиций дорог из WorldRenderer
 
 
-function createTrafficLightsForAllIntersections (layer) {
-  intersectionKeyToTL.clear();
-  const { maxVerticalPos } = worldRenderer ? worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
-  const horizontalRoadYs = game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [];
-  const verticalRoadXs = game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [];
-
-  for (let j = 0; j < horizontalRoadYs.length; j++) {
-    for (let i = 0; i < verticalRoadXs.length; i++) {
-      const x = verticalRoadXs[i];
-      const y = horizontalRoadYs[j];
-
-      if (!game._shouldHaveTrafficLight(i, j)) {
-        continue; // пропускаем этот перекресток
-      }
-
-      // Определяем, какие дороги есть в каждом направлении
-      const roadConnections = {
-        north: j > 0 || (x === maxVerticalPos), // дорога на север: внутренний ряд ИЛИ правая дорога (выезд за город)
-        south: j < horizontalRoadYs.length - 1 || (x === maxVerticalPos), // дорога на юг: внутренний ряд ИЛИ правая дорога (выезд за город)
-        west: i > 0, // есть дорога на запад, если не крайний левый столбец
-        east: i < verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
-      };
-
-      const tl = initTrafficLightsForIntersection({
-        PIXI,
-        app: game.app,
-        layer,
-        x,
-        y,
-        roadWidth: CONFIG.ROAD_WIDTH,
-        lampRadius: 9,
-        cycle: { green: 750, yellow: 200 },
-        roadConnections
-      });
-      const key = `${x},${y}`;
-      intersectionKeyToTL.set(key, tl);
-
-      // Регистрируем светофор в координаторе зеленой волны
-      trafficCoordinator.addTrafficLight(key, tl, x, y);
-    }
-  }
-
-  if (verticalRoadXs.length > 0 && horizontalRoadYs.length > 0) {
-    trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
-  }
-}
+// Функция createTrafficLightsForAllIntersections перенесена в Game.js как _createTrafficLightsForAllIntersections
 
 // Функция drawDashedPath перенесена в WorldRenderer
 

@@ -62,6 +62,7 @@ let buildingAvatars = new Map();
 - ✅ **НОВОЕ**: Перенесена функция `layout()` в Game.js как метод `_layout()` ✅
 - ✅ **НОВОЕ**: Перенесена функция `createTrafficLightsForAllIntersections()` в Game.js как метод `_createTrafficLightsForAllIntersections()`
 - ✅ **НОВОЕ**: Добавлена функция `_shouldHaveTrafficLight()` в Game.js
+- ✅ **НОВОЕ**: Удален дублирующий метод `_createTrafficLightsForAllIntersections()` из Game.js
 - **Файлы**: `src/main.js`, `src/game/Game.js`
 - **Проверка**: Функции `setupWorld()`, `layout()` и связанные функции успешно перенесены, все ссылки обновлены.
 
@@ -106,6 +107,9 @@ let buildingAvatars = new Map();
 - ✅ **НОВОЕ**: Обновлены все вызовы `layout()` → `game._layout()` в main.js
 - ✅ **НОВОЕ**: Удалена функция `layout()` из main.js
 - ✅ **НОВОЕ**: Удалена функция `setupWorld()` из main.js (дублирование устранено)
+- ✅ **НОВОЕ**: Перенесена функция `createTrafficLightsForAllIntersections()` в Game.js как метод `_createTrafficLightsForAllIntersections()`
+- ✅ **НОВОЕ**: Удален дублирующий метод `_createTrafficLightsForAllIntersections()` из Game.js
+- ✅ **НОВОЕ**: Удалена функция `createTrafficLightsForAllIntersections()` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 

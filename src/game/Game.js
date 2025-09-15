@@ -980,6 +980,7 @@ class Game {
         this._initEntities(currentRouteIndex, savedCarState, carRenderer);
     }
 
+
 }
 
 export default Game;
