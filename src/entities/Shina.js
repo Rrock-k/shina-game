@@ -687,6 +687,18 @@ export class Shina {
   }
 
   /**
+   * Получить данные для визуального представления (View Model)
+   * @returns {Object} объект с данными для рендеринга
+   */
+  getViewState() {
+    return {
+      position: this.position,
+      isVisible: this.isVisible,
+      currentState: this.currentState
+    };
+  }
+
+  /**
    * Получить информацию о персонаже для отладки
    * @returns {Object} объект с информацией о состоянии
    */

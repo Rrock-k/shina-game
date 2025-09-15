@@ -7,6 +7,7 @@ import DependencyContainer from './DependencyContainer.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
 import { CarRenderer } from '../rendering/CarRenderer.js';
+import { ShinaRenderer } from '../rendering/ShinaRenderer.js';
 import { Car } from '../entities/Car.js';
 import { Shina } from '../entities/Shina.js';
 import { CarTrafficController } from '../systems/carTrafficControl.js';
@@ -93,6 +94,9 @@ class Game {
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
         this.shinaEntity = new Shina(this.dependencies.get('config'));
+        
+        // Создаем рендерер Шины
+        this.shinaRenderer = new ShinaRenderer(this.dependencies.get('config'), this.pauseManager);
         
         // Инициализируем геометрию зон
         this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
@@ -357,6 +361,11 @@ class Game {
                 timeManager: this.timeManager,
                 debugLog: this.debugLog.bind(this)
             });
+            
+            // Обновляем визуальное представление Шины
+            if (this.shinaRenderer) {
+                this.shinaRenderer.updateVisuals(this.shinaEntity.getViewState());
+            }
         }
 
         // Обновляем светофоры (пустой цикл из main.js)
@@ -753,6 +762,10 @@ class Game {
 
         // Добавляем decorLayer (машина) - будет добавлен поверх оверлея
         world.addChild(decorLayer);
+        
+        // Создаем и добавляем визуальное представление Шины
+        const shinaSprite = this.shinaRenderer.create();
+        this.decorLayer.addChild(shinaSprite);
 
         // Добавляем светофоры - будут добавлены поверх оверлея
         world.addChild(trafficLightsLayer);
