@@ -64,13 +64,13 @@ export function getDirectionForSegment (dx, dy) {
   return Math.abs(dx) >= Math.abs(dy) ? Direction.EW : Direction.NS;
 }
 
-export function initTrafficLightsForIntersection ({ PIXI, app, layer, x, y, roadWidth = 48, lampRadius = 8, cycle = { green: 667, yellow: 200 }, roadConnections = { north: true, south: true, east: true, west: true } }) {
-  const tl = new IntersectionTrafficLight({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections });
+export function initTrafficLightsForIntersection ({ PIXI, app, layer, x, y, roadWidth = 48, lampRadius = 8, cycle = { green: 667, yellow: 200 }, roadConnections = { north: true, south: true, east: true, west: true }, pauseManager }) {
+  const tl = new IntersectionTrafficLight({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections, pauseManager });
   return tl;
 }
 
 class IntersectionTrafficLight {
-  constructor ({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections }) {
+  constructor ({ PIXI, app, layer, x, y, roadWidth, lampRadius, cycle, roadConnections, pauseManager }) {
     this.PIXI = PIXI;
     this.app = app;
     this.position = { x, y };
@@ -78,6 +78,7 @@ class IntersectionTrafficLight {
     this.lampRadius = lampRadius;
     this.cycle = { green: cycle.green, yellow: cycle.yellow };
     this.roadConnections = roadConnections;
+    this.pauseManager = pauseManager;
 
     // Фазы: NS_GREEN -> NS_YELLOW -> EW_GREEN -> EW_YELLOW -> повтор
     this.phase = 'NS_GREEN';
@@ -138,7 +139,7 @@ class IntersectionTrafficLight {
       return; // не обновляем фазы во время задержки
     }
 
-    if (typeof window !== 'undefined' && window.isGamePaused) {
+    if (this.pauseManager && this.pauseManager.isPaused()) {
       return; // не обновляем фазы во время паузы
     }
 

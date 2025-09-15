@@ -842,7 +842,8 @@ class Game {
                     roadWidth: CONFIG.ROAD_WIDTH,
                     lampRadius: 9,
                     cycle: { green: 750, yellow: 200 },
-                    roadConnections
+                    roadConnections,
+                    pauseManager: this.pauseManager
                 });
                 const key = `${x},${y}`;
                 intersectionKeyToTL.set(key, tl);

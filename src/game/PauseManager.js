@@ -5,8 +5,7 @@ export class PauseManager {
     this.speedMultiplier = 1; // множитель скорости (1 = нормальная, 5 = ускоренная)
     this.isSpeedBoosted = false; // включено ли ускорение по умолчанию
     
-    // Делаем глобальной для доступа из модулей
-    window.isGamePaused = this.isGamePaused;
+    // Удалено: больше не используем глобальную переменную window.isGamePaused
     
     this.loadSettings();
   }
@@ -39,7 +38,7 @@ export class PauseManager {
   // Поставить игру на паузу
   pauseGame() {
     this.isGamePaused = true;
-    window.isGamePaused = true; // обновляем глобальную переменную
+    // Удалено: больше не используем глобальную переменную window.isGamePaused
     console.log('⏸️ Игра поставлена на паузу');
     this.updatePauseButton();
     this.updatePauseModeText();
@@ -48,7 +47,7 @@ export class PauseManager {
   // Возобновить игру
   resumeGame() {
     this.isGamePaused = false;
-    window.isGamePaused = false; // обновляем глобальную переменную
+    // Удалено: больше не используем глобальную переменную window.isGamePaused
     console.log('▶️ Игра возобновлена');
     this.updatePauseButton();
     this.updatePauseModeText();
