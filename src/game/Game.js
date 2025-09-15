@@ -442,6 +442,7 @@ class Game {
             
             // Очищаем абсолютное время начала пребывания при начале новой поездки
             this.stateManager.clearStayStartTimeAbs();
+            this.stateManager.setStayTotalDuration(0);
             
             // Обновляем путь к новому пункту назначения
             const pathBuilder = this.dependencies.get('pathBuilder');
@@ -500,6 +501,9 @@ class Game {
         // 3. Устанавливаем состояние машины (атомарно)
         this.carEntity.setAtDestination(true);
         this.carEntity.setStayTimer(currentDest.stayHours);
+        
+        // 3.1. Сохраняем ПОЛНУЮ ДЛИТЕЛЬНОСТЬ в StateManager
+        this.stateManager.setStayTotalDuration(currentDest.stayHours);
         
         // 4. Сохраняем абсолютное время начала пребывания
         const gameTime = this.timeManager.getGameTime();
