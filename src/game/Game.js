@@ -248,9 +248,9 @@ class Game {
         this.updateEntities(delta);
         
         // Синхронизируем game.carEntity с carRenderer для визуального представления
-        if (this.carEntity && window.carRenderer) {
+        if (this.carEntity && this.carRenderer) {
             // Обновляем визуальное представление
-            window.carRenderer.updateVisuals(this.carEntity);
+            this.carRenderer.updateVisuals(this.carEntity);
             
             // Синхронизируем локальные переменные с game.carEntity (глобальные переменные удалены)
             const carPath = this.carEntity.getPath();
