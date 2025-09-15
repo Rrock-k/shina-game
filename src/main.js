@@ -54,35 +54,7 @@ function debugLogAlways (message, data = null) {
 // Инициализация новых сущностей теперь в Game.js
 
 
-// Обновление сущностей
-function updateEntities(delta) {
-  // Обновляем машину
-  if (game.carEntity) {
-    game.carEntity.update(delta, {
-      checkArrival: () => game.checkArrival(),
-      debugLog: debugLog,
-      debugLogAlways: debugLogAlways,
-      carTrafficController: window.carTrafficController,
-      intersectionKeyToTL: intersectionKeyToTL,
-      getVerticalRoadXs: () => game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [],
-      getHorizontalRoadYs: () => game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [],
-      buildCarPath: () => window.pathBuilder.buildCarPath(game.carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways),
-      updateLightBeams: undefined,
-      debugInfo: debugInfo
-    });
-  }
-
-  // Обновляем Шину
-  if (game.shinaEntity) {
-    game.shinaEntity.update({
-      timeManager: game.timeManager,
-      debugLog: debugLog
-    });
-  }
-
-  intersectionKeyToTL.forEach((trafficLight, key) => {
-  });
-}
+// Обновление сущностей теперь в Game.js
 
 // Геометрия зон теперь в game.zoneGeometry
 
@@ -427,7 +399,7 @@ function layout () {
 
 function updateCar (delta) {
   // Обновляем новые сущности
-  updateEntities(delta);
+  game.updateEntities(delta);
   
   // Синхронизируем game.carEntity с carRenderer для визуального представления
   if (game.carEntity && carRenderer) {

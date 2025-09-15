@@ -192,6 +192,13 @@ class Game {
                 debugLog: window.debugLog
             });
         }
+
+        // Обновляем светофоры (пустой цикл из main.js)
+        if (window.intersectionKeyToTL) {
+            window.intersectionKeyToTL.forEach((trafficLight, key) => {
+                // Пустой цикл - светофоры обновляются автоматически
+            });
+        }
     }
     
     /**

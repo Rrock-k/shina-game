@@ -52,11 +52,12 @@ let buildingAvatars = new Map();
 - ✅ Обновлены ссылки на `decorLayer` → `game.decorLayer`
 
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
-- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~500 строк (было 808)
-- ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()` и `createCar()` в Game.js
+- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~430 строк (было 808)
+- ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()`, `createCar()` и `updateEntities()` в Game.js
 - ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js
+- ✅ **НОВОЕ**: Перенесена функция `updateEntities()` в Game.js как метод класса
 - **Файлы**: `src/main.js`, `src/game/Game.js`
-- **Проверка**: Функция `getDestinationCenter()` успешно перенесена, все ссылки обновлены.
+- **Проверка**: Функция `updateEntities()` успешно перенесена, все ссылки обновлены.
 
 **Выполненные изменения:**
 - ✅ Перенесена функция `getDestinationCenter()` в `Game.js` как `_getDestinationCenter()`
@@ -76,6 +77,9 @@ let buildingAvatars = new Map();
 - ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js как свойства класса
 - ✅ **НОВОЕ**: Обновлен метод `updateStayTimer()` для использования `this.lastStayTimerUpdate` и `this.lastStayTimerDay`
 - ✅ **НОВОЕ**: Удалены глобальные переменные `lastStayTimerUpdate` и `lastStayTimerDay` из main.js
+- ✅ **НОВОЕ**: Перенесена функция `updateEntities()` в `Game.js` как метод класса
+- ✅ **НОВОЕ**: Обновлен вызов в `updateCar()` на `game.updateEntities(delta)`
+- ✅ **НОВОЕ**: Удалена функция `updateEntities()` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 
