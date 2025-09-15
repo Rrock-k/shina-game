@@ -144,7 +144,7 @@ class Game {
     /**
      * Инициализирует игру (настройка светофоров, создание машины, настройка UI)
      */
-    init() {
+    async init() {
         // Инициализируем переменные для светофоров
         // currentRouteIndex теперь управляется через stateManager
         // savedCarState теперь управляется через stateManager
@@ -190,7 +190,7 @@ class Game {
         this.dependencies.register('carTrafficController', carTrafficController);
         
         // Создаем PanningController и регистрируем в контейнере зависимостей
-        const PanningController = window.PanningController;
+        const { PanningController } = await import('../systems/panning.js');
         if (PanningController) {
             const panningController = new PanningController();
             panningController.setWorld(this.world);
