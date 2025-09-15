@@ -51,6 +51,7 @@ class Game {
         
         // Создаем контейнер мира и все слои
         this.world = new PIXI.Container();
+        this.world.sortableChildren = true; // Включаем сортировку по zIndex
         this.app.stage.addChild(this.world);
         
         this.gridLayer = new PIXI.Container();
@@ -90,7 +91,7 @@ class Game {
         // UIRenderer будет создан в init() после регистрации panningController
         
         // Создаем dayNightManager после worldRenderer
-        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'), this.worldRenderer);
+        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'), this.worldRenderer, this.shinaRenderer);
         
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
@@ -230,6 +231,9 @@ class Game {
         // Инициализируем UI
         this.uiRenderer.init();
         
+        // Подписываемся на события DayNightManager
+        this.initDayNightEventListeners();
+        
         // Обновляем текст режима дня/ночи и паузы в меню после инициализации
         setTimeout(() => {
             this.dayNightManager.updateDayNightModeText();
@@ -260,6 +264,31 @@ class Game {
         gameContainer.style.width = '1200px';
         gameContainer.style.height = '800px';
         gameContainer.style.overflow = 'auto';
+    }
+
+    /**
+     * Инициализация подписок на события DayNightManager
+     */
+    initDayNightEventListeners() {
+        if (!this.dayNightManager) return;
+
+        // Подписываемся на изменение режима дня/ночи
+        this.dayNightManager.on('modeChange', (data) => {
+            console.log('🌙 Game: получено событие modeChange', data);
+            // Здесь можно добавить дополнительную логику игры
+        });
+
+        // Подписываемся на переключение режима
+        this.dayNightManager.on('modeToggle', (data) => {
+            console.log('🌅 Game: получено событие modeToggle', data);
+            // Здесь можно добавить дополнительную логику игры
+        });
+
+        // Подписываемся на изменение альфы
+        this.dayNightManager.on('alphaChange', (data) => {
+            console.log('🎨 Game: получено событие alphaChange', data);
+            // Здесь можно добавить дополнительную логику игры
+        });
     }
 
     /**
@@ -772,7 +801,7 @@ class Game {
             border: borderLayer
         });
 
-        // Добавляем слои в правильном порядке (снизу вверх)
+        
         world.addChild(gridLayer);
         world.addChild(roadsLayer);
         world.addChild(intersectionsLayer);
@@ -786,23 +815,19 @@ class Game {
         // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
         this._createTrafficLightsForAllIntersections(this.trafficLightsLayer, intersectionKeyToTL, this.TRAFFIC_LIGHTS_CONFIG);
 
-        // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
-        // Оверлей будет создан позже в updateNightMode
-
-        // Добавляем decorLayer (машина) - будет добавлен поверх оверлея
-        world.addChild(decorLayer);
+        // Добавляем decorLayer и trafficLightsLayer в правильном порядке
+        // (cityNightOverlay будет добавлен позже через DayNightManager)
+        decorLayer.zIndex = 500; // Поверх cityNightOverlay (400)
+        trafficLightsLayer.zIndex = 500; // Поверх cityNightOverlay (400)
         
-        // Создаем и добавляем визуальное представление Шины
-        const shinaSprite = this.shinaRenderer.create();
-        this.decorLayer.addChild(shinaSprite);
-
-        // Добавляем светофоры - будут добавлены поверх оверлея
+        world.addChild(decorLayer);
         world.addChild(trafficLightsLayer);
 
         // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
         lightingLayer.zIndex = 1000; // поверх ночного оверлея
         this.app.stage.addChild(lightingLayer);
 
+        // Добавляем UI слой поверх всего
         uiLayer.zIndex = 2000; // поверх всего
         this.app.stage.addChild(uiLayer);
 

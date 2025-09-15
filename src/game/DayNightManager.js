@@ -1,16 +1,48 @@
-// Менеджер режимов дня/ночи
+// Менеджер режимов дня/ночи с поддержкой событий
 export class DayNightManager {
-  constructor(PIXI, config, worldRenderer) {
+  constructor(PIXI, config, worldRenderer, shinaRenderer = null) {
     this.PIXI = PIXI;
     this.config = config;
     this.worldRenderer = worldRenderer; // Получаем WorldRenderer для доступа к слоям
+    this.shinaRenderer = shinaRenderer; // Получаем ShinaRenderer для создания спрайта Шины
     this.dayNightMode = 'auto'; // 'auto', 'day', 'night'
     this.isNightMode = false;
     this.cityNightOverlay = null;
     this.currentCityNightAlpha = 0;
     this.nightTransitionSpeed = 0.02;
     
+    // Система событий
+    this.listeners = new Map();
+    
     this.loadSettings();
+  }
+
+  // Методы для работы с событиями
+  on(event, callback) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push(callback);
+  }
+
+  off(event, callback) {
+    if (!this.listeners.has(event)) return;
+    const callbacks = this.listeners.get(event);
+    const index = callbacks.indexOf(callback);
+    if (index > -1) {
+      callbacks.splice(index, 1);
+    }
+  }
+
+  emit(event, data = null) {
+    if (!this.listeners.has(event)) return;
+    this.listeners.get(event).forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error(`Ошибка в обработчике события ${event}:`, error);
+      }
+    });
   }
 
   // Загрузить настройки из localStorage
@@ -76,6 +108,13 @@ export class DayNightManager {
     if (shouldBeNight !== this.isNightMode) {
       this.isNightMode = shouldBeNight;
       console.log(`🌙 ${this.isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
+      
+      // Эмитим событие изменения режима дня/ночи
+      this.emit('modeChange', {
+        isNightMode: this.isNightMode,
+        gameTime: gameTime,
+        mode: this.isNightMode ? 'night' : 'day'
+      });
     }
 
     if (!this.cityNightOverlay) {
@@ -103,6 +142,13 @@ export class DayNightManager {
           
           world.addChildAt(this.cityNightOverlay, insertIndex);
           console.log('🌙 Ночной оверлей добавлен в сцену в правильном порядке');
+          
+          // Создаем и добавляем визуальное представление Шины в decorLayer
+          if (decorLayer && this.shinaRenderer) {
+            const shinaSprite = this.shinaRenderer.create();
+            decorLayer.addChild(shinaSprite);
+            console.log('👤 Спрайт Шины добавлен в decorLayer');
+          }
         } else {
           console.warn('⚠️ world контейнер не найден, не могу добавить оверлей');
           return;
@@ -126,6 +172,13 @@ export class DayNightManager {
       this.currentCityNightAlpha += alphaDiff * this.nightTransitionSpeed;
       this.currentCityNightAlpha = Math.max(0, Math.min(1, this.currentCityNightAlpha));
       this.cityNightOverlay.alpha = this.currentCityNightAlpha;
+      
+      // Эмитим событие изменения альфы
+      this.emit('alphaChange', {
+        alpha: this.currentCityNightAlpha,
+        isNightMode: this.isNightMode,
+        targetAlpha: targetAlpha
+      });
     }
   }
 
@@ -139,6 +192,12 @@ export class DayNightManager {
     
     console.log(`🌅 Режим дня/ночи изменен на: ${this.dayNightMode}`);
     this.updateDayNightModeText();
+    
+    // Эмитим событие изменения режима
+    this.emit('modeToggle', {
+      dayNightMode: this.dayNightMode,
+      previousMode: modes[currentIndex]
+    });
   }
 
   // Обновить текст режима дня/ночи в меню
