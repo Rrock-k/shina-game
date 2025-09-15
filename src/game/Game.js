@@ -74,7 +74,7 @@ class Game {
         this.timeManager = new TimeManager();
         this.pauseManager = new PauseManager();
         this.journalManager = new JournalManager(this.timeManager);
-        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'));
+        // dayNightManager будет создан в init() после worldRenderer
         
         // Синхронизируем менеджеры
         this.timeManager.setSpeedMultiplier(this.pauseManager.getSpeedMultiplier());
@@ -86,6 +86,9 @@ class Game {
         // Создаем рендереры
         this.worldRenderer = new WorldRenderer(this.dependencies.get('config'), this.app);
         // UIRenderer будет создан в init() после регистрации panningController
+        
+        // Создаем dayNightManager после worldRenderer
+        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'), this.worldRenderer);
         
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);

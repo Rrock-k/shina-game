@@ -202,6 +202,70 @@ export class WorldRenderer {
   }
 
   /**
+   * Получить основной контейнер мира
+   * @returns {PIXI.Container} world контейнер
+   */
+  getWorldContainer() {
+    return this.world;
+  }
+
+  /**
+   * Получить слой дорог
+   * @returns {PIXI.Container} roadsLayer
+   */
+  getRoadsLayer() {
+    return this.layers.roadsLayer;
+  }
+
+  /**
+   * Получить слой участков
+   * @returns {PIXI.Container} lotsLayer
+   */
+  getLotsLayer() {
+    return this.layers.lotsLayer;
+  }
+
+  /**
+   * Получить слой зон
+   * @returns {PIXI.Container} zonesLayer
+   */
+  getZonesLayer() {
+    return this.layers.zonesLayer;
+  }
+
+  /**
+   * Получить слой подписей
+   * @returns {PIXI.Container} labelsLayer
+   */
+  getLabelsLayer() {
+    return this.layers.labelsLayer;
+  }
+
+  /**
+   * Получить слой декора (машина)
+   * @returns {PIXI.Container} decorLayer
+   */
+  getDecorLayer() {
+    return this.layers.decorLayer;
+  }
+
+  /**
+   * Получить слой светофоров
+   * @returns {PIXI.Container} trafficLightsLayer
+   */
+  getTrafficLightsLayer() {
+    return this.layers.trafficLightsLayer;
+  }
+
+  /**
+   * Получить слой освещения
+   * @returns {PIXI.Container} lightingLayer
+   */
+  getLightingLayer() {
+    return this.layers.lightingLayer;
+  }
+
+  /**
    * Добавить слой
    * @param {string} layerName - имя слоя
    * @param {PIXI.Container} layer - слой

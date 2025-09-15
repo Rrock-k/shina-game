@@ -1,8 +1,9 @@
 // Менеджер режимов дня/ночи
 export class DayNightManager {
-  constructor(PIXI, config) {
+  constructor(PIXI, config, worldRenderer) {
     this.PIXI = PIXI;
     this.config = config;
+    this.worldRenderer = worldRenderer; // Получаем WorldRenderer для доступа к слоям
     this.dayNightMode = 'auto'; // 'auto', 'day', 'night'
     this.isNightMode = false;
     this.cityNightOverlay = null;
@@ -83,23 +84,31 @@ export class DayNightManager {
 
     // Если оверлей создан, но не добавлен в сцену, добавляем его
     if (this.cityNightOverlay && !this.cityNightOverlay.parent) {
-      // Ищем world контейнер в глобальной области
-      if (typeof window !== 'undefined' && window.world) {
-        // Добавляем оверлей перед decorLayer (машиной) и trafficLightsLayer
-        const world = window.world;
-        const decorLayerIndex = world.children.findIndex(child => child === window.decorLayer);
-        const trafficLightsLayerIndex = world.children.findIndex(child => child === window.trafficLightsLayer);
+      // Используем worldRenderer для доступа к слоям
+      if (this.worldRenderer) {
+        const world = this.worldRenderer.getWorldContainer();
+        const decorLayer = this.worldRenderer.getDecorLayer();
+        const trafficLightsLayer = this.worldRenderer.getTrafficLightsLayer();
         
-        // Находим правильную позицию для вставки (перед машиной и светофорами)
-        const insertIndex = Math.min(
-          decorLayerIndex >= 0 ? decorLayerIndex : world.children.length,
-          trafficLightsLayerIndex >= 0 ? trafficLightsLayerIndex : world.children.length
-        );
-        
-        world.addChildAt(this.cityNightOverlay, insertIndex);
-        console.log('🌙 Ночной оверлей добавлен в сцену в правильном порядке');
+        if (world) {
+          // Добавляем оверлей перед decorLayer (машиной) и trafficLightsLayer
+          const decorLayerIndex = world.children.findIndex(child => child === decorLayer);
+          const trafficLightsLayerIndex = world.children.findIndex(child => child === trafficLightsLayer);
+          
+          // Находим правильную позицию для вставки (перед машиной и светофорами)
+          const insertIndex = Math.min(
+            decorLayerIndex >= 0 ? decorLayerIndex : world.children.length,
+            trafficLightsLayerIndex >= 0 ? trafficLightsLayerIndex : world.children.length
+          );
+          
+          world.addChildAt(this.cityNightOverlay, insertIndex);
+          console.log('🌙 Ночной оверлей добавлен в сцену в правильном порядке');
+        } else {
+          console.warn('⚠️ world контейнер не найден, не могу добавить оверлей');
+          return;
+        }
       } else {
-        console.warn('⚠️ world контейнер не найден, не могу добавить оверлей');
+        console.warn('⚠️ worldRenderer не найден, не могу добавить оверлей');
         return;
       }
     }
@@ -178,63 +187,79 @@ export class DayNightManager {
     const nightTint = 0x4a4a6a; // приглушенный синеватый оттенок
     const nightAlpha = 0.3; // степень приглушения
 
-    // Применяем фильтр к основным слоям
-    if (typeof window !== 'undefined') {
-      if (window.roadsLayer) {
-        window.roadsLayer.tint = nightTint;
-        window.roadsLayer.alpha = 1 - nightAlpha;
+    // Применяем фильтр к основным слоям через worldRenderer
+    if (this.worldRenderer) {
+      const roadsLayer = this.worldRenderer.getRoadsLayer();
+      const lotsLayer = this.worldRenderer.getLotsLayer();
+      const zonesLayer = this.worldRenderer.getZonesLayer();
+      const labelsLayer = this.worldRenderer.getLabelsLayer();
+      
+      if (roadsLayer) {
+        roadsLayer.tint = nightTint;
+        roadsLayer.alpha = 1 - nightAlpha;
       }
-      if (window.lotsLayer) {
-        window.lotsLayer.tint = nightTint;
-        window.lotsLayer.alpha = 1 - nightAlpha;
+      if (lotsLayer) {
+        lotsLayer.tint = nightTint;
+        lotsLayer.alpha = 1 - nightAlpha;
       }
-      if (window.zonesLayer) {
-        window.zonesLayer.tint = nightTint;
-        window.zonesLayer.alpha = 1 - nightAlpha;
+      if (zonesLayer) {
+        zonesLayer.tint = nightTint;
+        zonesLayer.alpha = 1 - nightAlpha;
       }
-      if (window.labelsLayer) {
-        window.labelsLayer.tint = nightTint;
-        window.labelsLayer.alpha = 1 - nightAlpha;
+      if (labelsLayer) {
+        labelsLayer.tint = nightTint;
+        labelsLayer.alpha = 1 - nightAlpha;
       }
     }
   }
 
   // Сбросить дневной цветовой фильтр
   resetDayColorFilter() {
-    // Сбрасываем фильтры для дневного режима
-    if (typeof window !== 'undefined') {
-      if (window.roadsLayer) {
-        window.roadsLayer.tint = 0xffffff;
-        window.roadsLayer.alpha = 1;
+    // Сбрасываем фильтры для дневного режима через worldRenderer
+    if (this.worldRenderer) {
+      const roadsLayer = this.worldRenderer.getRoadsLayer();
+      const lotsLayer = this.worldRenderer.getLotsLayer();
+      const zonesLayer = this.worldRenderer.getZonesLayer();
+      const labelsLayer = this.worldRenderer.getLabelsLayer();
+      
+      if (roadsLayer) {
+        roadsLayer.tint = 0xffffff;
+        roadsLayer.alpha = 1;
       }
-      if (window.lotsLayer) {
-        window.lotsLayer.tint = 0xffffff;
-        window.lotsLayer.alpha = 1;
+      if (lotsLayer) {
+        lotsLayer.tint = 0xffffff;
+        lotsLayer.alpha = 1;
       }
-      if (window.zonesLayer) {
-        window.zonesLayer.tint = 0xffffff;
-        window.zonesLayer.alpha = 1;
+      if (zonesLayer) {
+        zonesLayer.tint = 0xffffff;
+        zonesLayer.alpha = 1;
       }
-      if (window.labelsLayer) {
-        window.labelsLayer.tint = 0xffffff;
-        window.labelsLayer.alpha = 1;
+      if (labelsLayer) {
+        labelsLayer.tint = 0xffffff;
+        labelsLayer.alpha = 1;
       }
     }
   }
 
   // Добавить источник света в слой освещения
   addLightSource(lightObject) {
-    if (typeof window !== 'undefined' && window.lightingLayer) {
-      window.lightingLayer.addChild(lightObject);
-      console.log('💡 Источник света добавлен в слой освещения');
+    if (this.worldRenderer) {
+      const lightingLayer = this.worldRenderer.getLightingLayer();
+      if (lightingLayer) {
+        lightingLayer.addChild(lightObject);
+        console.log('💡 Источник света добавлен в слой освещения');
+      }
     }
   }
 
   // Удалить источник света из слоя освещения
   removeLightSource(lightObject) {
-    if (typeof window !== 'undefined' && window.lightingLayer && lightObject.parent) {
-      lightObject.parent.removeChild(lightObject);
-      console.log('💡 Источник света удален из слоя освещения');
+    if (this.worldRenderer) {
+      const lightingLayer = this.worldRenderer.getLightingLayer();
+      if (lightingLayer && lightObject.parent) {
+        lightObject.parent.removeChild(lightObject);
+        console.log('💡 Источник света удален из слоя освещения');
+      }
     }
   }
 }
