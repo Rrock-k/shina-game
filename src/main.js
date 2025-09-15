@@ -65,6 +65,8 @@ let savedCarState = null; // сохраненное состояние маши�
 const intersectionKeyToTL = new Map();
 // Координатор зеленой волны светофоров
 const trafficCoordinator = new TrafficLightCoordinator(45); // скорость машин ~45 км/ч
+// Делаем trafficCoordinator глобально доступным
+window.trafficCoordinator = trafficCoordinator;
 
 // 🚦 КОНФИГУРАЦИЯ СВЕТОФОРОВ 🚦
 // Массив буквенно-цифровых координат перекрестков, где должны быть светофоры
@@ -79,6 +81,9 @@ const TRAFFIC_LIGHTS_CONFIG = [
   'F2', 'F4',        // шестой столбец
   'G1', 'G3', 'G4'   // правый столбец (выезд из города) - убран G2
 ];
+
+// Делаем конфигурацию светофоров глобально доступной
+window.TRAFFIC_LIGHTS_CONFIG = TRAFFIC_LIGHTS_CONFIG;
 
 // Определяем мобильное устройство в начале
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -107,7 +112,7 @@ let panningController;
 let worldRenderer = game.worldRenderer;
 let uiRenderer = game.uiRenderer;
 
-setupWorld();
+game._setupWorld(intersectionKeyToTL);
 
 uiRenderer.init();
 

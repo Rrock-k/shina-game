@@ -29,8 +29,12 @@ export class CarTrafficController {
     const intersectionKey = `${targetIntersection.x},${targetIntersection.y}`;
     const trafficLight = intersectionMap.get(intersectionKey);
 
+    console.log(`🚦 intersectionMap size: ${intersectionMap.size}, keys:`, Array.from(intersectionMap.keys()));
+    console.log(`🚦 Looking for intersection: ${intersectionKey}, found:`, trafficLight ? 'YES' : 'NO');
+
     if (!trafficLight) {
       // Нет светофора на этом перекрестке - можем ехать
+      console.log(`🚦 Нет светофора на перекрестке ${intersectionKey} - можем ехать`);
       this.clearWaitingState();
       return { canMove: true, shouldStop: false };
     }
@@ -41,7 +45,7 @@ export class CarTrafficController {
       carPosition.y - targetIntersection.y
     );
 
-    // console.log(`🚦 Traffic check: distance=${distanceToIntersection.toFixed(1)}, direction=${direction}, allowed=${isPassAllowed}, intersection=${intersectionKey}, phase=${trafficLight.phase || 'unknown'}`);
+    console.log(`🚦 Traffic check: distance=${distanceToIntersection.toFixed(1)}, direction=${direction}, allowed=${isPassAllowed}, intersection=${intersectionKey}, phase=${trafficLight.phase || 'unknown'}`);
 
     // Если уже ждем на этом перекрестке
     if (this.isWaitingAtTrafficLight && this.lastCheckedIntersection === intersectionKey) {

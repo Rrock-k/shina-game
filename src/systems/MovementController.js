@@ -237,7 +237,19 @@ export class MovementController {
       x: this.car.position.x + offsetX,
       y: this.car.position.y + offsetY
     };
-    const targetIntersection = { x: p2.x, y: p2.y }; // целевой перекресток
+    // Находим реальный перекресток впереди по направлению движения
+    const targetIntersection = carTrafficController.findNextIntersection(
+      currentPos,
+      { x: p2.x, y: p2.y },
+      getVerticalRoadXs(),
+      getHorizontalRoadYs()
+    );
+    
+    // Если нет перекрестка впереди, пропускаем проверку светофоров
+    if (!targetIntersection) {
+      return true;
+    }
+    
     const roadPositions = { 
       verticalRoadXs: getVerticalRoadXs(), 
       horizontalRoadYs: getHorizontalRoadYs() 
@@ -249,10 +261,15 @@ export class MovementController {
     if (this.car.currentSegment === 0 && this.car.progress < 20) {
       console.log(`🚗 DEBUG: segment=${this.car.currentSegment}, progress=${this.car.progress.toFixed(1)}, distance=${distanceToIntersection.toFixed(1)}, carPos=(${this.car.position.x.toFixed(0)},${this.car.position.y.toFixed(0)}), frontPos=(${currentPos.x.toFixed(0)},${currentPos.y.toFixed(0)}) to=(${targetIntersection.x},${targetIntersection.y})`);
     }
+    
+    // ОТЛАДКА: показываем информацию о перекрестке
+    if (targetIntersection) {
+      console.log(`🚦 Найден перекресток: (${targetIntersection.x}, ${targetIntersection.y}), distance=${distanceToIntersection.toFixed(1)}`);
+    }
 
-    // 1. Находимся в зоне проверки (30-60 пикселей до перекрестка)
+    // 1. Находимся в зоне проверки (50-100 пикселей до перекрестка)
     // 2. И НЕ стоим прямо на перекрестке старта 
-    if (distanceToIntersection <= 60 && distanceToIntersection > 15) { // зона проверки светофора
+    if (distanceToIntersection <= 100 && distanceToIntersection > 20) { // зона проверки светофора
       const trafficCheck = carTrafficController.checkTrafficLights(
         currentPos,
         targetIntersection,

@@ -10,6 +10,7 @@ import { Shina } from '../entities/Shina.js';
 import { CarTrafficController } from '../systems/carTrafficControl.js';
 import { PathBuilder } from '../systems/PathBuilder.js';
 import { CONFIG } from '../config/gameConfig.js';
+import { initTrafficLightsForIntersection, TrafficLightCoordinator } from '../systems/trafficLights.js';
 
 /**
  * Главный класс игры - централизует управление игровым состоянием и циклом
@@ -222,7 +223,11 @@ class Game {
         // Обновляем светофоры (пустой цикл из main.js)
         if (window.intersectionKeyToTL) {
             window.intersectionKeyToTL.forEach((trafficLight, key) => {
-                // Пустой цикл - светофоры обновляются автоматически
+                // Пустой цикл - светофоры обновляются автоматически через app.ticker
+                // Но проверим, что светофоры работают
+                if (trafficLight && typeof trafficLight.isPassAllowed === 'function') {
+                    // Светофор работает правильно
+                }
             });
         }
     }
@@ -580,6 +585,271 @@ class Game {
     }
 
     /**
+     * Настроить мир игры (слои, светофоры, UI)
+     * @param {Map} intersectionKeyToTL - карта светофоров
+     */
+    _setupWorld(intersectionKeyToTL) {
+        // Получаем слои из экземпляра игры - теперь используем напрямую через this
+        const world = this.world;
+        const gridLayer = this.gridLayer;
+        const roadsLayer = this.roadsLayer;
+        const lotsLayer = this.lotsLayer;
+        const zonesLayer = this.zonesLayer;
+        const labelsLayer = this.labelsLayer;
+        const intersectionsLayer = this.intersectionsLayer;
+        const decorLayer = this.decorLayer;
+        const trafficLightsLayer = this.trafficLightsLayer;
+        const borderLayer = this.borderLayer;
+        const lightingLayer = this.lightingLayer;
+        const uiLayer = this.uiLayer;
+
+        // Инициализируем WorldRenderer с слоями
+        this.worldRenderer.init(world, {
+            grid: gridLayer,
+            roads: roadsLayer,
+            lots: lotsLayer,
+            zones: zonesLayer,
+            intersections: intersectionsLayer,
+            trafficLights: trafficLightsLayer,
+            labels: labelsLayer,
+            decor: decorLayer,
+            border: borderLayer
+        });
+
+        // Добавляем слои в правильном порядке (снизу вверх)
+        world.addChild(gridLayer);
+        world.addChild(roadsLayer);
+        world.addChild(intersectionsLayer);
+        world.addChild(lotsLayer);
+        world.addChild(zonesLayer);
+        world.addChild(labelsLayer);
+        world.addChild(borderLayer);
+
+        // Используем WorldRenderer для отрисовки базовых элементов
+        this.worldRenderer.render(this.zoneGeometry);
+        // Светофоры создаются в отдельном слое (пока что в trafficLightsLayer)
+        this._createTrafficLightsForAllIntersections(this.trafficLightsLayer, intersectionKeyToTL, window.TRAFFIC_LIGHTS_CONFIG);
+
+        // Пропускаем создание оверлея здесь, так как dayNightManager еще не инициализирован
+        // Оверлей будет создан позже в updateNightMode
+
+        // Добавляем decorLayer (машина) - будет добавлен поверх оверлея
+        world.addChild(decorLayer);
+
+        // Добавляем светофоры - будут добавлены поверх оверлея
+        world.addChild(trafficLightsLayer);
+
+        // Добавляем слой освещения ПЕРЕД UI (но после ночного оверлея)
+        lightingLayer.zIndex = 1000; // поверх ночного оверлея
+        this.app.stage.addChild(lightingLayer);
+
+        uiLayer.zIndex = 2000; // поверх всего
+        this.app.stage.addChild(uiLayer);
+
+        const pauseButton = document.getElementById('pause-button');
+        const speedButton = document.getElementById('speed-button');
+        const zoomButton = document.getElementById('zoom-button');
+        const zoomInButton = document.getElementById('zoom-in-button');
+        const zoomOutButton = document.getElementById('zoom-out-button');
+
+        // Настраиваем кнопку паузы
+        pauseButton.addEventListener('click', () => {
+            this.pauseManager.togglePause();
+            this.timeManager.setPaused(this.pauseManager.isPaused());
+            this.pauseManager.showSpeedNotification(this.pauseManager.isPaused() ? 'ПАУЗА' : 'ВОЗОБНОВЛЕНО');
+        });
+
+        // Настраиваем кнопку скорости
+        speedButton.addEventListener('click', () => {
+            const currentSpeed = this.pauseManager.getSpeedMultiplier();
+            let newSpeed;
+            
+            // Цикл: x1 → x2 → x5 → x1
+            if (currentSpeed === 1) {
+                newSpeed = 2;
+            } else if (currentSpeed === 2) {
+                newSpeed = 5;
+            } else {
+                newSpeed = 1;
+            }
+            
+            this.pauseManager.setSpeedBoosted(newSpeed > 1);
+            this.pauseManager.setSpeedMultiplier(newSpeed);
+            this.timeManager.setSpeedMultiplier(newSpeed);
+
+            // Обновляем внешний вид кнопки
+            speedButton.textContent = `x${newSpeed}`;
+            speedButton.classList.toggle('boosted', newSpeed > 1);
+
+            // Логируем изменение
+            console.log(`⚡ СКОРОСТЬ ИГРЫ: x${newSpeed} ${newSpeed > 1 ? 'УСКОРЕНО' : 'НОРМАЛЬНАЯ'}`);
+
+            // Показываем уведомление
+            this.pauseManager.showSpeedNotification(`СКОРОСТЬ x${newSpeed}`);
+        });
+
+        const initialSpeed = this.pauseManager.getSpeedMultiplier();
+        speedButton.textContent = `x${initialSpeed}`;
+        speedButton.classList.toggle('boosted', initialSpeed > 1);
+
+        // Настраиваем кнопку масштабирования
+        zoomButton.addEventListener('click', () => {
+            if (typeof window.panningController !== 'undefined' && window.panningController) {
+                window.panningController.toggleZoom();
+                this.uiRenderer.updateZoomButton();
+            }
+        });
+
+        // Настраиваем кнопки увеличения/уменьшения масштаба
+        zoomInButton.addEventListener('click', () => {
+            if (typeof window.panningController !== 'undefined' && window.panningController) {
+                window.panningController.zoomIn();
+                this.uiRenderer.updateZoomButton();
+            }
+        });
+
+        zoomOutButton.addEventListener('click', () => {
+            if (typeof window.panningController !== 'undefined' && window.panningController) {
+                window.panningController.zoomOut();
+                this.uiRenderer.updateZoomButton();
+            }
+        });
+
+        // Инициализируем PanningController
+        const PanningController = window.PanningController;
+        if (PanningController) {
+            window.panningController = new PanningController();
+            window.panningController.setWorld(this.world);
+            window.panningController.setOnZoomChange((scale) => {
+                if (this.uiRenderer) {
+                    this.uiRenderer.updateZoomButton();
+                }
+            });
+            window.panningController.setOnFullscreenChange((isFullscreen) => {
+                if (this.uiRenderer) {
+                    this.uiRenderer.updateZoomButton();
+                }
+            });
+        }
+
+        // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
+        setTimeout(() => {
+            // перестроим путь, когда геометрия зон уже известна
+            if (this.carEntity) {
+                const newPath = window.pathBuilder.buildCarPath(this.carEntity, window.currentRouteIndex, window.savedCarState, this._getDestinationCenter.bind(this), window.debugLogAlways);
+                this.carEntity.setPath(newPath);
+            }
+        }, 0);
+    }
+
+    /**
+     * Создать светофоры для всех перекрестков
+     * @param {Object} layer - слой для светофоров
+     * @param {Map} intersectionKeyToTL - карта светофоров
+     * @param {Array} trafficLightsConfig - конфигурация светофоров
+     */
+    _createTrafficLightsForAllIntersections(layer, intersectionKeyToTL, trafficLightsConfig) {
+        // Очищаем переданную карту
+        intersectionKeyToTL.clear();
+        
+        // Делаем карту глобально доступной
+        window.intersectionKeyToTL = intersectionKeyToTL;
+        const { maxVerticalPos } = this.worldRenderer ? this.worldRenderer.getRoadPositions() : { maxVerticalPos: 0 };
+        const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
+        const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
+
+        for (let j = 0; j < horizontalRoadYs.length; j++) {
+            for (let i = 0; i < verticalRoadXs.length; i++) {
+                const x = verticalRoadXs[i];
+                const y = horizontalRoadYs[j];
+
+                if (!this._shouldHaveTrafficLight(i, j, trafficLightsConfig)) {
+                    continue; // пропускаем этот перекресток
+                }
+
+                // Определяем, какие дороги есть в каждом направлении
+                const roadConnections = {
+                    north: j > 0 || (x === maxVerticalPos), // дорога на север: внутренний ряд ИЛИ правая дорога (выезд за город)
+                    south: j < horizontalRoadYs.length - 1 || (x === maxVerticalPos), // дорога на юг: внутренний ряд ИЛИ правая дорога (выезд за город)
+                    west: i > 0, // есть дорога на запад, если не крайний левый столбец
+                    east: i < verticalRoadXs.length - 1 // есть дорога на восток, если не крайний правый столбец
+                };
+
+                const tl = initTrafficLightsForIntersection({
+                    PIXI,
+                    app: this.app,
+                    layer,
+                    x,
+                    y,
+                    roadWidth: CONFIG.ROAD_WIDTH,
+                    lampRadius: 9,
+                    cycle: { green: 750, yellow: 200 },
+                    roadConnections
+                });
+                const key = `${x},${y}`;
+                intersectionKeyToTL.set(key, tl);
+
+                // Регистрируем светофор в координаторе зеленой волны
+                if (window.trafficCoordinator) {
+                    window.trafficCoordinator.addTrafficLight(key, tl, x, y);
+                } else {
+                    console.warn('🚦 trafficCoordinator не найден при добавлении светофора');
+                }
+            }
+        }
+
+        if (verticalRoadXs.length > 0 && horizontalRoadYs.length > 0) {
+            if (window.trafficCoordinator) {
+                window.trafficCoordinator.setWaveOrigin(verticalRoadXs[0], horizontalRoadYs[0]);
+            } else {
+                console.warn('🚦 trafficCoordinator не найден в window');
+            }
+        }
+        
+        console.log(`🚦 Создано светофоров: ${intersectionKeyToTL.size}`);
+    }
+
+    /**
+     * Проверить, должен ли быть светофор на данном перекрестке
+     * @param {number} i - индекс столбца
+     * @param {number} j - индекс ряда
+     * @param {Array} trafficLightsConfig - конфигурация светофоров
+     * @returns {boolean} true если должен быть светофор
+     */
+    _shouldHaveTrafficLight(i, j, trafficLightsConfig) {
+        const coord = String.fromCharCode(65 + i) + (j + 1);
+        const hasConfig = trafficLightsConfig ? true : false;
+        const includes = hasConfig ? trafficLightsConfig.includes(coord) : false;
+        return includes;
+    }
+
+    /**
+     * Настроить layout игры
+     */
+    _layout() {
+        const w = 1200;
+        const h = 800;
+        const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
+
+        if (!window.panningController || window.panningController.getCurrentScale() === 1) {
+            this.world.scale.set(scale);
+            this.world.pivot.set(0, 0);
+            this.world.position.set(
+                (w - CONFIG.WORLD_WIDTH * scale) / 2,
+                (h - CONFIG.WORLD_HEIGHT * scale) / 2
+            );
+        }
+
+        this.labelsLayer.children.forEach(label => {
+            label.scale.set(1 / scale);
+        });
+
+        // Светофоры теперь внутри world, поэтому синхронизация не нужна
+        
+        this._initEntities(window.currentRouteIndex, window.savedCarState, window.carRenderer);
+    }
+
+    /**
      * Создать машину и связанные компоненты
      * @param {number} currentRouteIndex - текущий индекс маршрута
      * @param {Object} savedCarState - сохраненное состояние машины
@@ -616,7 +886,7 @@ class Game {
         window.carTrafficController = carTrafficController;
         window.pathBuilder = pathBuilder;
         window.carRenderer = carRenderer;
-        window.intersectionKeyToTL = intersectionKeyToTL;
+        // window.intersectionKeyToTL уже установлена в _setupWorld
         window.getDestinationCenter = this._getDestinationCenter.bind(this);
 
         // Начинаем с дома
