@@ -408,32 +408,38 @@ export class WorldRenderer {
    */
   createWrappedLabel(textValue, fontSize, maxWidth) {
     const style = new PIXI.TextStyle({
-      fontFamily: 'sans-serif',
-      fontSize,
-      fill: 0x000000,
+      fontFamily: 'Arial, sans-serif',
+      fontSize: Math.max(fontSize, 18), // Минимальный размер для читаемости
+      fill: 0xecf0f1, // Светлый цвет как в меню
       wordWrap: true,
       wordWrapWidth: maxWidth,
       breakWords: true,
       align: 'center',
-      stroke: 0xffffff,
-      strokeThickness: 4
+      stroke: 0x2c3e50, // Темный обводка для контраста
+      strokeThickness: 3,
+      fontWeight: 'bold',
+      dropShadow: true,
+      dropShadowColor: 0x000000,
+      dropShadowBlur: 4,
+      dropShadowAngle: Math.PI / 4,
+      dropShadowDistance: 2
     });
     const label = new PIXI.Text(textValue, style);
-    label.anchor.set(0.5);
+    label.anchor.set(0, 0); // Левое верхнее выравнивание
     return label;
   }
 
   /**
    * Отрисовка метки
    * @param {string} textValue - текст
-   * @param {number} x - X координата
-   * @param {number} y - Y координата
+   * @param {number} x - X координата (уже с отступом)
+   * @param {number} y - Y координата (уже с отступом)
    * @param {number} maxWidth - максимальная ширина
    * @param {PIXI.Container} layer - слой для отрисовки
    */
   drawLabel(textValue, x, y, maxWidth, layer) {
     const label = this.createWrappedLabel(textValue, this.config.BASE_FONT, Math.max(60, maxWidth * 0.9));
-    label.position.set(x, y);
+    label.position.set(x, y); // Прямое позиционирование, так как отступ уже учтен
     layer.addChild(label);
   }
 
@@ -534,20 +540,19 @@ export class WorldRenderer {
       const minY = Math.min(...cells.map(({ r }) => startY + r * (lotHeight + gap)));
       const maxY = Math.max(...cells.map(({ r }) => startY + r * (lotHeight + gap) + lotHeight));
 
-      // Подпись в центре тяжести фигуры (среднее центров занятых ячеек)
-      const centers = cells.map(({ c, r }) => ({
-        cx: startX + c * (lotWidth + gap) + lotWidth / 2,
-        cy: startY + r * (lotHeight + gap) + lotHeight / 2
-      }));
-      const cgx = centers.reduce((s, p) => s + p.cx, 0) / centers.length;
-      const cgy = centers.reduce((s, p) => s + p.cy, 0) / centers.length;
+      // Подпись в левом верхнем углу фигуры с отступом
+      const labelPadding = 10;
+      const labelX = minX + labelPadding;
+      const labelY = minY + labelPadding;
       // Ширина для переноса: охватывающая ширина фигуры
-      this.drawLabel(this.config.ZONES[name].label, cgx, cgy, maxX - minX, layer);
+      this.drawLabel(this.config.ZONES[name].label, labelX, labelY, maxX - minX, layer);
 
       // Сохраняем геометрию зоны (центр и bbox)
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
       const zoneData = {
         type: 'composite',
-        center: { x: cgx, y: cgy },
+        center: { x: centerX, y: centerY },
         bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
       };
       zoneGeometry.set(name, zoneData);
@@ -568,11 +573,13 @@ export class WorldRenderer {
     const w = (maxC - minC + 1) * lotWidth + (maxC - minC) * gap;
     const h = (maxR - minR + 1) * lotHeight + (maxR - minR) * gap;
     this.drawZoneRect(x, y, w, h, this.config.COLORS[colorKey], layer);
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    this.drawLabel(this.config.ZONES[name].label, cx, cy, w, layer);
+    // Подпись в левом верхнем углу с отступом
+    const labelPadding = 10;
+    this.drawLabel(this.config.ZONES[name].label, x + labelPadding, y + labelPadding, w, layer);
     // Сохраняем геометрию зоны
-    zoneGeometry.set(name, { type: 'rect', center: { x: cx, y: cy }, bounds: { x, y, w, h } });
+    const centerX = x + w / 2;
+    const centerY = y + h / 2;
+    zoneGeometry.set(name, { type: 'rect', center: { x: centerX, y: centerY }, bounds: { x, y, w, h } });
   }
 
   /**
@@ -622,11 +629,17 @@ export class WorldRenderer {
     let hoverLabel;
     if (!this.hoverLabel) {
       hoverLabel = new PIXI.Text('', {
-        fontFamily: 'sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: this.config.BASE_FONT,
-        fill: 0xffff66,
-        stroke: 0x000000,
-        strokeThickness: 4
+        fill: 0xf39c12, // Оранжевый цвет как в меню для акцентов
+        stroke: 0x2c3e50,
+        strokeThickness: 3,
+        fontWeight: 'bold',
+        dropShadow: true,
+        dropShadowColor: 0x000000,
+        dropShadowBlur: 3,
+        dropShadowAngle: Math.PI / 4,
+        dropShadowDistance: 1
       });
       hoverLabel.anchor.set(0.5, 1);
       hoverLabel.visible = false;
@@ -748,11 +761,17 @@ export class WorldRenderer {
         y = z.y;
       }
       const text = new PIXI.Text(z.label, {
-        fontFamily: 'sans-serif',
+        fontFamily: 'Arial, sans-serif',
         fontSize: this.config.BASE_FONT,
-        fill: 0xffffff,
-        stroke: 0x000000,
-        strokeThickness: 4
+        fill: 0xecf0f1,
+        stroke: 0x2c3e50,
+        strokeThickness: 3,
+        fontWeight: 'bold',
+        dropShadow: true,
+        dropShadowColor: 0x000000,
+        dropShadowBlur: 4,
+        dropShadowAngle: Math.PI / 4,
+        dropShadowDistance: 2
       });
       text.anchor.set(0.5);
       text.position.set(x, y);
