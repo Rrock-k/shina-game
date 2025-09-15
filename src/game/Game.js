@@ -211,7 +211,7 @@ class Game {
         
         // Создаем UIRenderer после регистрации panningController
         const panningController = this.dependencies.has('panningController') ? this.dependencies.get('panningController') : null;
-        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, panningController, this.journalManager);
+        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, panningController, this.journalManager, this.carEntity);
         
         // Настраиваем мир
         this._setupWorld(this.intersectionKeyToTL);

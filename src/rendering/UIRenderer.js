@@ -3,13 +3,14 @@
  * Обрабатывает меню, уведомления, дисплеи и кнопки
  */
 export class UIRenderer {
-  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager) {
+  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager, carEntity) {
     this.config = config;
     this.timeManager = timeManager;
     this.pauseManager = pauseManager;
     this.dayNightManager = dayNightManager;
     this.panningController = panningController;
     this.journalManager = journalManager;
+    this.carEntity = carEntity;
     
     // UI элементы
     this.datetimeDisplay = null;
@@ -186,8 +187,8 @@ export class UIRenderer {
         break;
       case 'menu-car-lights':
         // Переключаем фары машины
-        if (window.carEntity && typeof window.carEntity.toggleHeadlights === 'function') {
-          window.carEntity.toggleHeadlights();
+        if (this.carEntity && typeof this.carEntity.toggleHeadlights === 'function') {
+          this.carEntity.toggleHeadlights();
           this.updateCarLightsDisplay();
         }
         break;
@@ -415,8 +416,8 @@ export class UIRenderer {
     if (!lightsStatus) return;
     
     let headlightsOn = false;
-    if (window.carEntity && typeof window.carEntity.areHeadlightsOn === 'function') {
-      headlightsOn = window.carEntity.areHeadlightsOn();
+    if (this.carEntity && typeof this.carEntity.areHeadlightsOn === 'function') {
+      headlightsOn = this.carEntity.areHeadlightsOn();
     }
     
     lightsStatus.textContent = headlightsOn ? 'ВКЛ' : 'ВЫКЛ';
