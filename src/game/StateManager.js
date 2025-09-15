@@ -185,8 +185,6 @@ class StateManager {
         // Рассчитываем новое время пребывания
         const newStayTimer = currentStayDuration - timeDiff / 60; // переводим в игровые часы
         
-        console.log(`⏱️ Таймер пребывания: ${timeDiff} минут прошло, осталось ${newStayTimer.toFixed(2)} часов`);
-        
         return newStayTimer;
     }
     
