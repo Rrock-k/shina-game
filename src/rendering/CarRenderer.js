@@ -93,21 +93,21 @@ class CarRenderer {
   }
 
   /**
-   * Обновляет визуальное представление машины на основе данных из Car
-   * @param {Object} car - объект Car с актуальными данными
+   * Обновляет визуальное представление машины на основе данных для рендеринга
+   * @param {Object} carViewState - объект с данными для рендеринга {position, rotation, headlightsOn}
    */
-  updateVisuals(car) {
+  updateVisuals(carViewState) {
     if (!this.car) return;
 
     // Обновляем позицию машины
-    this.car.position.set(car.position.x, car.position.y);
+    this.car.position.set(carViewState.position.x, carViewState.position.y);
     
     // Обновляем поворот машины
-    this.car.rotation = car.rotation;
+    this.car.rotation = carViewState.rotation;
     
     // Обновляем поворот аватарки (противоположный повороту машины)
     if (this.avatar) {
-      this.avatar.rotation = -car.rotation;
+      this.avatar.rotation = -carViewState.rotation;
     }
   }
 

@@ -581,6 +581,18 @@ export class Car {
   }
 
   /**
+   * Получить данные для визуального представления (View Model)
+   * @returns {Object} объект с данными для рендеринга
+   */
+  getViewState() {
+    return {
+      position: this.position,
+      rotation: this.rotation,
+      headlightsOn: this.headlightsOn
+    };
+  }
+
+  /**
    * Получить информацию о машине для отладки
    * @returns {Object} объект с информацией о состоянии
    */
