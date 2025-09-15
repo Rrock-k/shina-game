@@ -124,10 +124,10 @@ setTimeout(() => {
 
 const carData = game._createCar(currentRouteIndex, savedCarState, intersectionKeyToTL, uiRenderer, debugLogAlways);
 carRenderer = carData.carRenderer;
-layout();
+game._layout(panningController, currentRouteIndex, savedCarState, carRenderer);
 window.addEventListener('resize', () => {
   // Убираем изменение размера canvas - оставляем фиксированный размер
-  layout();
+  game._layout(panningController, currentRouteIndex, savedCarState, carRenderer);
 
   // Если включен полноэкранный режим, обновляем его при изменении размера окна
   if (typeof panningController !== 'undefined' && panningController && panningController.isFullscreenMode()) {
@@ -351,28 +351,6 @@ function createTrafficLightsForAllIntersections (layer) {
 
 
 
-function layout () {
-  const w = 1200;
-  const h = 800;
-  const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
-
-  if (!panningController || panningController.getCurrentScale() === 1) {
-    game.world.scale.set(scale);
-    game.world.pivot.set(0, 0);
-    game.world.position.set(
-      (w - CONFIG.WORLD_WIDTH * scale) / 2,
-      (h - CONFIG.WORLD_HEIGHT * scale) / 2
-    );
-  }
-
-  game.labelsLayer.children.forEach(label => {
-    label.scale.set(1 / scale);
-  });
-
-  // Светофоры теперь внутри world, поэтому синхронизация не нужна
-  
-  game._initEntities(currentRouteIndex, savedCarState, carRenderer);
-}
 
 // ======= Новая логика движения по графу перекрёстков и зданий =======
 // Вспомогательные функции индексации и координат перекрёстков

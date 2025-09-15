@@ -950,6 +950,36 @@ class Game {
         return window.TRAFFIC_LIGHTS_CONFIG.includes(coord);
     }
 
+    /**
+     * Управляет компоновкой и масштабированием игрового мира
+     * @param {Object} panningController - контроллер панорамирования
+     * @param {number} currentRouteIndex - текущий индекс маршрута
+     * @param {Object} savedCarState - сохраненное состояние машины
+     * @param {Object} carRenderer - рендерер машины
+     */
+    _layout(panningController, currentRouteIndex, savedCarState, carRenderer) {
+        const w = 1200;
+        const h = 800;
+        const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
+
+        if (!panningController || panningController.getCurrentScale() === 1) {
+            this.world.scale.set(scale);
+            this.world.pivot.set(0, 0);
+            this.world.position.set(
+                (w - CONFIG.WORLD_WIDTH * scale) / 2,
+                (h - CONFIG.WORLD_HEIGHT * scale) / 2
+            );
+        }
+
+        this.labelsLayer.children.forEach(label => {
+            label.scale.set(1 / scale);
+        });
+
+        // Светофоры теперь внутри world, поэтому синхронизация не нужна
+        
+        this._initEntities(currentRouteIndex, savedCarState, carRenderer);
+    }
+
 }
 
 export default Game;

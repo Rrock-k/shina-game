@@ -52,14 +52,14 @@ let buildingAvatars = new Map();
 - ✅ Обновлены ссылки на `decorLayer` → `game.decorLayer`
 
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
-- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~300 строк (было 808)
+- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~280 строк (было 808)
 - ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()`, `createCar()`, `updateEntities()`, `updateCar()`, `setupWorld()`, `layout()` в Game.js
 - ✅ **НОВОЕ**: Перенесены функции `parseIntersectionCoordinate()` и `shouldHaveTrafficLight()` в Game.js как приватные методы
 - ✅ **НОВОЕ**: Перенесены переменные `lastStayTimerUpdate` и `lastStayTimerDay` в Game.js
 - ✅ **НОВОЕ**: Перенесена функция `updateEntities()` в Game.js как метод класса
 - ✅ **НОВОЕ**: Перенесена функция `updateCar()` в Game.js как метод `_updateCar()`
 - ✅ **НОВОЕ**: Перенесена функция `setupWorld()` в Game.js как метод `_setupWorld()`
-- ✅ **НОВОЕ**: Перенесена функция `layout()` в Game.js как метод `_layout()`
+- ✅ **НОВОЕ**: Перенесена функция `layout()` в Game.js как метод `_layout()` ✅
 - ✅ **НОВОЕ**: Перенесена функция `createTrafficLightsForAllIntersections()` в Game.js как метод `_createTrafficLightsForAllIntersections()`
 - ✅ **НОВОЕ**: Добавлена функция `_shouldHaveTrafficLight()` в Game.js
 - **Файлы**: `src/main.js`, `src/game/Game.js`
@@ -102,6 +102,9 @@ let buildingAvatars = new Map();
 - ✅ **ИСПРАВЛЕНО**: Исправлена инициализация `TRAFFIC_LIGHTS_CONFIG` - константа теперь доступна в глобальной области видимости
 - ✅ **ИСПРАВЛЕНО**: Обновлен метод `_createTrafficLightsForAllIntersections()` для получения конфигурации светофоров как параметра
 - ✅ **ИСПРАВЛЕНО**: Машина теперь корректно останавливается на красных светофорах и проезжает на зеленых
+- ✅ **НОВОЕ**: Перенесена функция `layout()` в `Game.js` как метод `_layout()`
+- ✅ **НОВОЕ**: Обновлены все вызовы `layout()` → `game._layout()` в main.js
+- ✅ **НОВОЕ**: Удалена функция `layout()` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 
