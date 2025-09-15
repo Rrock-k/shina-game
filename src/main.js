@@ -147,7 +147,8 @@ setTimeout(() => {
   pauseManager.updatePauseModeText();
 }, 100);
 
-createCar();
+const carData = game._createCar(currentRouteIndex, savedCarState, intersectionKeyToTL, uiRenderer, debugLogAlways);
+carRenderer = carData.carRenderer;
 layout();
 window.addEventListener('resize', () => {
   // Убираем изменение размера canvas - оставляем фиксированный размер
@@ -418,65 +419,7 @@ function layout () {
 
 // Построить полный маршрут с учётом ограничений: только I->I и I->B/B->I
 
-function createCar () {
-  carRenderer = new CarRenderer(CONFIG, pauseManager);
-  
-  const car = carRenderer.createCar({
-    carPath: [],
-    currentRouteIndex: currentRouteIndex,
-    savedCarState: savedCarState,
-    getDestinationCenter: game._getDestinationCenter.bind(game)
-  });
-  
-  const avatar = carRenderer.getAvatar();
-  
-  const carTrafficController = new CarTrafficController();
-
-  const verticalRoadXs = game.worldRenderer ? game.worldRenderer.getVerticalRoadXs() : [];
-  const horizontalRoadYs = game.worldRenderer ? game.worldRenderer.getHorizontalRoadYs() : [];
-  console.log('🔧 Инициализация PathBuilder:', {
-    verticalRoads: verticalRoadXs.length,
-    horizontalRoads: horizontalRoadYs.length,
-    verticalRoadXs: verticalRoadXs.slice(0, 5), // первые 5 для примера
-    horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
-  });
-  const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
-  
-  // Делаем дополнительные переменные глобально доступными для Game.js (временно)
-  window.carTrafficController = carTrafficController;
-  window.pathBuilder = pathBuilder;
-  window.carRenderer = carRenderer;
-  window.intersectionKeyToTL = intersectionKeyToTL;
-  window.getDestinationCenter = game._getDestinationCenter.bind(game);
-
-  // Начинаем с дома
-  currentRouteIndex = 0; // дом
-  stayTimer = CONFIG.ROUTE_SCHEDULE[0].stayHours; // устанавливаем таймер для дома
-  
-  // Обновляем индекс маршрута в UIRenderer
-  if (uiRenderer) {
-    uiRenderer.setCurrentRouteIndex(currentRouteIndex);
-  }
-
-  // Не начинаем поездку сразу - она начнется при выходе из здания
-
-  const carPath = pathBuilder.buildCarPath(game.carEntity, currentRouteIndex, savedCarState, game._getDestinationCenter.bind(game), debugLogAlways);
-  
-  // Если game.carEntity уже создан, обновляем его путь
-  if (game.carEntity) {
-    game.carEntity.setPath(carPath);
-    game.carEntity.setAtDestination(true);
-    game.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
-  }
-  
-  const gameTime = game.timeManager.getGameTime();
-  lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
-  lastStayTimerDay = gameTime.day;
-
-  game.decorLayer.addChild(car);
-
-  uiRenderer.updateRouteDisplay(game.carEntity ? game.carEntity.isAtDestination() : false);
-}
+// Создание машины теперь в Game.js
 
 
 

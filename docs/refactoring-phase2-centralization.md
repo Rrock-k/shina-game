@@ -52,8 +52,8 @@ let buildingAvatars = new Map();
 - ✅ Обновлены ссылки на `decorLayer` → `game.decorLayer`
 
 ### 6.3 Упростить main.js до точки входа ⏳ (В ПРОЦЕССЕ)
-- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~550 строк (было 808)
-- ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()` и `initEntities()` в Game.js
+- ⏳ **В ПРОЦЕССЕ**: main.js содержит ~500 строк (было 808)
+- ⏳ **В ПРОЦЕССЕ**: Перенесены функции `getDestinationCenter()`, `initEntities()` и `createCar()` в Game.js
 - **Файлы**: `src/main.js`, `src/game/Game.js`
 - **Проверка**: Функция `getDestinationCenter()` успешно перенесена, все ссылки обновлены.
 
@@ -68,6 +68,10 @@ let buildingAvatars = new Map();
 - ✅ **НОВОЕ**: Перенесена функция `initEntities()` в `Game.js` как `_initEntities()`
 - ✅ **НОВОЕ**: Обновлены все ссылки на `carEntity` и `shinaEntity` в main.js → `game.carEntity` и `game.shinaEntity`
 - ✅ **НОВОЕ**: Удалена функция `initEntities()` из main.js
+- ✅ **НОВОЕ**: Перенесена функция `createCar()` в `Game.js` как `_createCar()`
+- ✅ **НОВОЕ**: Добавлены импорты `CarRenderer`, `CarTrafficController`, `PathBuilder` в Game.js
+- ✅ **НОВОЕ**: Обновлен вызов в main.js на `game._createCar()` с получением `carRenderer`
+- ✅ **НОВОЕ**: Удалена функция `createCar()` из main.js
 
 **Цель**: Оставить только импорты и `const game = new Game(); game.start();`
 

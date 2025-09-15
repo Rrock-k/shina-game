@@ -4,8 +4,11 @@ import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
+import { CarRenderer } from '../rendering/CarRenderer.js';
 import { Car } from '../entities/Car.js';
 import { Shina } from '../entities/Shina.js';
+import { CarTrafficController } from '../systems/carTrafficControl.js';
+import { PathBuilder } from '../systems/PathBuilder.js';
 import { CONFIG } from '../config/gameConfig.js';
 
 /**
@@ -537,6 +540,82 @@ class Game {
         }
 
         // shinaEntity уже создан в конструкторе, дополнительная инициализация не требуется
+    }
+
+    /**
+     * Создать машину и связанные компоненты
+     * @param {number} currentRouteIndex - текущий индекс маршрута
+     * @param {Object} savedCarState - сохраненное состояние машины
+     * @param {Object} intersectionKeyToTL - карта светофоров
+     * @param {Object} uiRenderer - рендерер UI
+     * @param {Function} debugLogAlways - функция отладки
+     */
+    _createCar(currentRouteIndex, savedCarState, intersectionKeyToTL, uiRenderer, debugLogAlways) {
+        // Создаем рендерер машины
+        const carRenderer = new CarRenderer(CONFIG, this.pauseManager);
+        
+        const car = carRenderer.createCar({
+            carPath: [],
+            currentRouteIndex: currentRouteIndex,
+            savedCarState: savedCarState,
+            getDestinationCenter: this._getDestinationCenter.bind(this)
+        });
+        
+        const avatar = carRenderer.getAvatar();
+        
+        const carTrafficController = new CarTrafficController();
+
+        const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
+        const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
+        console.log('🔧 Инициализация PathBuilder:', {
+            verticalRoads: verticalRoadXs.length,
+            horizontalRoads: horizontalRoadYs.length,
+            verticalRoadXs: verticalRoadXs.slice(0, 5), // первые 5 для примера
+            horizontalRoadYs: horizontalRoadYs.slice(0, 5) // первые 5 для примера
+        });
+        const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, CONFIG);
+        
+        // Делаем дополнительные переменные глобально доступными для совместимости (временно)
+        window.carTrafficController = carTrafficController;
+        window.pathBuilder = pathBuilder;
+        window.carRenderer = carRenderer;
+        window.intersectionKeyToTL = intersectionKeyToTL;
+        window.getDestinationCenter = this._getDestinationCenter.bind(this);
+
+        // Начинаем с дома
+        const routeIndex = 0; // дом
+        const stayTimer = CONFIG.ROUTE_SCHEDULE[0].stayHours; // устанавливаем таймер для дома
+        
+        // Обновляем индекс маршрута в UIRenderer
+        if (uiRenderer) {
+            uiRenderer.setCurrentRouteIndex(routeIndex);
+        }
+
+        // Не начинаем поездку сразу - она начнется при выходе из здания
+        const carPath = pathBuilder.buildCarPath(this.carEntity, routeIndex, savedCarState, this._getDestinationCenter.bind(this), debugLogAlways);
+        
+        // Если carEntity уже создан, обновляем его путь
+        if (this.carEntity) {
+            this.carEntity.setPath(carPath);
+            this.carEntity.setAtDestination(true);
+            this.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
+        }
+        
+        const gameTime = this.timeManager.getGameTime();
+        this.lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
+        this.lastStayTimerDay = gameTime.day;
+
+        this.decorLayer.addChild(car);
+
+        uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
+        
+        return {
+            carRenderer,
+            carTrafficController,
+            pathBuilder,
+            routeIndex,
+            stayTimer
+        };
     }
 
 }
