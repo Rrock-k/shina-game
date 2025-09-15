@@ -29,33 +29,102 @@ function parseGitignore(gitignorePath) {
     return rules;
 }
 
+// Читаем .collectignore и парсим правила
+function parseCollectignore(collectignorePath) {
+    if (!fs.existsSync(collectignorePath)) {
+        return [];
+    }
+    
+    const content = fs.readFileSync(collectignorePath, 'utf8');
+    const rules = content.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(line => {
+            // Убираем ведущий слэш для упрощения
+            if (line.startsWith('/')) {
+                line = line.substring(1);
+            }
+            return line;
+        });
+    
+    return rules;
+}
+
+// Проверяем, является ли файл бинарным
+function isBinaryFile(filePath) {
+    try {
+        const buffer = fs.readFileSync(filePath);
+        // Проверяем первые 512 байт на наличие null байтов
+        for (let i = 0; i < Math.min(buffer.length, 512); i++) {
+            if (buffer[i] === 0) {
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
 // Проверяем, должен ли файл быть проигнорирован
-function shouldIgnore(filePath, gitignoreRules) {
+function shouldIgnore(filePath, gitignoreRules, collectignoreRules) {
     const relativePath = path.relative(process.cwd(), filePath);
     
+    // Принудительно исключаем скрытые папки и системные файлы
+    if (relativePath.startsWith('.git/') || 
+        relativePath.startsWith('.vscode/') || 
+        relativePath.startsWith('.idea/') ||
+        relativePath.startsWith('.DS_Store') ||
+        relativePath.startsWith('Thumbs.db') ||
+        relativePath.startsWith('node_modules/') ||
+        relativePath === 'repository-content.txt') {
+        return true;
+    }
+    
+    // Проверяем бинарные файлы
+    if (isBinaryFile(filePath)) {
+        return true;
+    }
+    
+    // Проверяем правила .gitignore
     for (const rule of gitignoreRules) {
-        // Обрабатываем правила с wildcard
-        if (rule.includes('*')) {
-            const regex = new RegExp('^' + rule.replace(/\*/g, '.*') + '$');
-            if (regex.test(relativePath) || regex.test(path.basename(relativePath))) {
-                return true;
-            }
-        } else {
-            // Точное совпадение или совпадение с началом пути
-            if (relativePath === rule || 
-                relativePath.startsWith(rule + '/') ||
-                relativePath.endsWith('/' + rule) ||
-                path.basename(relativePath) === rule) {
-                return true;
-            }
+        if (matchesRule(relativePath, rule)) {
+            return true;
+        }
+    }
+    
+    // Проверяем правила .collectignore
+    for (const rule of collectignoreRules) {
+        if (matchesRule(relativePath, rule)) {
+            return true;
         }
     }
     
     return false;
 }
 
+// Проверяем соответствие файла правилу
+function matchesRule(relativePath, rule) {
+    // Обрабатываем правила с wildcard
+    if (rule.includes('*')) {
+        const regex = new RegExp('^' + rule.replace(/\*/g, '.*') + '$');
+        if (regex.test(relativePath) || regex.test(path.basename(relativePath))) {
+            return true;
+        }
+    } else {
+        // Точное совпадение или совпадение с началом пути
+        if (relativePath === rule || 
+            relativePath.startsWith(rule + '/') ||
+            relativePath.endsWith('/' + rule) ||
+            path.basename(relativePath) === rule) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Рекурсивно собираем все файлы
-function collectFiles(dirPath, gitignoreRules, allFiles = []) {
+function collectFiles(dirPath, gitignoreRules, collectignoreRules, allFiles = []) {
     const items = fs.readdirSync(dirPath);
     
     for (const item of items) {
@@ -64,12 +133,12 @@ function collectFiles(dirPath, gitignoreRules, allFiles = []) {
         
         if (stat.isDirectory()) {
             // Пропускаем директории, которые должны быть проигнорированы
-            if (!shouldIgnore(fullPath, gitignoreRules)) {
-                collectFiles(fullPath, gitignoreRules, allFiles);
+            if (!shouldIgnore(fullPath, gitignoreRules, collectignoreRules)) {
+                collectFiles(fullPath, gitignoreRules, collectignoreRules, allFiles);
             }
         } else if (stat.isFile()) {
             // Добавляем файлы, которые не должны быть проигнорированы
-            if (!shouldIgnore(fullPath, gitignoreRules)) {
+            if (!shouldIgnore(fullPath, gitignoreRules, collectignoreRules)) {
                 allFiles.push(fullPath);
             }
         }
@@ -82,6 +151,7 @@ function collectFiles(dirPath, gitignoreRules, allFiles = []) {
 function main() {
     const projectRoot = process.cwd();
     const gitignorePath = path.join(projectRoot, '.gitignore');
+    const collectignorePath = path.join(__dirname, '.collectignore');
     const outputPath = path.join(projectRoot, 'repository-content.txt');
     
     // Красивый заголовок
@@ -90,17 +160,22 @@ function main() {
     console.log('='.repeat(60));
     console.log(`📁 Проект: ${path.basename(projectRoot)}`);
     console.log(`⏰ Время: ${new Date().toLocaleString('ru-RU')}`);
-    console.log(`🔧 Режим: С учетом .gitignore`);
+    console.log(`🔧 Режим: С учетом .gitignore и .collectignore`);
     console.log('='.repeat(60) + '\n');
     
     // Парсим .gitignore
     console.log('📋 Анализ .gitignore...');
     const gitignoreRules = parseGitignore(gitignorePath);
-    console.log(`✅ Найдено ${gitignoreRules.length} правил исключения\n`);
+    console.log(`✅ Найдено ${gitignoreRules.length} правил исключения`);
+    
+    // Парсим .collectignore
+    console.log('📋 Анализ .collectignore...');
+    const collectignoreRules = parseCollectignore(collectignorePath);
+    console.log(`✅ Найдено ${collectignoreRules.length} дополнительных правил исключения\n`);
     
     // Собираем все файлы
     console.log('🔍 Сканирование файлов...');
-    const allFiles = collectFiles(projectRoot, gitignoreRules);
+    const allFiles = collectFiles(projectRoot, gitignoreRules, collectignoreRules);
     console.log(`✅ Найдено ${allFiles.length} файлов для обработки\n`);
     
     // Сортируем файлы по алфавиту
@@ -113,7 +188,8 @@ function main() {
     let output = `# Содержимое репозитория\n`;
     output += `# Собрано: ${new Date().toLocaleString('ru-RU')}\n`;
     output += `# Всего файлов: ${allFiles.length}\n`;
-    output += `# Режим: Полный сбор с .gitignore\n\n`;
+    output += `# Режим: Полный сбор с .gitignore и .collectignore\n`;
+    output += `# Исключены: бинарные файлы, package.json, node_modules, .git и др.\n\n`;
     
     let processedFiles = 0;
     let errors = 0;
@@ -158,7 +234,7 @@ function main() {
     console.log(`❌ Ошибок: ${errors}`);
     console.log(`📊 Размер файла: ${(fs.statSync(outputPath).size / 1024).toFixed(2)} KB`);
     console.log(`📄 Результат: ${outputPath}`);
-    console.log(`🔧 Режим: Полный сбор с .gitignore`);
+    console.log(`🔧 Режим: Полный сбор с .gitignore и .collectignore`);
     console.log('='.repeat(60) + '\n');
 }
 
@@ -167,4 +243,4 @@ if (require.main === module) {
     main();
 }
 
-module.exports = { collectFiles, parseGitignore, shouldIgnore };
+module.exports = { collectFiles, parseGitignore, parseCollectignore, shouldIgnore, isBinaryFile };
