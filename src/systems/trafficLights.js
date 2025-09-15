@@ -129,7 +129,6 @@ export class TrafficLight {
         this.isDelayActive = false;
         // Начинаем нормальную работу светофора
         this.elapsedMs = 0;
-        console.log(`🚦 Светофор (${this.position.x}, ${this.position.y}) начал работу после задержки`);
       }
       return; // не обновляем фазы во время задержки
     }
@@ -143,7 +142,6 @@ export class TrafficLight {
       const oldPhase = this.phase;
       this.elapsedMs = 0;
       this.#advancePhase();
-      console.log(`🚦 Светофор (${this.position.x}, ${this.position.y}): ${oldPhase} → ${this.phase}`);
     }
   }
 
