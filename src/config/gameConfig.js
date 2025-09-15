@@ -24,6 +24,12 @@ export const CONFIG = {
     institute: 0xd0f0ff,
     lotFill: 0xf1e9d2,
     lotBorder: 0x777777,
+    redberry: 0xffa07a,
+    shop: 0xadd8e6,
+    market: 0x90ee90,
+    barber: 0xf0e68c,
+    construction: 0xd2b48c,
+    park: 0x3cb371
   },
   LOTS: {
     SLOTS_PER_BLOCK: 6,
