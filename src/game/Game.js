@@ -85,7 +85,7 @@ class Game {
         
         // Создаем рендереры
         this.worldRenderer = new WorldRenderer(this.dependencies.get('config'), this.app);
-        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, null, this.journalManager);
+        // UIRenderer будет создан в init() после регистрации panningController
         
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
@@ -186,6 +186,30 @@ class Game {
         const carTrafficController = new CarTrafficController();
         this.dependencies.register('carTrafficController', carTrafficController);
         
+        // Создаем PanningController и регистрируем в контейнере зависимостей
+        const PanningController = window.PanningController;
+        if (PanningController) {
+            const panningController = new PanningController();
+            panningController.setWorld(this.world);
+            panningController.setOnZoomChange((scale) => {
+                if (this.uiRenderer) {
+                    this.uiRenderer.updateZoomButton();
+                }
+            });
+            panningController.setOnFullscreenChange((isFullscreen) => {
+                if (this.uiRenderer) {
+                    this.uiRenderer.updateZoomButton();
+                }
+            });
+            this.dependencies.register('panningController', panningController);
+            // TODO: убрать window.panningController после рефакторинга всех систем
+            window.panningController = panningController;
+        }
+        
+        // Создаем UIRenderer после регистрации panningController
+        const panningController = this.dependencies.has('panningController') ? this.dependencies.get('panningController') : null;
+        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, panningController, this.journalManager);
+        
         // Настраиваем мир
         this._setupWorld(this.intersectionKeyToTL);
         
@@ -216,9 +240,10 @@ class Game {
             this._layout(null, this.stateManager.getCurrentRouteIndex(), this.stateManager.getSavedCarState(), this.carRenderer);
             
             // Если включен полноэкранный режим, обновляем его при изменении размера окна
-            if (typeof window.panningController !== 'undefined' && window.panningController && window.panningController.isFullscreenMode()) {
-                window.panningController.toggleFullscreen(); // выключаем
-                window.panningController.toggleFullscreen(); // включаем с новыми размерами
+            const panningController = this.dependencies.get('panningController');
+            if (panningController && panningController.isFullscreenMode()) {
+                panningController.toggleFullscreen(); // выключаем
+                panningController.toggleFullscreen(); // включаем с новыми размерами
             }
         });
         
@@ -784,43 +809,31 @@ class Game {
 
         // Настраиваем кнопку масштабирования
         zoomButton.addEventListener('click', () => {
-            if (typeof window.panningController !== 'undefined' && window.panningController) {
-                window.panningController.toggleZoom();
+            const panningController = this.dependencies.get('panningController');
+            if (panningController) {
+                panningController.toggleZoom();
                 this.uiRenderer.updateZoomButton();
             }
         });
 
         // Настраиваем кнопки увеличения/уменьшения масштаба
         zoomInButton.addEventListener('click', () => {
-            if (typeof window.panningController !== 'undefined' && window.panningController) {
-                window.panningController.zoomIn();
+            const panningController = this.dependencies.get('panningController');
+            if (panningController) {
+                panningController.zoomIn();
                 this.uiRenderer.updateZoomButton();
             }
         });
 
         zoomOutButton.addEventListener('click', () => {
-            if (typeof window.panningController !== 'undefined' && window.panningController) {
-                window.panningController.zoomOut();
+            const panningController = this.dependencies.get('panningController');
+            if (panningController) {
+                panningController.zoomOut();
                 this.uiRenderer.updateZoomButton();
             }
         });
 
-        // Инициализируем PanningController
-        const PanningController = window.PanningController;
-        if (PanningController) {
-            window.panningController = new PanningController();
-            window.panningController.setWorld(this.world);
-            window.panningController.setOnZoomChange((scale) => {
-                if (this.uiRenderer) {
-                    this.uiRenderer.updateZoomButton();
-                }
-            });
-            window.panningController.setOnFullscreenChange((isFullscreen) => {
-                if (this.uiRenderer) {
-                    this.uiRenderer.updateZoomButton();
-                }
-            });
-        }
+        // PanningController уже создан и зарегистрирован в контейнере зависимостей выше
 
         // Лёгкая задержка, чтобы зона успела отрисоваться, затем построим первый путь
         setTimeout(() => {
@@ -927,7 +940,8 @@ class Game {
         const CONFIG = this.dependencies.get('config');
         const scale = Math.min(w / CONFIG.WORLD_WIDTH, h / CONFIG.WORLD_HEIGHT);
 
-        if (!window.panningController || window.panningController.getCurrentScale() === 1) {
+        const panningController = this.dependencies.get('panningController');
+        if (!panningController || panningController.getCurrentScale() === 1) {
             this.world.scale.set(scale);
             this.world.pivot.set(0, 0);
             this.world.position.set(
