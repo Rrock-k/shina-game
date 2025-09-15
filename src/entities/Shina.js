@@ -33,9 +33,6 @@ export class Shina {
       sleepDays: [0, 1, 2, 3, 4, 5, 6] // Все дни недели
     };
     
-    // Визуальное представление
-    this.sprite = null;
-    this.avatar = null;
     
     // Callback функции
     this.onStateChange = null;
@@ -75,7 +72,6 @@ export class Shina {
    */
   setPosition(position) {
     this.position = { ...position };
-    this.updateVisualPosition();
   }
 
   /**
@@ -114,8 +110,6 @@ export class Shina {
       duration: 0
     });
     
-    // Обновляем визуальное представление
-    this.updateVisualState();
     
     // Вызываем callback
     if (this.onStateChange) {
@@ -424,64 +418,6 @@ export class Shina {
     });
   }
 
-  /**
-   * Установить визуальное представление
-   * @param {PIXI.Sprite} sprite - PIXI спрайт персонажа
-   */
-  setSprite(sprite) {
-    this.sprite = sprite;
-    this.updateVisualPosition();
-    this.updateVisualState();
-  }
-
-  /**
-   * Получить визуальное представление
-   * @returns {PIXI.Sprite} PIXI спрайт персонажа
-   */
-  getSprite() {
-    return this.sprite;
-  }
-
-  /**
-   * Установить аватарку
-   * @param {PIXI.Sprite} avatar - спрайт аватарки
-   */
-  setAvatar(avatar) {
-    this.avatar = avatar;
-    this.updateVisualState();
-  }
-
-  /**
-   * Получить аватарку
-   * @returns {PIXI.Sprite} спрайт аватарки
-   */
-  getAvatar() {
-    return this.avatar;
-  }
-
-  /**
-   * Обновить позицию визуального представления
-   */
-  updateVisualPosition() {
-    if (this.sprite) {
-      this.sprite.position.set(this.position.x, this.position.y);
-    }
-  }
-
-  /**
-   * Обновить визуальное представление состояния
-   */
-  updateVisualState() {
-    if (!this.sprite) return;
-
-    // Показываем/скрываем персонажа в зависимости от состояния
-    this.sprite.visible = this.isVisible && this.currentState !== 'driving';
-    
-    // Обновляем аватарку
-    if (this.avatar) {
-      this.avatar.visible = this.isVisible && this.currentState !== 'driving';
-    }
-  }
 
   /**
    * Установить callback для изменения состояния
