@@ -83,9 +83,7 @@ class Game {
         // Инициализируем геометрию зон
         this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }
         
-        // Переменные для таймера пребывания в здании
-        this.lastStayTimerUpdate = 0;
-        this.lastStayTimerDay = 0;
+        // Переменные для таймера пребывания в здании теперь управляются через StateManager
         
         // Переменные отладки
         this.DEBUG_MODE = true; // теперь можно изменять
@@ -322,39 +320,16 @@ class Game {
     updateStayTimer() {
         if (this.carEntity && this.carEntity.isAtDestination()) {
             const gameTime = this.timeManager.getGameTime();
-            const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
-            const currentDay = gameTime.day; // день месяца
+            const currentStayDuration = this.carEntity.getStayTimer();
             
-            // Инициализируем переменные для отслеживания времени
-            if (this.lastStayTimerUpdate === 0) {
-                this.lastStayTimerUpdate = currentTime;
-                this.lastStayTimerDay = currentDay;
-                return;
-            }
+            // Используем StateManager для обновления таймера
+            const newStayTimer = this.stateManager.updateStayTimer(gameTime, currentStayDuration);
+            this.carEntity.setStayTimer(newStayTimer);
             
-            // Обновляем таймер только при изменении времени
-            if (currentTime !== this.lastStayTimerUpdate || currentDay !== this.lastStayTimerDay) {
-                let timeDiff;
-                
-                // Если день изменился, это переход через полночь
-                if (currentDay !== this.lastStayTimerDay) {
-                    // Время с последнего обновления до полуночи + время с полуночи до текущего момента
-                    timeDiff = (24 * 60 - this.lastStayTimerUpdate) + currentTime;
-                    console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
-                } else {
-                    timeDiff = currentTime - this.lastStayTimerUpdate;
-                }
-                
-                const newStayTimer = this.carEntity.getStayTimer() - timeDiff / 60; // переводим в игровые часы
-                this.carEntity.setStayTimer(newStayTimer);
-                this.lastStayTimerUpdate = currentTime;
-                this.lastStayTimerDay = currentDay;
-                
-                if (newStayTimer <= 0) {
-                    // Время пребывания закончилось, едем к следующему пункту
-                    console.log('🚗 Время пребывания закончилось, продолжаем движение');
-                    this.nextDestination();
-                }
+            if (newStayTimer <= 0) {
+                // Время пребывания закончилось, едем к следующему пункту
+                console.log('🚗 Время пребывания закончилось, продолжаем движение');
+                this.nextDestination();
             }
         }
     }
@@ -438,9 +413,7 @@ class Game {
                 this.carEntity.setStayTimer(currentDest.stayHours);
             }
             
-            const gameTime = this.timeManager.getGameTime();
-            this.lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes; // инициализируем таймер
-            this.lastStayTimerDay = gameTime.day; // инициализируем день
+            // Инициализация таймера теперь происходит в StateManager
             this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
             // Показываем маленькую аватарку в здании
             this.showBuildingAvatar(currentDest.location);
@@ -992,10 +965,7 @@ class Game {
             this.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
         }
         
-        // Инициализируем переменные таймера пребывания
-        const gameTime = this.timeManager.getGameTime();
-        this.lastStayTimerUpdate = gameTime.hours * 60 + gameTime.minutes;
-        this.lastStayTimerDay = gameTime.day;
+        // Инициализация таймера пребывания теперь происходит в StateManager
 
         this.decorLayer.addChild(car);
 

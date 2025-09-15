@@ -128,6 +128,46 @@ class StateManager {
     }
 
     /**
+     * Обновляет таймер пребывания в здании
+     * @param {Object} gameTime - Объект с игровым временем {hours, minutes, day}
+     * @param {number} currentStayDuration - Текущая продолжительность пребывания
+     * @returns {number} Новая продолжительность пребывания
+     */
+    updateStayTimer(gameTime, currentStayDuration) {
+        const currentTime = gameTime.hours * 60 + gameTime.minutes; // время в минутах
+        const currentDay = gameTime.day; // день месяца
+        
+        // Инициализируем переменные для отслеживания времени
+        if (this.lastStayTimerUpdate === 0) {
+            this.lastStayTimerUpdate = currentTime;
+            this.lastStayTimerDay = currentDay;
+            return currentStayDuration;
+        }
+        
+        // Обновляем таймер только при изменении времени
+        if (currentTime !== this.lastStayTimerUpdate || currentDay !== this.lastStayTimerDay) {
+            let timeDiff;
+            
+            // Если день изменился, это переход через полночь
+            if (currentDay !== this.lastStayTimerDay) {
+                // Время с последнего обновления до полуночи + время с полуночи до текущего момента
+                timeDiff = (24 * 60 - this.lastStayTimerUpdate) + currentTime;
+                console.log(`🌙 Переход через полночь: ${timeDiff} минут`);
+            } else {
+                timeDiff = currentTime - this.lastStayTimerUpdate;
+            }
+            
+            const newStayTimer = currentStayDuration - timeDiff / 60; // переводим в игровые часы
+            this.lastStayTimerUpdate = currentTime;
+            this.lastStayTimerDay = currentDay;
+            
+            return newStayTimer;
+        }
+        
+        return currentStayDuration;
+    }
+
+    /**
      * Сбросить все состояние к начальному
      */
     reset() {
