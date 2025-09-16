@@ -26,6 +26,7 @@ export class UIRenderer {
     this.journalUpdateInterval = null;
     this.currentMenuState = 'main'; // 'main', 'journal', 'schedule', 'help', 'about'
     this.modalStack = []; // Стек для навигации по модальным окнам
+    this.scheduleOverlayVisible = false; // Состояние оверлея расписания
   }
 
   /**
@@ -358,6 +359,14 @@ export class UIRenderer {
             // Если уже в журнале, закрываем модальное окно (toggle поведение)
             this.closeUnifiedModal();
           }
+          break;
+        case 'k':
+        case 'K':
+        case 'л':  // русская раскладка
+        case 'Л':
+          e.preventDefault();
+          // Переключаем отображение расписания внутри game-container
+          this.toggleScheduleOverlay();
           break;
         // Здесь можно добавить другие горячие клавиши в будущем
       }
@@ -1062,5 +1071,122 @@ export class UIRenderer {
     if (unifiedModal && unifiedModal.classList.contains('active') && this.currentMenuState === 'schedule') {
       this.updateScheduleDisplay();
     }
+    
+    // Обновляем оверлей расписания, если он видим
+    if (this.scheduleOverlayVisible) {
+      this.updateScheduleOverlay();
+    }
+  }
+
+  /**
+   * Переключение отображения оверлея расписания
+   */
+  toggleScheduleOverlay() {
+    if (this.scheduleOverlayVisible) {
+      this.hideScheduleOverlay();
+    } else {
+      this.showScheduleOverlay();
+    }
+  }
+
+  /**
+   * Показать оверлей расписания внутри game-container
+   */
+  showScheduleOverlay() {
+    // Создаем оверлей, если его еще нет
+    let overlay = document.getElementById('schedule-overlay');
+    if (!overlay) {
+      overlay = this.createScheduleOverlay();
+    }
+    
+    overlay.style.display = 'block';
+    this.scheduleOverlayVisible = true;
+    this.updateScheduleOverlay();
+  }
+
+  /**
+   * Скрыть оверлей расписания
+   */
+  hideScheduleOverlay() {
+    const overlay = document.getElementById('schedule-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    this.scheduleOverlayVisible = false;
+  }
+
+  /**
+   * Создать оверлей расписания внутри game-container
+   */
+  createScheduleOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'schedule-overlay';
+    overlay.className = 'schedule-overlay';
+    overlay.innerHTML = `
+      <div class="schedule-overlay-content">
+        <div class="schedule-overlay-header">
+          <h3>📅 Расписание маршрута</h3>
+        </div>
+        <div class="schedule-overlay-body">
+          <div class="schedule-overlay-list" id="schedule-overlay-list">
+            <!-- Элементы расписания будут добавлены динамически -->
+          </div>
+        </div>
+        <div class="schedule-overlay-footer">
+          <div class="schedule-overlay-hint">Нажмите K или Escape для закрытия</div>
+        </div>
+      </div>
+    `;
+    
+    // Добавляем в game-container вместо document.body
+    const gameContainer = document.querySelector('.game-container');
+    if (gameContainer) {
+      gameContainer.appendChild(overlay);
+    } else {
+      document.body.appendChild(overlay);
+    }
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.scheduleOverlayVisible) {
+        this.hideScheduleOverlay();
+      }
+    });
+    
+    return overlay;
+  }
+
+  /**
+   * Обновить содержимое оверлея расписания
+   */
+  updateScheduleOverlay() {
+    const scheduleList = document.getElementById('schedule-overlay-list');
+    if (!scheduleList || !this.config) return;
+
+    const schedule = this.config.ROUTE_SCHEDULE;
+    let html = '';
+    
+    schedule.forEach((item, index) => {
+      const isCurrent = index === this.currentRouteIndex;
+      const statusClass = isCurrent ? 'current' : '';
+      const statusText = isCurrent ? ' (текущий)' : '';
+      
+      html += `
+        <div class="schedule-overlay-item ${statusClass}">
+          <div class="schedule-overlay-item-number">${index + 1}</div>
+          <div class="schedule-overlay-item-content">
+            <div class="schedule-overlay-item-name">${item.name}${statusText}</div>
+            <div class="schedule-overlay-item-location">${item.location}</div>
+            <div class="schedule-overlay-item-duration">Время пребывания: ${item.stayHours}ч</div>
+          </div>
+        </div>
+      `;
+    });
+    
+    if (html === '') {
+      html = '<div class="schedule-overlay-empty">Расписание пусто</div>';
+    }
+    
+    scheduleList.innerHTML = html;
   }
 }

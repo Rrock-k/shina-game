@@ -798,3 +798,187 @@ canvas {
   margin-bottom: 8px;
   color: #ecf0f1;
 }
+
+/* Оверлей расписания - минималистичный стиль внутри game-container */
+.schedule-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 1000;
+  display: none;
+  animation: fadeIn 0.3s ease-out;
+  pointer-events: none;
+  /* Позволяет кликать сквозь оверлей */
+}
+
+.schedule-overlay-content {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  max-width: 400px;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.schedule-overlay-header {
+  background: transparent;
+  padding: 0;
+  display: block;
+  border: none;
+  margin-bottom: 10px;
+}
+
+.schedule-overlay-header h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  background: none;
+  padding: 0;
+}
+
+.schedule-overlay-close {
+  display: none;
+  /* Скрываем кнопку закрытия */
+}
+
+.schedule-overlay-body {
+  padding: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.schedule-overlay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-overlay-item {
+  display: flex;
+  align-items: flex-start;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  transition: none;
+  position: relative;
+}
+
+.schedule-overlay-item:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.schedule-overlay-item.current {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.schedule-overlay-item.current:hover {
+  box-shadow: none;
+}
+
+.schedule-overlay-item-number {
+  background: transparent;
+  color: #ffffff;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  display: inline;
+  align-items: center;
+  justify-content: flex-start;
+  font-weight: bold;
+  font-size: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.schedule-overlay-item.current .schedule-overlay-item-number {
+  background: transparent;
+  color: #ffff00;
+  /* Желтый цвет для текущего пункта */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.schedule-overlay-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schedule-overlay-item-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  margin: 0;
+}
+
+.schedule-overlay-item.current .schedule-overlay-item-name {
+  color: #ffff00;
+  /* Желтый цвет для текущего пункта */
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.schedule-overlay-item-location {
+  font-size: 12px;
+  color: #cccccc;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  margin: 0;
+}
+
+.schedule-overlay-item-duration {
+  font-size: 11px;
+  color: #aaaaaa;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  margin: 0;
+}
+
+.schedule-overlay-empty {
+  text-align: left;
+  color: #ffffff;
+  font-style: italic;
+  padding: 0;
+  font-size: 14px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.schedule-overlay-footer {
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  border: none;
+  margin-top: 10px;
+}
+
+.schedule-overlay-hint {
+  color: #aaaaaa;
+  font-size: 10px;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Анимация для оверлея */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
