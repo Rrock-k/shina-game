@@ -14,10 +14,11 @@ import {
 import { PathValidator } from '../utils/PathValidator.js';
 
 export class PathBuilder {
-  constructor(verticalRoadXs, horizontalRoadYs, config = null) {
+  constructor(verticalRoadXs, horizontalRoadYs, config = null, routeSchedule = null) {
     this.verticalRoadXs = verticalRoadXs;
     this.horizontalRoadYs = horizontalRoadYs;
     this.config = config;
+    this.routeSchedule = routeSchedule;
     this.validator = new PathValidator(verticalRoadXs, horizontalRoadYs);
     
     // Оптимизация: отключаем валидацию в production режиме
@@ -150,7 +151,7 @@ export class PathBuilder {
    * @returns {Array} - массив точек пути
    */
   buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways) {
-    const currentDestination = this.config?.ROUTE_SCHEDULE?.[currentRouteIndex];
+    const currentDestination = this.routeSchedule?.getTaskByIndex(currentRouteIndex);
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток

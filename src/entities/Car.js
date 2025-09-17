@@ -189,7 +189,9 @@ export class Car {
    * Перейти к следующему маршруту
    */
   nextRoute() {
-    this.currentRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
+    // Этот метод больше не используется напрямую
+    // Логика перехода к следующему маршруту теперь в RouteSchedule
+    console.warn('nextRoute() устарел, используйте RouteSchedule.nextTask()');
   }
 
   /**
@@ -323,10 +325,11 @@ export class Car {
       getIntersectionCoord,
       buildGraphPathToBuilding,
       debugLog,
-      debugLogAlways
+      debugLogAlways,
+      routeSchedule
     } = options;
 
-    const currentDestination = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const currentDestination = routeSchedule.getTaskByIndex(this.currentRouteIndex);
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток
@@ -404,12 +407,14 @@ export class Car {
       getDestinationCenter,
       getNearestIntersectionIJ,
       buildGraphPathToBuilding,
-      getIntersectionCoord
+      getIntersectionCoord,
+      routeSchedule
     } = options;
 
     // Определяем следующий пункт назначения
-    const nextRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
-    const nextDestination = this.config.ROUTE_SCHEDULE[nextRouteIndex];
+    const scheduleLength = routeSchedule.getTaskCount();
+    const nextRouteIndex = (this.currentRouteIndex + 1) % scheduleLength;
+    const nextDestination = routeSchedule.getTaskByIndex(nextRouteIndex);
 
     const nextDestCenter = getDestinationCenter(nextDestination.location);
 
@@ -526,10 +531,11 @@ export class Car {
     const {
       timeManager,
       debugLogAlways,
-      showBuildingAvatar
+      showBuildingAvatar,
+      routeSchedule
     } = options;
 
-    const currentDest = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const currentDest = routeSchedule.getTaskByIndex(this.currentRouteIndex);
     if (!currentDest) return;
 
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
