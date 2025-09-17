@@ -150,7 +150,8 @@ export class PathBuilder {
    * @returns {Array} - массив точек пути
    */
   buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways) {
-    const currentDestination = this.config?.ROUTE_SCHEDULE?.[currentRouteIndex];
+    const routeSchedule = window.routeSchedule;
+    const currentDestination = routeSchedule ? routeSchedule.getTaskByIndex(currentRouteIndex) : null;
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток

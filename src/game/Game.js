@@ -4,6 +4,7 @@ import { DayNightManager } from './DayNightManager.js';
 import { JournalManager } from './JournalManager.js';
 import StateManager from './StateManager.js';
 import DependencyContainer from './DependencyContainer.js';
+import { RouteSchedule } from './RouteSchedule.js';
 import { WorldRenderer } from '../rendering/WorldRenderer.js';
 import { UIRenderer } from '../rendering/UIRenderer.js';
 import { CarRenderer } from '../rendering/CarRenderer.js';
@@ -28,6 +29,7 @@ class Game {
         
         // Регистрируем базовые зависимости
         this.dependencies.register('config', CONFIG);
+        this.dependencies.register('routeSchedule', () => new RouteSchedule());
         this.dependencies.register('debugLog', () => this.debugLog.bind(this));
         this.dependencies.register('debugLogAlways', () => this.debugLogAlways.bind(this));
         this.dependencies.register('debugInfo', () => this.debugInfo);
@@ -183,6 +185,7 @@ class Game {
         // Делаем необходимые переменные глобально доступными (временно)
         // TODO: убрать после полного рефакторинга всех систем
         window.CONFIG = this.dependencies.get('config');
+        window.routeSchedule = this.dependencies.get('routeSchedule');
         window.debugLog = this.dependencies.get('debugLog');
         window.debugLogAlways = this.dependencies.get('debugLogAlways');
         window.debugInfo = this.dependencies.get('debugInfo');
@@ -217,7 +220,8 @@ class Game {
         
         // Создаем UIRenderer после регистрации panningController
         const panningController = this.dependencies.has('panningController') ? this.dependencies.get('panningController') : null;
-        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, panningController, this.journalManager, this.carEntity);
+        const routeSchedule = this.dependencies.get('routeSchedule');
+        this.uiRenderer = new UIRenderer(this.dependencies.get('config'), this.timeManager, this.pauseManager, this.dayNightManager, panningController, this.journalManager, this.carEntity, routeSchedule);
         
         // Настраиваем мир
         this._setupWorld(this.intersectionKeyToTL);
@@ -444,10 +448,10 @@ class Game {
         
         // Получаем текущий индекс маршрута из stateManager
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
+        const routeSchedule = this.dependencies.get('routeSchedule');
         
         // Завершаем пребывание в текущем месте
-        const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+        const currentDest = routeSchedule.getTaskByIndex(currentRouteIndex);
         if (this.journalManager && currentDest) {
             this.journalManager.endLocationStay(currentDest.name);
         }
@@ -455,7 +459,7 @@ class Game {
         // Скрываем аватарку в текущем здании
         this.hideBuildingAvatar();
 
-        const newRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
+        const newRouteIndex = (currentRouteIndex + 1) % routeSchedule.getTaskCount();
         this.stateManager.setCurrentRouteIndex(newRouteIndex);
         
         // Обновляем индекс маршрута в UIRenderer
@@ -482,7 +486,7 @@ class Game {
         }
 
         // Начинаем новую дорогу в журнале при выходе из здания
-        const newDest = CONFIG.ROUTE_SCHEDULE[newRouteIndex];
+        const newDest = routeSchedule.getTaskByIndex(newRouteIndex);
         if (this.journalManager && newDest) {
             this.journalManager.startTrip(newDest.name, newDest.location);
         }
@@ -496,8 +500,8 @@ class Game {
      */
     checkArrival() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+        const routeSchedule = this.dependencies.get('routeSchedule');
+        const currentDest = routeSchedule.getTaskByIndex(currentRouteIndex);
         
         // Проверяем, что у нас есть все необходимые компоненты
         if (!this.carEntity || !currentDest) {
@@ -551,9 +555,9 @@ class Game {
      */
     saveCarStateForNextDestination() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
-        const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
+        const routeSchedule = this.dependencies.get('routeSchedule');
+        const nextRouteIndex = (currentRouteIndex + 1) % routeSchedule.getTaskCount();
+        const nextDestination = routeSchedule.getTaskByIndex(nextRouteIndex);
 
         if (!nextDestination) return null;
 
@@ -1074,7 +1078,8 @@ class Game {
 
         // Начинаем с дома
         const routeIndex = 0; // дом
-        const stayTimer = CONFIG.ROUTE_SCHEDULE[0].stayHours; // устанавливаем таймер для дома
+        const routeSchedule = this.dependencies.get('routeSchedule');
+        const stayTimer = routeSchedule.getTaskByIndex(0)?.stayHours || 2; // устанавливаем таймер для дома
         
         // Обновляем индекс маршрута в UIRenderer
         if (uiRenderer) {
@@ -1088,7 +1093,7 @@ class Game {
         if (this.carEntity) {
             this.carEntity.setPath(carPath);
             this.carEntity.setAtDestination(true);
-            this.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
+            this.carEntity.setStayTimer(routeSchedule.getTaskByIndex(0)?.stayHours || 2);
         }
         
         // Инициализация таймера пребывания теперь происходит в StateManager

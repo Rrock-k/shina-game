@@ -189,7 +189,11 @@ export class Car {
    * Перейти к следующему маршруту
    */
   nextRoute() {
-    this.currentRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
+    // Получаем routeSchedule из контейнера зависимостей
+    const routeSchedule = window.routeSchedule;
+    if (routeSchedule) {
+      this.currentRouteIndex = (this.currentRouteIndex + 1) % routeSchedule.getTaskCount();
+    }
   }
 
   /**
@@ -326,7 +330,8 @@ export class Car {
       debugLogAlways
     } = options;
 
-    const currentDestination = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const routeSchedule = window.routeSchedule;
+    const currentDestination = routeSchedule ? routeSchedule.getTaskByIndex(this.currentRouteIndex) : null;
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток
@@ -408,8 +413,9 @@ export class Car {
     } = options;
 
     // Определяем следующий пункт назначения
-    const nextRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
-    const nextDestination = this.config.ROUTE_SCHEDULE[nextRouteIndex];
+    const routeSchedule = window.routeSchedule;
+    const nextRouteIndex = routeSchedule ? (this.currentRouteIndex + 1) % routeSchedule.getTaskCount() : 0;
+    const nextDestination = routeSchedule ? routeSchedule.getTaskByIndex(nextRouteIndex) : null;
 
     const nextDestCenter = getDestinationCenter(nextDestination.location);
 
@@ -529,7 +535,8 @@ export class Car {
       showBuildingAvatar
     } = options;
 
-    const currentDest = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const routeSchedule = window.routeSchedule;
+    const currentDest = routeSchedule ? routeSchedule.getTaskByIndex(this.currentRouteIndex) : null;
     if (!currentDest) return;
 
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);
