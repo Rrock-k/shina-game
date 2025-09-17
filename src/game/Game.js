@@ -135,13 +135,13 @@ class Game {
             position: { x: 0, y: 0 },
             initialState: 'atWork', // Шина дома в начале игры
             onStateChange: (oldState, newState, shina) => {
-                console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
+                // console.log(`👤 Шина изменила состояние: ${oldState} → ${newState}`);
             },
             onAvailabilityChange: (isAvailable, shina) => {
-                console.log(`👤 Шина ${isAvailable ? 'доступна' : 'недоступна'}`);
+                // console.log(`👤 Шина ${isAvailable ? 'доступна' : 'недоступна'}`);
             },
             onMessageReceived: (message, shina) => {
-                console.log(`💬 Шина получила сообщение:`, message);
+                // console.log(`💬 Шина получила сообщение:`, message);
             }
         });
 
@@ -274,19 +274,19 @@ class Game {
 
         // Подписываемся на изменение режима дня/ночи
         this.dayNightManager.on('modeChange', (data) => {
-            console.log('🌙 Game: получено событие modeChange', data);
+            // console.log('🌙 Game: получено событие modeChange', data);
             // Здесь можно добавить дополнительную логику игры
         });
 
         // Подписываемся на переключение режима
         this.dayNightManager.on('modeToggle', (data) => {
-            console.log('🌅 Game: получено событие modeToggle', data);
+            // console.log('🌅 Game: получено событие modeToggle', data);
             // Здесь можно добавить дополнительную логику игры
         });
 
         // Подписываемся на изменение альфы
         this.dayNightManager.on('alphaChange', (data) => {
-            console.log('🎨 Game: получено событие alphaChange', data);
+            // console.log('🎨 Game: получено событие alphaChange', data);
             // Здесь можно добавить дополнительную логику игры
         });
     }

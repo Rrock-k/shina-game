@@ -62,19 +62,19 @@ export class UIRenderer {
 
     // Подписываемся на изменение режима дня/ночи
     this.dayNightManager.on('modeChange', (data) => {
-      console.log('🌙 UIRenderer: получено событие modeChange', data);
+      // console.log('🌙 UIRenderer: получено событие modeChange', data);
       // Здесь можно добавить дополнительную логику обновления UI
     });
 
     // Подписываемся на переключение режима
     this.dayNightManager.on('modeToggle', (data) => {
-      console.log('🌅 UIRenderer: получено событие modeToggle', data);
+      // console.log('🌅 UIRenderer: получено событие modeToggle', data);
       // Здесь можно добавить дополнительную логику обновления UI
     });
 
     // Подписываемся на изменение альфы
     this.dayNightManager.on('alphaChange', (data) => {
-      console.log('🎨 UIRenderer: получено событие alphaChange', data);
+      // console.log('🎨 UIRenderer: получено событие alphaChange', data);
       // Здесь можно добавить дополнительную логику обновления UI
     });
   }
