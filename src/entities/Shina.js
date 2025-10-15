@@ -219,15 +219,38 @@ export class Shina {
   /**
    * Выйти из состояния "еду"
    */
-  exitDrivingState() {
-    if (this.currentState === 'driving') {
-      // Возвращаемся к состоянию, определенному по времени
-      const now = new Date();
-      const hour = now.getHours();
-      const dayOfWeek = now.getDay();
-      const newState = this.determineStateFromTime(hour, dayOfWeek);
-      this.setState(newState);
+  exitDrivingState(options = {}) {
+    if (this.currentState !== 'driving') return;
+
+    const { timeManager, gameTime } = options;
+
+    let sourceTime = gameTime || null;
+    if (!sourceTime && timeManager) {
+      sourceTime = timeManager.getGameTime();
     }
+
+    if (!sourceTime) {
+      console.warn('⚠️ Shina.exitDrivingState: нет игрового времени, используем системное');
+      const now = new Date();
+      sourceTime = {
+        hours: now.getHours(),
+        dayOfWeek: now.getDay()
+      };
+    }
+
+    const hour = typeof sourceTime.hours === 'number'
+      ? sourceTime.hours
+      : sourceTime instanceof Date
+        ? sourceTime.getHours()
+        : new Date().getHours();
+
+    const dayOfWeek = typeof sourceTime.dayOfWeek === 'number'
+      ? sourceTime.dayOfWeek
+      : sourceTime instanceof Date
+        ? sourceTime.getDay()
+        : new Date().getDay();
+    const newState = this.determineStateFromTime(hour, dayOfWeek);
+    this.setState(newState);
   }
 
   /**

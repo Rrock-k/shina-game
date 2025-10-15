@@ -90,21 +90,24 @@ class Game {
         this.worldRenderer = new WorldRenderer(this.dependencies.get('config'), this.app);
         // UIRenderer будет создан в init() после регистрации panningController
         
-        // Создаем dayNightManager после worldRenderer
-        this.dayNightManager = new DayNightManager(
-            PIXI,
-            this.dependencies.get('config'),
-            this.worldRenderer,
-            this.shinaRenderer,
-            this.timeManager
-        );
-        
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
         this.shinaEntity = new Shina(this.dependencies.get('config'));
         
         // Создаем рендерер Шины
         this.shinaRenderer = new ShinaRenderer(this.dependencies.get('config'), this.pauseManager);
+        this.shinaSprite = this.shinaRenderer.create();
+        if (this.decorLayer && this.shinaSprite) {
+            this.decorLayer.addChild(this.shinaSprite);
+        }
+        
+        // Создаем dayNightManager после worldRenderer
+        this.dayNightManager = new DayNightManager(
+            PIXI,
+            this.dependencies.get('config'),
+            this.worldRenderer,
+            this.timeManager
+        );
         
         // Инициализируем геометрию зон
         this.zoneGeometry = new Map(); // key -> { center:{x,y}, bounds:{x,y,w,h} | {x,y,r}, type }

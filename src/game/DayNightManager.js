@@ -1,10 +1,9 @@
 // Менеджер режимов дня/ночи с поддержкой событий
 export class DayNightManager {
-  constructor(PIXI, config, worldRenderer, shinaRenderer = null, timeManager = null) {
+  constructor(PIXI, config, worldRenderer, timeManager = null) {
     this.PIXI = PIXI;
     this.config = config;
     this.worldRenderer = worldRenderer; // Получаем WorldRenderer для доступа к слоям
-    this.shinaRenderer = shinaRenderer; // Получаем ShinaRenderer для создания спрайта Шины
     this.timeManager = timeManager;
     this.dayNightMode = 'auto'; // 'auto', 'day', 'night'
     this.isNightMode = false;
@@ -140,42 +139,18 @@ export class DayNightManager {
       this.createCityNightOverlay();
     }
 
-    // Если оверлей создан, но не добавлен в сцену, добавляем его
-    if (this.cityNightOverlay && !this.cityNightOverlay.parent) {
-      // Используем worldRenderer для доступа к слоям
-      if (this.worldRenderer) {
-        const world = this.worldRenderer.getWorldContainer();
-        const decorLayer = this.worldRenderer.getDecorLayer();
-        const trafficLightsLayer = this.worldRenderer.getTrafficLightsLayer();
-        
-        if (world) {
-          // Добавляем оверлей перед decorLayer (машиной) и trafficLightsLayer
-          const decorLayerIndex = world.children.findIndex(child => child === decorLayer);
-          const trafficLightsLayerIndex = world.children.findIndex(child => child === trafficLightsLayer);
-          
-          // Находим правильную позицию для вставки (перед машиной и светофорами)
-          const insertIndex = Math.min(
-            decorLayerIndex >= 0 ? decorLayerIndex : world.children.length,
-            trafficLightsLayerIndex >= 0 ? trafficLightsLayerIndex : world.children.length
-          );
-          
-          world.addChildAt(this.cityNightOverlay, insertIndex);
-          console.log('🌙 Ночной оверлей добавлен в сцену в правильном порядке');
-          
-          // Создаем и добавляем визуальное представление Шины в decorLayer
-          if (decorLayer && this.shinaRenderer) {
-            const shinaSprite = this.shinaRenderer.create();
-            decorLayer.addChild(shinaSprite);
-            console.log('👤 Спрайт Шины добавлен в decorLayer');
-          }
-        } else {
-          console.warn('⚠️ world контейнер не найден, не могу добавить оверлей');
-          return;
-        }
-      } else {
-        console.warn('⚠️ worldRenderer не найден, не могу добавить оверлей');
-        return;
-      }
+    if (!this.cityNightOverlay) {
+      console.warn('⚠️ DayNightManager: не удалось создать ночной оверлей');
+      return;
+    }
+
+    const overlayAttached = this.worldRenderer
+      ? this.worldRenderer.attachOverlayBeforeDecor(this.cityNightOverlay)
+      : false;
+
+    if (!overlayAttached) {
+      console.warn('⚠️ DayNightManager: не удалось разместить ночной оверлей');
+      return;
     }
 
     if (!this.isOverlayReady()) {

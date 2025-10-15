@@ -214,7 +214,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} roadsLayer
    */
   getRoadsLayer() {
-    return this.layers.roadsLayer;
+    return this.layers.roads;
   }
 
   /**
@@ -222,7 +222,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} lotsLayer
    */
   getLotsLayer() {
-    return this.layers.lotsLayer;
+    return this.layers.lots;
   }
 
   /**
@@ -230,7 +230,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} zonesLayer
    */
   getZonesLayer() {
-    return this.layers.zonesLayer;
+    return this.layers.zones;
   }
 
   /**
@@ -238,7 +238,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} labelsLayer
    */
   getLabelsLayer() {
-    return this.layers.labelsLayer;
+    return this.layers.labels;
   }
 
   /**
@@ -246,7 +246,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} decorLayer
    */
   getDecorLayer() {
-    return this.layers.decorLayer;
+    return this.layers.decor;
   }
 
   /**
@@ -254,7 +254,7 @@ export class WorldRenderer {
    * @returns {PIXI.Container} trafficLightsLayer
    */
   getTrafficLightsLayer() {
-    return this.layers.trafficLightsLayer;
+    return this.layers.trafficLights;
   }
 
   /**
@@ -263,6 +263,53 @@ export class WorldRenderer {
    */
   getLightingLayer() {
     return this.layers.lightingLayer;
+  }
+
+  /**
+   * Размещает оверлей перед слоями декора и светофоров
+   * @param {PIXI.Container} overlay - контейнер оверлея
+   * @returns {boolean} успешно ли размещен оверлей
+   */
+  attachOverlayBeforeDecor(overlay) {
+    if (!overlay) return false;
+    if (!this.world) {
+      console.warn('⚠️ WorldRenderer.attachOverlayBeforeDecor: world контейнер не инициализирован');
+      return false;
+    }
+
+    const decorLayer = this.layers.decor || null;
+    const trafficLightsLayer = this.layers.trafficLights || null;
+
+    const worldChildren = this.world.children;
+    const candidateIndexes = [];
+
+    if (decorLayer && decorLayer.parent === this.world) {
+      candidateIndexes.push(worldChildren.indexOf(decorLayer));
+    }
+
+    if (trafficLightsLayer && trafficLightsLayer.parent === this.world) {
+      candidateIndexes.push(worldChildren.indexOf(trafficLightsLayer));
+    }
+
+    const targetIndex = candidateIndexes.length
+      ? Math.min(...candidateIndexes)
+      : worldChildren.length;
+
+    if (overlay.parent !== this.world) {
+      this.world.addChildAt(overlay, targetIndex);
+      return true;
+    }
+
+    if (!candidateIndexes.length) {
+      return true;
+    }
+
+    const currentIndex = this.world.getChildIndex(overlay);
+    if (currentIndex > targetIndex) {
+      this.world.setChildIndex(overlay, targetIndex);
+    }
+
+    return true;
   }
 
   /**
