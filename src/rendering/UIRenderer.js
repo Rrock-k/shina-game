@@ -3,7 +3,17 @@
  * Обрабатывает меню, уведомления, дисплеи и кнопки
  */
 export class UIRenderer {
-  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager, carEntity) {
+  constructor(
+    config,
+    timeManager,
+    pauseManager,
+    dayNightManager,
+    panningController,
+    journalManager,
+    carEntity,
+    scheduleManager = null,
+    stateManager = null
+  ) {
     this.config = config;
     this.timeManager = timeManager;
     this.pauseManager = pauseManager;
@@ -11,6 +21,8 @@ export class UIRenderer {
     this.panningController = panningController;
     this.journalManager = journalManager;
     this.carEntity = carEntity;
+    this.scheduleManager = scheduleManager;
+    this.stateManager = stateManager;
     
     // UI элементы
     this.datetimeDisplay = null;
@@ -22,7 +34,8 @@ export class UIRenderer {
     
     // Состояние
     this.isInitialized = false;
-    this.currentRouteIndex = 0;
+    this.currentRouteIndex = 0; // сохраним для фолбэка на статическое расписание
+    this.fallbackRoute = this.config?.ROUTE_SCHEDULE?.[0] || null;
     this.journalUpdateInterval = null;
     this.currentMenuState = 'main'; // 'main', 'journal', 'schedule', 'help', 'about'
     this.modalStack = []; // Стек для навигации по модальным окнам
@@ -418,17 +431,42 @@ export class UIRenderer {
    */
   updateRouteDisplay(isAtDestination = false) {
     if (!this.routeDisplay) return; // защита от вызова до инициализации
-    const currentDest = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+
     const prefixSpan = this.routeDisplay.querySelector('.route-prefix');
     const destinationSpan = this.routeDisplay.querySelector('.route-destination');
-    
-    if (isAtDestination) {
-      prefixSpan.textContent = 'В пункте:';
-      destinationSpan.textContent = currentDest.name;
-    } else {
-      prefixSpan.textContent = 'В пути в:';
-      destinationSpan.textContent = currentDest.name;
+
+    let prefixText = isAtDestination ? 'В пункте:' : 'В пути в:';
+    let destinationText = this._getFallbackRouteName();
+
+    if (this.scheduleManager) {
+      const now = this._getGameDate();
+      const currentLocationKey = this.stateManager ? this.stateManager.getCurrentLocation() : null;
+
+      const activeTask = this.scheduleManager.getCurrentTask(
+        now,
+        isAtDestination ? currentLocationKey : null
+      );
+
+      if (isAtDestination) {
+        destinationText =
+          activeTask?.name ||
+          this._getLocationLabel(currentLocationKey) ||
+          destinationText;
+      } else {
+        const enRouteTask =
+          (activeTask && activeTask.status === 'ACTIVE') ?
+            activeTask :
+            this.scheduleManager.getUpcomingTask();
+
+        destinationText =
+          enRouteTask?.name ||
+          this._getLocationLabel(enRouteTask?.location) ||
+          destinationText;
+      }
     }
+
+    prefixSpan.textContent = prefixText;
+    destinationSpan.textContent = destinationText;
   }
 
   /**
@@ -523,6 +561,8 @@ export class UIRenderer {
    */
   setCurrentRouteIndex(index) {
     this.currentRouteIndex = index;
+    const routeList = this.config?.ROUTE_SCHEDULE || [];
+    this.fallbackRoute = routeList[index] || this.fallbackRoute;
   }
 
   /**
@@ -896,28 +936,57 @@ export class UIRenderer {
    */
   updateScheduleDisplay() {
     const scheduleList = document.getElementById('schedule-list');
-    if (!scheduleList || !this.config) return;
+    if (!scheduleList) return;
 
-    const schedule = this.config.ROUTE_SCHEDULE;
-    let html = '';
-    
-    schedule.forEach((item, index) => {
-      const isCurrent = index === this.currentRouteIndex;
-      const status = isCurrent ? ' (текущий)' : '';
-      
-      html += `
-        <div class="schedule-item ${isCurrent ? 'current' : ''}">
-          <div class="schedule-time">${item.time || '--:--'}</div>
-          <div class="schedule-destination">${item.name}${status}</div>
-          <div class="schedule-location">${item.location}</div>
+    if (!this.scheduleManager) {
+      scheduleList.innerHTML = '<div class="no-schedule">Планировщик расписания недоступен</div>';
+      return;
+    }
+
+    const tasks = this.scheduleManager.getAllTasks();
+    if (tasks.length === 0) {
+      scheduleList.innerHTML = '<div class="no-schedule">Расписание пусто</div>';
+      return;
+    }
+
+    const html = tasks.map((task) => {
+      const isCurrent = task.status === 'ACTIVE';
+      const isUpcoming = task.status === 'PENDING';
+      const isCompleted = task.status === 'COMPLETED';
+      const isCancelled = task.status === 'CANCELLED';
+
+      let statusText = '';
+      let itemClass = 'schedule-item';
+
+      if (isCurrent) {
+        statusText = ' (текущая)';
+        itemClass += ' current';
+      } else if (isUpcoming) {
+        statusText = ' (предстоящая)';
+        itemClass += ' upcoming';
+      } else if (isCompleted) {
+        statusText = ' (завершена)';
+        itemClass += ' completed';
+      } else if (isCancelled) {
+        statusText = ' (отменена)';
+        itemClass += ' cancelled';
+      }
+
+      const startTime = task.startTime ? task.startTime.toTimeString().slice(0, 5) : '--:--';
+      const endTime = task.endTime ? task.endTime.toTimeString().slice(0, 5) : '--:--';
+      const locationLabel = this._getLocationLabel(task.location) || 'Без локации';
+      const duration = task.duration ? `${task.duration}ч` : '';
+
+      return `
+        <div class="${itemClass}">
+          <div class="schedule-time">${startTime} - ${endTime}</div>
+          <div class="schedule-destination">${task.name}${statusText}</div>
+          <div class="schedule-location">${locationLabel}</div>
+          <div class="schedule-duration">${duration}</div>
         </div>
       `;
-    });
-    
-    if (html === '') {
-      html = '<div class="no-schedule">Расписание пусто</div>';
-    }
-    
+    }).join('');
+
     scheduleList.innerHTML = html;
   }
 
@@ -1161,32 +1230,86 @@ export class UIRenderer {
    */
   updateScheduleOverlay() {
     const scheduleList = document.getElementById('schedule-overlay-list');
-    if (!scheduleList || !this.config) return;
+    if (!scheduleList) return;
 
-    const schedule = this.config.ROUTE_SCHEDULE;
-    let html = '';
-    
-    schedule.forEach((item, index) => {
-      const isCurrent = index === this.currentRouteIndex;
-      const statusClass = isCurrent ? 'current' : '';
-      const statusText = isCurrent ? ' (текущий)' : '';
-      
-      html += `
+    if (!this.scheduleManager) {
+      scheduleList.innerHTML = '<div class="schedule-overlay-empty">Планировщик расписания недоступен</div>';
+      return;
+    }
+
+    const tasks = this.scheduleManager.getAllTasks();
+    if (tasks.length === 0) {
+      scheduleList.innerHTML = '<div class="schedule-overlay-empty">Расписание пусто</div>';
+      return;
+    }
+
+    scheduleList.innerHTML = tasks.map((task, index) => {
+      const isCurrent = task.status === 'ACTIVE';
+      const isUpcoming = task.status === 'PENDING';
+      const isCompleted = task.status === 'COMPLETED';
+      const isCancelled = task.status === 'CANCELLED';
+
+      let statusClass = '';
+      let statusText = '';
+
+      if (isCurrent) {
+        statusClass = 'current';
+        statusText = ' (текущая)';
+      } else if (isUpcoming) {
+        statusClass = 'upcoming';
+        statusText = ' (предстоящая)';
+      } else if (isCompleted) {
+        statusClass = 'completed';
+        statusText = ' (завершена)';
+      } else if (isCancelled) {
+        statusClass = 'cancelled';
+        statusText = ' (отменена)';
+      }
+
+      const locationLabel = this._getLocationLabel(task.location) || 'Без локации';
+      const duration = task.duration ? `${task.duration}ч` : '—';
+
+      return `
         <div class="schedule-overlay-item ${statusClass}">
           <div class="schedule-overlay-item-number">${index + 1}</div>
           <div class="schedule-overlay-item-content">
-            <div class="schedule-overlay-item-name">${item.name}${statusText}</div>
-            <div class="schedule-overlay-item-location">${item.location}</div>
-            <div class="schedule-overlay-item-duration">Время пребывания: ${item.stayHours}ч</div>
+            <div class="schedule-overlay-item-name">${task.name}${statusText}</div>
+            <div class="schedule-overlay-item-location">${locationLabel}</div>
+            <div class="schedule-overlay-item-duration">Время: ${duration}</div>
           </div>
         </div>
       `;
-    });
-    
-    if (html === '') {
-      html = '<div class="schedule-overlay-empty">Расписание пусто</div>';
-    }
-    
-    scheduleList.innerHTML = html;
+    }).join('');
   }
+
+  _getGameDate() {
+    if (!this.timeManager || typeof this.timeManager.getGameTime !== 'function') {
+      return new Date();
+    }
+    const gameTime = this.timeManager.getGameTime();
+    return new Date(
+      gameTime.year,
+      gameTime.month,
+      gameTime.day,
+      Math.floor(gameTime.hours),
+      Math.floor(gameTime.minutes),
+      0,
+      0
+    );
+  }
+
+  _getLocationLabel(locationKey) {
+    if (!locationKey) return null;
+    const zone = this.config?.ZONES?.[locationKey];
+    return zone?.label || null;
+  }
+
+  _getFallbackRouteName() {
+    if (this.fallbackRoute?.name) {
+      return this.fallbackRoute.name;
+    }
+    const fallbackLocation = this.fallbackRoute?.location;
+    return this._getLocationLabel(fallbackLocation) || '—';
+  }
+
 }
