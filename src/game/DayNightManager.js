@@ -1,10 +1,11 @@
 // Менеджер режимов дня/ночи с поддержкой событий
 export class DayNightManager {
-  constructor(PIXI, config, worldRenderer, shinaRenderer = null) {
+  constructor(PIXI, config, worldRenderer, shinaRenderer = null, timeManager = null) {
     this.PIXI = PIXI;
     this.config = config;
     this.worldRenderer = worldRenderer; // Получаем WorldRenderer для доступа к слоям
     this.shinaRenderer = shinaRenderer; // Получаем ShinaRenderer для создания спрайта Шины
+    this.timeManager = timeManager;
     this.dayNightMode = 'auto'; // 'auto', 'day', 'night'
     this.isNightMode = false;
     this.cityNightOverlay = null;
@@ -65,8 +66,18 @@ export class DayNightManager {
     if (this.dayNightMode === 'night') return true;
     if (this.dayNightMode === 'day') return false;
 
+    const sourceTime = gameTime || (this.timeManager ? this.timeManager.getGameTime() : null);
+    if (!sourceTime) {
+      console.warn('⚠️ DayNightManager: нет данных времени, предполагаем дневной режим');
+      return false;
+    }
+
+    if (this.timeManager) {
+      return this.timeManager.isNightTime(sourceTime);
+    }
+
     // Автоматический режим - зависит от времени
-    const hour = gameTime.hours;
+    const hour = sourceTime.hours;
     // Ночь с 20:00 до 06:00
     return hour >= 20 || hour < 6;
   }
@@ -103,16 +114,24 @@ export class DayNightManager {
 
   // Обновить ночной режим
   updateNightMode(gameTime) {
-    const shouldBeNight = this.isNightTime(gameTime);
+    const effectiveTime = gameTime || (this.timeManager ? this.timeManager.getGameTime() : null);
+    const shouldBeNight = this.isNightTime(effectiveTime);
 
     if (shouldBeNight !== this.isNightMode) {
       this.isNightMode = shouldBeNight;
-      console.log(`🌙 ${this.isNightMode ? 'Включен' : 'Выключен'} ночной режим (${gameTime.hours}:${Math.floor(gameTime.minutes).toString().padStart(2, '0')})`);
+      const timeForLog = effectiveTime || {};
+      const hourStr = typeof timeForLog.hours === 'number'
+        ? Math.floor(timeForLog.hours).toString().padStart(2, '0')
+        : '??';
+      const minuteStr = typeof timeForLog.minutes === 'number'
+        ? Math.floor(timeForLog.minutes).toString().padStart(2, '0')
+        : '??';
+      console.log(`🌙 ${this.isNightMode ? 'Включен' : 'Выключен'} ночной режим (${hourStr}:${minuteStr})`);
       
       // Эмитим событие изменения режима дня/ночи
       this.emit('modeChange', {
         isNightMode: this.isNightMode,
-        gameTime: gameTime,
+        gameTime: effectiveTime,
         mode: this.isNightMode ? 'night' : 'day'
       });
     }

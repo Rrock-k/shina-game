@@ -91,7 +91,13 @@ class Game {
         // UIRenderer будет создан в init() после регистрации panningController
         
         // Создаем dayNightManager после worldRenderer
-        this.dayNightManager = new DayNightManager(PIXI, this.dependencies.get('config'), this.worldRenderer, this.shinaRenderer);
+        this.dayNightManager = new DayNightManager(
+            PIXI,
+            this.dependencies.get('config'),
+            this.worldRenderer,
+            this.shinaRenderer,
+            this.timeManager
+        );
         
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);

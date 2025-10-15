@@ -6,10 +6,11 @@ export class TimeManager {
       month: 8, // сентябрь (0-индексированный)
       day: 7,
       hours: 6, // начинаем с 06:00 утра
-      minutes: 0
+      minutes: 0,
+      dayOfWeek: this.getDayOfWeek(2025, 8, 7)
     }; // начинаем с 7 сентября 2025, 06:00
     
-    this.baseTimeSpeed = 25; // Базовая скорость времени (1 реальная секунда = 1 игровая минута)
+    this.baseTimeSpeed = 25; // Базовая скорость времени (1 реальная секунда = 25 игровых минут)
     this.lastTimeUpdate = Date.now();
     this.speedMultiplier = 1;
     this.isPaused = false;
@@ -18,11 +19,20 @@ export class TimeManager {
   // Установить множитель скорости
   setSpeedMultiplier(multiplier) {
     this.speedMultiplier = multiplier;
+    // Сбрасываем момент времени, чтобы избежать скачков при следующем обновлении
+    this.lastTimeUpdate = Date.now();
   }
 
   // Установить состояние паузы
   setPaused(paused) {
+    if (this.isPaused === paused) return;
+
     this.isPaused = paused;
+
+    // При выходе из паузы обнуляем отсчёт, чтобы не было скачка времени
+    if (!paused) {
+      this.lastTimeUpdate = Date.now();
+    }
   }
 
   // Обновить игровое время
@@ -60,6 +70,13 @@ export class TimeManager {
         }
       }
     }
+
+    // После корректировки минут/часов обновляем день недели
+    this.gameTime.dayOfWeek = this.getDayOfWeek(
+      this.gameTime.year,
+      this.gameTime.month,
+      this.gameTime.day
+    );
   }
 
   // Получить текущее игровое время
@@ -69,13 +86,8 @@ export class TimeManager {
 
   // Форматировать дату и время для отображения
   formatDateTime() {
-    const dayOfWeek = this.getDayOfWeek(this.gameTime.year, this.gameTime.month, this.gameTime.day);
-    const dayShort = this.getDayOfWeekShort(dayOfWeek);
-    const day = this.gameTime.day.toString().padStart(2, '0');
-    const monthShort = this.getMonthName(this.gameTime.month).substring(0, 3);
-    const hours = Math.floor(this.gameTime.hours).toString().padStart(2, '0');
-    const minutes = Math.floor(this.gameTime.minutes).toString().padStart(2, '0');
-    return `<span class="date-part">${dayShort} ${day} ${monthShort} - </span>${hours}:${minutes}`;
+    const parts = this.getDateTimeParts();
+    return `${parts.dayOfWeekShort} ${parts.day} ${parts.monthShort} - ${parts.time}`;
   }
 
   // Получить название месяца
@@ -85,6 +97,11 @@ export class TimeManager {
       'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
     ];
     return months[monthIndex];
+  }
+
+  // Получить короткое название месяца
+  getMonthShortName(monthIndex) {
+    return this.getMonthName(monthIndex).substring(0, 3);
   }
 
   // Получить день недели
@@ -105,8 +122,8 @@ export class TimeManager {
   }
 
   // Проверить, ночное ли время
-  isNightTime() {
-    const hour = this.gameTime.hours;
+  isNightTime(gameTime = this.gameTime) {
+    const hour = Math.floor(gameTime.hours);
     // Ночь с 20:00 до 06:00
     return hour >= 20 || hour < 6;
   }
@@ -126,5 +143,42 @@ export class TimeManager {
     const hours = Math.floor(this.gameTime.hours).toString().padStart(2, '0');
     const minutes = Math.floor(this.gameTime.minutes).toString().padStart(2, '0');
     return `${hours}:${minutes}`;
+  }
+
+  /**
+   * Получить части даты/времени для отображения
+   * @returns {{year:number, month:number, day:string, monthName:string, monthShort:string, dayOfWeek:number, dayOfWeekShort:string, time:string}}
+   */
+  getDateTimeParts() {
+    const hours = Math.floor(this.gameTime.hours).toString().padStart(2, '0');
+    const minutes = Math.floor(this.gameTime.minutes).toString().padStart(2, '0');
+
+    const day = this.gameTime.day.toString().padStart(2, '0');
+    const monthName = this.getMonthName(this.gameTime.month);
+
+    return {
+      year: this.gameTime.year,
+      month: this.gameTime.month,
+      dayNumber: this.gameTime.day,
+      day,
+      monthName,
+      monthShort: this.getMonthShortName(this.gameTime.month),
+      dayOfWeek: this.gameTime.dayOfWeek,
+      dayOfWeekShort: this.getDayOfWeekShort(this.gameTime.dayOfWeek),
+      hours: Math.floor(this.gameTime.hours),
+      minutes: Math.floor(this.gameTime.minutes),
+      time: `${hours}:${minutes}`
+    };
+  }
+
+  /**
+   * Получить игровые минуты в абсолютном выражении (для внутренних нужд)
+   * @returns {{hours:number, minutes:number}}
+   */
+  getTimeOfDay() {
+    return {
+      hours: Math.floor(this.gameTime.hours),
+      minutes: Math.floor(this.gameTime.minutes)
+    };
   }
 }

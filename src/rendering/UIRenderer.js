@@ -526,9 +526,10 @@ export class UIRenderer {
    * Обновление отображения времени
    */
   updateDateTimeDisplay() {
-    if (this.datetimeDisplay) {
-      this.datetimeDisplay.innerHTML = this.timeManager.formatDateTime();
-    }
+    if (!this.datetimeDisplay || !this.timeManager) return;
+
+    const parts = this.timeManager.getDateTimeParts();
+    this.datetimeDisplay.innerHTML = `<span class="date-part">${parts.dayOfWeekShort} ${parts.day} ${parts.monthShort} - </span>${parts.time}`;
   }
 
   /**
