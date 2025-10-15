@@ -80,9 +80,12 @@ class Game {
         this.journalManager = new JournalManager(this.timeManager);
         this.scheduleManager = new ScheduleManager(this.dependencies.get('config'), this.timeManager);
         this.dependencies.register('scheduleManager', this.scheduleManager);
-        const initialIndex = this.stateManager.getCurrentRouteIndex();
+        const initialIndex = this.scheduleManager.getActiveTaskIndex();
+        this.stateManager.setCurrentRouteIndex(initialIndex);
+        const currentGameTime = this.timeManager.getGameTime();
+        const initialTaskStart = this._gameTimeToDate(currentGameTime);
         this.scheduleManager.setCurrentTaskIndex(initialIndex);
-        this.scheduleManager.startTask(initialIndex, null);
+        this.scheduleManager.startTask(initialIndex, initialTaskStart);
         const initialTask = this.scheduleManager.getTaskByIndex(initialIndex);
         if (initialTask) {
             this.stateManager.setCurrentLocation(initialTask.location);
@@ -352,6 +355,9 @@ class Game {
         
         // Обновляем ночной режим
         const gameTime = this.timeManager.getGameTime();
+        if (this.scheduleManager) {
+            this.scheduleManager.update(gameTime);
+        }
         this.dayNightManager.updateNightMode(gameTime);
         
         // Обновляем UI (включая журнал)

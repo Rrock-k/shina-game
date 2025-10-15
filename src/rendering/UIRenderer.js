@@ -986,10 +986,12 @@ export class UIRenderer {
       const endTime = task.endTime ? task.endTime.toTimeString().slice(0, 5) : '--:--';
       const locationLabel = this._getLocationLabel(task.location) || 'Без локации';
       const duration = task.duration ? `${task.duration}ч` : '';
+      const dayLabel = task.dayLabel || (task.startTime ? this._formatDayLabel(task.startTime) : '');
+      const timeDisplay = dayLabel ? `${dayLabel} • ${startTime} - ${endTime}` : `${startTime} - ${endTime}`;
 
       return `
         <div class="${itemClass}">
-          <div class="schedule-time">${startTime} - ${endTime}</div>
+          <div class="schedule-time">${timeDisplay}</div>
           <div class="schedule-destination">${task.name}${statusText}</div>
           <div class="schedule-location">${locationLabel}</div>
           <div class="schedule-duration">${duration}</div>
@@ -1306,6 +1308,15 @@ export class UIRenderer {
       0,
       0
     );
+  }
+
+  _formatDayLabel(date) {
+    if (!(date instanceof Date)) return '';
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const dayName = days[date.getDay()] || '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${dayName} ${day}.${month}`;
   }
 
   _getLocationLabel(locationKey) {
