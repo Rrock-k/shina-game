@@ -1,7 +1,7 @@
 {
   "name": "shina-game",
   "version": "1.0.0",
-  "description": "Игра 'Карта Шины' - симуляция движения персонажа по городу",
+  "description": "Карта Шины — статичный PIXI-проект с симуляцией поездок по городу",
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8000",
@@ -15,9 +15,8 @@
   "keywords": [
     "game",
     "simulation",
-    "pixi.js",
-    "javascript",
-    "html5"
+    "pixi",
+    "javascript"
   ],
   "author": "Kirill",
   "license": "MIT",
