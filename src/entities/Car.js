@@ -44,6 +44,12 @@ export class Car {
     
     // Контроллер движения
     this.movementController = new MovementController(this, config);
+
+    // Доступ к расписанию (может быть переопределен извне)
+    this.scheduleAccess = {
+      getTaskByIndex: null,
+      getTaskCount: null
+    };
   }
 
   /**
@@ -64,6 +70,46 @@ export class Car {
     if (this.savedState) {
       this.restoreSavedState();
     }
+  }
+
+  /**
+   * Установить функции доступа к расписанию
+   * @param {Object} access
+   * @param {Function} access.getTaskByIndex
+   * @param {Function} access.getTaskCount
+   */
+  setScheduleAccess(access = {}) {
+    this.scheduleAccess.getTaskByIndex = access.getTaskByIndex || null;
+    this.scheduleAccess.getTaskCount = access.getTaskCount || null;
+  }
+
+  /**
+   * Получить задачу маршрута по индексу
+   * @param {number} index
+   * @returns {Object|null}
+   */
+  _getRouteTask(index) {
+    if (this.scheduleAccess.getTaskByIndex) {
+      return this.scheduleAccess.getTaskByIndex(index);
+    }
+    if (this.config?.ROUTE_SCHEDULE) {
+      return this.config.ROUTE_SCHEDULE[index] || null;
+    }
+    return null;
+  }
+
+  /**
+   * Получить количество задач в маршруте
+   * @returns {number}
+   */
+  _getRouteCount() {
+    if (this.scheduleAccess.getTaskCount) {
+      return this.scheduleAccess.getTaskCount();
+    }
+    if (this.config?.ROUTE_SCHEDULE) {
+      return this.config.ROUTE_SCHEDULE.length;
+    }
+    return 0;
   }
 
   /**
@@ -189,7 +235,9 @@ export class Car {
    * Перейти к следующему маршруту
    */
   nextRoute() {
-    this.currentRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
+    const total = this._getRouteCount();
+    if (total === 0) return;
+    this.currentRouteIndex = (this.currentRouteIndex + 1) % total;
   }
 
   /**
@@ -326,7 +374,7 @@ export class Car {
       debugLogAlways
     } = options;
 
-    const currentDestination = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const currentDestination = this._getRouteTask(this.currentRouteIndex);
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток
@@ -407,9 +455,18 @@ export class Car {
       getIntersectionCoord
     } = options;
 
+    const routeCount = this._getRouteCount();
+    if (routeCount === 0) {
+      return null;
+    }
+
     // Определяем следующий пункт назначения
-    const nextRouteIndex = (this.currentRouteIndex + 1) % this.config.ROUTE_SCHEDULE.length;
-    const nextDestination = this.config.ROUTE_SCHEDULE[nextRouteIndex];
+    const nextRouteIndex = (this.currentRouteIndex + 1) % routeCount;
+    const nextDestination = this._getRouteTask(nextRouteIndex);
+
+    if (!nextDestination) {
+      return null;
+    }
 
     const nextDestCenter = getDestinationCenter(nextDestination.location);
 
@@ -529,7 +586,7 @@ export class Car {
       showBuildingAvatar
     } = options;
 
-    const currentDest = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const currentDest = this._getRouteTask(this.currentRouteIndex);
     if (!currentDest) return;
 
     debugLogAlways(`🏠 Прибытие в ${currentDest.name} (обочина)`);

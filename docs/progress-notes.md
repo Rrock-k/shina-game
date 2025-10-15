@@ -9,11 +9,11 @@
 - [x] Обновлены `docs/current-state.md` и `docs/tech-debt.md`, отражающие новое разделение обязанностей.
 
 ## Что осталось сделать (главные задачи)
-- [ ] **Перевести движение машины на ScheduleManager**  
-   Сейчас Car/Game/PathBuilder строят маршруты, полагаясь на `CONFIG.ROUTE_SCHEDULE`. Нужно брать «следующую задачу» из ScheduleManager и использовать её координаты:
-   - Ввести в Game/helpers методы вида `getCurrentTask()`, `getNextTask()` и использовать их вместо прямого доступа к конфигу.
-   - Переписать `Car.saveStateForNextDestination`, `Game.nextDestination`, PathBuilder так, чтобы они работали с задачами, а не с индексами статического расписания.
-   - После полной миграции удалить `ROUTE_SCHEDULE` либо оставить минимальный fallback (например, для первого запуска).
+- [x] **Перевести движение машины на ScheduleManager**  
+   Car/Game/PathBuilder теперь получают маршруты через ScheduleManager; `CONFIG.ROUTE_SCHEDULE` остался только как fallback на случай отсутствия задач:
+   - [x] Ввести в Game/helpers методы вида `getCurrentTask()`, `getNextTask()` и использовать их вместо прямого доступа к конфигу.
+   - [x] Переписать `Car.saveStateForNextDestination`, `Game.nextDestination`, PathBuilder так, чтобы они работали с задачами, а не с индексами статического расписания.
+   - [x] После полной миграции удалить `ROUTE_SCHEDULE` либо оставить минимальный fallback (например, для первого запуска).
 
 - [ ] **Smoke-тесты менеджеров**  
    - Зафиксировать поведение TimeManager при паузе и переключении скорости (reset `lastTimeUpdate` при возобновлении).

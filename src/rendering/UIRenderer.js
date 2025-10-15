@@ -35,7 +35,9 @@ export class UIRenderer {
     // Состояние
     this.isInitialized = false;
     this.currentRouteIndex = 0; // сохраним для фолбэка на статическое расписание
-    this.fallbackRoute = this.config?.ROUTE_SCHEDULE?.[0] || null;
+    this.fallbackRoute = (this.scheduleManager && this.scheduleManager.getFallbackTask)
+      ? this.scheduleManager.getFallbackTask()
+      : this.config?.ROUTE_SCHEDULE?.[0] || null;
     this.journalUpdateInterval = null;
     this.currentMenuState = 'main'; // 'main', 'journal', 'schedule', 'help', 'about'
     this.modalStack = []; // Стек для навигации по модальным окнам
@@ -562,6 +564,13 @@ export class UIRenderer {
    */
   setCurrentRouteIndex(index) {
     this.currentRouteIndex = index;
+    if (this.scheduleManager) {
+      const task = this.scheduleManager.getTaskByIndex(index);
+      if (task) {
+        this.fallbackRoute = task;
+        return;
+      }
+    }
     const routeList = this.config?.ROUTE_SCHEDULE || [];
     this.fallbackRoute = routeList[index] || this.fallbackRoute;
   }

@@ -15,6 +15,7 @@ import { PathBuilder } from '../systems/PathBuilder.js';
 import { CONFIG } from '../config/gameConfig.js';
 import { TrafficLight, TrafficLightCoordinator } from '../systems/trafficLights.js';
 import { TrafficLightRenderer } from '../rendering/TrafficLightRenderer.js';
+import ScheduleManager from './ScheduleManager.js';
 
 /**
  * Главный класс игры - централизует управление игровым состоянием и циклом
@@ -77,6 +78,15 @@ class Game {
         this.timeManager = new TimeManager();
         this.pauseManager = new PauseManager();
         this.journalManager = new JournalManager(this.timeManager);
+        this.scheduleManager = new ScheduleManager(this.dependencies.get('config'), this.timeManager);
+        this.dependencies.register('scheduleManager', this.scheduleManager);
+        const initialIndex = this.stateManager.getCurrentRouteIndex();
+        this.scheduleManager.setCurrentTaskIndex(initialIndex);
+        this.scheduleManager.startTask(initialIndex, null);
+        const initialTask = this.scheduleManager.getTaskByIndex(initialIndex);
+        if (initialTask) {
+            this.stateManager.setCurrentLocation(initialTask.location);
+        }
         // dayNightManager будет создан в init() после worldRenderer
         
         // Синхронизируем менеджеры
@@ -93,6 +103,10 @@ class Game {
         // Создаем сущности
         this.carEntity = new Car(this.dependencies.get('config'), this.pauseManager);
         this.shinaEntity = new Shina(this.dependencies.get('config'));
+        this.carEntity.setScheduleAccess({
+            getTaskByIndex: this.scheduleManager.getTaskByIndex.bind(this.scheduleManager),
+            getTaskCount: this.scheduleManager.getTaskCount.bind(this.scheduleManager)
+        });
         
         // Создаем рендерер Шины
         this.shinaRenderer = new ShinaRenderer(this.dependencies.get('config'), this.pauseManager);
@@ -245,6 +259,9 @@ class Game {
         const verticalRoadXs = this.worldRenderer ? this.worldRenderer.getVerticalRoadXs() : [];
         const horizontalRoadYs = this.worldRenderer ? this.worldRenderer.getHorizontalRoadYs() : [];
         const pathBuilder = new PathBuilder(verticalRoadXs, horizontalRoadYs, this.dependencies.get('config'));
+        if (this.scheduleManager) {
+            pathBuilder.setRouteResolver(index => this.scheduleManager.getTaskByIndex(index));
+        }
         this.dependencies.register('pathBuilder', pathBuilder);
         
         // Инициализируем UI
@@ -460,50 +477,58 @@ class Game {
      */
     nextDestination() {
         console.log(`🔄 Переход к следующему пункту назначения`);
-        
-        // Получаем текущий индекс маршрута из stateManager
+
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        
-        // Завершаем пребывание в текущем месте
-        const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
-        if (this.journalManager && currentDest) {
-            this.journalManager.endLocationStay(currentDest.name);
+        const currentTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(currentRouteIndex) : null;
+
+        if (this.journalManager && currentTask) {
+            this.journalManager.endLocationStay(currentTask.name);
         }
 
-        // Скрываем аватарку в текущем здании
-        this.hideBuildingAvatar();
+        if (this.scheduleManager && currentTask) {
+            const departureTime = this._gameTimeToDate(this.timeManager.getGameTime());
+            this.scheduleManager.completeTask(currentRouteIndex, departureTime);
+        }
 
-        const newRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
+        this.hideBuildingAvatar();
+        this.stateManager.setCurrentLocation(null);
+
+        const newRouteIndex = this.scheduleManager
+            ? this.scheduleManager.getNextIndex(currentRouteIndex)
+            : currentRouteIndex;
         this.stateManager.setCurrentRouteIndex(newRouteIndex);
-        
-        // Обновляем индекс маршрута в UIRenderer
+        if (this.scheduleManager) {
+            this.scheduleManager.setCurrentTaskIndex(newRouteIndex);
+        }
+
         if (this.uiRenderer) {
             this.uiRenderer.setCurrentRouteIndex(newRouteIndex);
         }
-        
-        // Синхронизируем с carEntity
+
         if (this.carEntity) {
             this.carEntity.setCurrentRouteIndex(newRouteIndex);
             this.carEntity.setAtDestination(false);
             this.carEntity.setStayTimer(0);
-            
-            // Очищаем абсолютное время начала пребывания при начале новой поездки
+
             this.stateManager.clearStayStartTimeAbs();
             this.stateManager.setStayTotalDuration(0);
-            
-            // Обновляем путь к новому пункту назначения
+
             const pathBuilder = this.dependencies.get('pathBuilder');
             if (pathBuilder) {
-                const newPath = pathBuilder.buildCarPath(this.carEntity, newRouteIndex, this.stateManager.getSavedCarState(), this._getDestinationCenter.bind(this), this.debugLogAlways.bind(this));
+                const newPath = pathBuilder.buildCarPath(
+                    this.carEntity,
+                    newRouteIndex,
+                    this.stateManager.getSavedCarState(),
+                    this._getDestinationCenter.bind(this),
+                    this.debugLogAlways.bind(this)
+                );
                 this.carEntity.setPath(newPath);
             }
         }
 
-        // Начинаем новую дорогу в журнале при выходе из здания
-        const newDest = CONFIG.ROUTE_SCHEDULE[newRouteIndex];
-        if (this.journalManager && newDest) {
-            this.journalManager.startTrip(newDest.name, newDest.location);
+        const newTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(newRouteIndex) : null;
+        if (this.journalManager && newTask) {
+            this.journalManager.startTrip(newTask.name, newTask.location);
         }
 
         this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
@@ -515,54 +540,46 @@ class Game {
      */
     checkArrival() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+        const currentTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(currentRouteIndex) : null;
         
-        // Проверяем, что у нас есть все необходимые компоненты
-        if (!this.carEntity || !currentDest) {
+        if (!this.carEntity || !currentTask) {
             console.warn('⚠️ checkArrival: отсутствуют необходимые компоненты');
             return;
         }
 
-        // Проверяем, что машина еще не в пункте назначения
         if (this.carEntity.isAtDestination()) {
-            return; // Уже в пункте назначения, ничего не делаем
+            return;
         }
 
-        console.log(`🏠 Прибытие в ${currentDest.name} (обочина)`);
+        console.log(`🏠 Прибытие в ${currentTask.name} (обочина)`);
 
-        // АТОМАРНО ВЫПОЛНЯЕМ ВСЕ ДЕЙСТВИЯ ПРИБЫТИЯ:
-        
-        // 1. Завершаем дорогу в журнале
         if (this.journalManager) {
-            this.journalManager.endTrip(currentDest.name);
-            this.journalManager.setLocationStartTime(currentDest.name);
+            this.journalManager.endTrip(currentTask.name);
+            this.journalManager.setLocationStartTime(currentTask.name);
         }
 
-        // 2. Сохраняем состояние машины для следующего пункта
         const savedCarState = this.saveCarStateForNextDestination();
         this.stateManager.setSavedCarState(savedCarState);
-        // TODO: убрать дублирование в window после рефакторинга
         window.savedCarState = savedCarState;
         console.log(`💾 Сохранено состояние машины:`, savedCarState);
 
-        // 3. Устанавливаем состояние машины (атомарно)
         this.carEntity.setAtDestination(true);
-        this.carEntity.setStayTimer(currentDest.stayHours);
+        this.carEntity.setStayTimer(currentTask.duration || 0);
+        this.stateManager.setStayTotalDuration(currentTask.duration || 0);
+        this.stateManager.setCurrentLocation(currentTask.location);
         
-        // 3.1. Сохраняем ПОЛНУЮ ДЛИТЕЛЬНОСТЬ в StateManager
-        this.stateManager.setStayTotalDuration(currentDest.stayHours);
-        
-        // 4. Сохраняем абсолютное время начала пребывания
         const gameTime = this.timeManager.getGameTime();
         this.stateManager.setStayStartTimeAbs(gameTime);
+        const arrivalTime = this._gameTimeToDate(gameTime);
+        if (this.scheduleManager) {
+            this.scheduleManager.startTask(currentRouteIndex, arrivalTime);
+        }
         console.log(`⏰ Сохранено время начала пребывания: ${gameTime.hours}:${Math.floor(gameTime.minutes)}`);
         
-        // 5. Обновляем UI (атомарно)
         this.uiRenderer.updateRouteDisplay(true);
-        this.showBuildingAvatar(currentDest.location);
+        this.showBuildingAvatar(currentTask.location);
         
-        console.log(`✅ Прибытие в ${currentDest.name} обработано атомарно`);
+        console.log(`✅ Прибытие в ${currentTask.name} обработано атомарно`);
     }
     
     /**
@@ -570,15 +587,18 @@ class Game {
      */
     saveCarStateForNextDestination() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        const nextRouteIndex = (currentRouteIndex + 1) % CONFIG.ROUTE_SCHEDULE.length;
-        const nextDestination = CONFIG.ROUTE_SCHEDULE[nextRouteIndex];
+        const taskCount = this.scheduleManager ? this.scheduleManager.getTaskCount() : 0;
+        if (!taskCount) return null;
 
-        if (!nextDestination) return null;
+        const nextRouteIndex = this.scheduleManager
+            ? this.scheduleManager.getNextIndex(currentRouteIndex)
+            : currentRouteIndex;
+        const nextTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(nextRouteIndex) : null;
 
-        const nextDestCenter = this._getDestinationCenter(nextDestination.location);
+        if (!nextTask) return null;
 
-        // Строим путь к следующему пункту назначения, чтобы найти первый перекресток
+        const nextDestCenter = this._getDestinationCenter(nextTask.location);
+
         const carRenderer = this.carRenderer;
         const pathBuilder = this.dependencies.get('pathBuilder');
         if (!carRenderer || !pathBuilder) return null;
@@ -587,17 +607,13 @@ class Game {
         const currentIJ = pathBuilder.getNearestIntersectionIJ(currentPos.x, currentPos.y);
         const nextPath = pathBuilder.buildPathToBuilding(currentIJ, nextDestCenter);
 
-        // Находим первый перекресток в пути (не точку остановки у здания)
         let nextIntersection = null;
         if (nextPath.length >= 2) {
-            // Берем предпоследнюю точку (последняя - это остановка у здания)
             nextIntersection = nextPath[nextPath.length - 2];
         } else if (nextPath.length === 1) {
-            // Если путь состоит только из одной точки, используем ее
             nextIntersection = nextPath[0];
         }
 
-        // Если не нашли перекресток, используем направление к центру назначения как fallback
         let direction;
         if (nextIntersection) {
             const dx = nextIntersection.x - currentPos.x;
@@ -612,7 +628,7 @@ class Game {
         }
 
         return {
-            nextDestination: nextDestination,
+            nextDestination: nextTask,
             nextDestCenter: nextDestCenter,
             nextIntersection: nextIntersection,
             direction: direction,
@@ -693,19 +709,18 @@ class Game {
      */
     hideBuildingAvatar() {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const CONFIG = this.dependencies.get('config');
-        const currentDest = CONFIG.ROUTE_SCHEDULE[currentRouteIndex];
+        const currentTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(currentRouteIndex) : null;
+        const locationKey = currentTask?.location;
         
-        if (this.buildingAvatars) {
-            const avatarContainer = this.buildingAvatars.get(currentDest.location);
+        if (locationKey && this.buildingAvatars) {
+            const avatarContainer = this.buildingAvatars.get(locationKey);
             if (avatarContainer && avatarContainer.parent) {
                 avatarContainer.parent.removeChild(avatarContainer);
-                this.buildingAvatars.delete(currentDest.location);
-                console.log(`🏠 Скрыта аватарка в здании ${currentDest.location}`);
+                this.buildingAvatars.delete(locationKey);
+                console.log(`🏠 Скрыта аватарка в здании ${locationKey}`);
             }
         }
 
-        // Показываем аватарку обратно в машинке
         const carRenderer = this.carRenderer;
         if (carRenderer) {
             carRenderer.setAvatarVisible(true);
@@ -745,6 +760,18 @@ class Game {
         if (def.type === 'rect') return { x: def.x + def.w / 2, y: def.y + def.h / 2 };
         if (def.type === 'circle') return { x: def.x, y: def.y };
         return { x: verticalRoadXs[0], y: horizontalRoadYs[0] };
+    }
+
+    _gameTimeToDate(gameTime) {
+        return new Date(
+            gameTime.year,
+            gameTime.month,
+            gameTime.day,
+            Math.floor(gameTime.hours),
+            Math.floor(gameTime.minutes),
+            0,
+            0
+        );
     }
 
     /**
@@ -1091,9 +1118,9 @@ class Game {
         // window.intersectionKeyToTL больше не нужен - доступен через контейнер зависимостей
         // window.getDestinationCenter больше не нужен - метод доступен через this._getDestinationCenter
 
-        // Начинаем с дома
-        const routeIndex = 0; // дом
-        const stayTimer = CONFIG.ROUTE_SCHEDULE[0].stayHours; // устанавливаем таймер для дома
+        const routeIndex = this.stateManager.getCurrentRouteIndex();
+        const initialTask = this.scheduleManager.getTaskByIndex(routeIndex);
+        const stayTimer = initialTask?.duration || 0;
         
         // Обновляем индекс маршрута в UIRenderer
         if (uiRenderer) {
@@ -1107,8 +1134,9 @@ class Game {
         if (this.carEntity) {
             this.carEntity.setPath(carPath);
             this.carEntity.setAtDestination(true);
-            this.carEntity.setStayTimer(CONFIG.ROUTE_SCHEDULE[0].stayHours);
+            this.carEntity.setStayTimer(stayTimer);
         }
+        this.stateManager.setStayTotalDuration(stayTimer);
         
         // Инициализация таймера пребывания теперь происходит в StateManager
 

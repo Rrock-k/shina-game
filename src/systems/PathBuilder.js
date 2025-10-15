@@ -19,11 +19,27 @@ export class PathBuilder {
     this.horizontalRoadYs = horizontalRoadYs;
     this.config = config;
     this.validator = new PathValidator(verticalRoadXs, horizontalRoadYs);
+    this.routeResolver = null;
     
     // Оптимизация: отключаем валидацию в production режиме
     if (config && config.disableValidation) {
       this.validator.validationEnabled = false;
     }
+  }
+
+  /**
+   * Установить функцию получения задач маршрута
+   * @param {Function} routeResolver - функция (index) => task
+   */
+  setRouteResolver(routeResolver) {
+    this.routeResolver = routeResolver;
+  }
+
+  _getRouteTask(index) {
+    if (typeof this.routeResolver === 'function') {
+      return this.routeResolver(index);
+    }
+    return this.config?.ROUTE_SCHEDULE?.[index] || null;
   }
 
   /**
@@ -150,7 +166,7 @@ export class PathBuilder {
    * @returns {Array} - массив точек пути
    */
   buildCarPath(carEntity, currentRouteIndex, savedCarState, getDestinationCenter, debugLogAlways) {
-    const currentDestination = this.config?.ROUTE_SCHEDULE?.[currentRouteIndex];
+    const currentDestination = this._getRouteTask(currentRouteIndex);
     if (!currentDestination) return [];
 
     // Определяем стартовый перекрёсток

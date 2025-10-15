@@ -12,6 +12,7 @@ class StateManager {
     constructor() {
         // Состояние маршрута
         this.currentRouteIndex = 0;
+        this.currentLocation = null;
         
         // Сохраненное состояние машины для следующей поездки
         this.savedCarState = null;
@@ -42,6 +43,22 @@ class StateManager {
     }
 
     /**
+     * Получить текущую локацию
+     * @returns {string|null}
+     */
+    getCurrentLocation() {
+        return this.currentLocation;
+    }
+
+    /**
+     * Установить текущую локацию
+     * @param {string|null} locationKey
+     */
+    setCurrentLocation(locationKey) {
+        this.currentLocation = locationKey || null;
+    }
+
+    /**
      * Перейти к следующему маршруту
      */
     nextRoute() {
@@ -53,6 +70,7 @@ class StateManager {
      */
     resetRoute() {
         this.currentRouteIndex = 0;
+        this.currentLocation = null;
     }
 
     // === Методы для управления savedCarState ===
@@ -258,6 +276,7 @@ class StateManager {
      */
     reset() {
         this.currentRouteIndex = 0;
+        this.currentLocation = null;
         this.savedCarState = null;
         this.lastStayTimerUpdate = 0;
         this.lastStayTimerDay = 0;
