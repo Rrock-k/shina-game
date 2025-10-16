@@ -80,6 +80,7 @@ class Game {
         this.journalManager = new JournalManager(this.timeManager);
         this.scheduleManager = new ScheduleManager(this.dependencies.get('config'), this.timeManager);
         this.dependencies.register('scheduleManager', this.scheduleManager);
+        this.activeAvatarLocation = null;
         const initialIndex = this.scheduleManager.getActiveTaskIndex();
         this.stateManager.setCurrentRouteIndex(initialIndex);
         const currentGameTime = this.timeManager.getGameTime();
@@ -364,9 +365,11 @@ class Game {
                 if (isAtDestination) {
                     this.nextDestination();
                 } else {
+                    const previousTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(storedIndex) : null;
+                    const previousLocation = previousTask?.location || this.stateManager.getCurrentLocation();
                     this.stateManager.setCurrentRouteIndex(activeIndex);
                     this.scheduleManager.setCurrentTaskIndex(activeIndex);
-                    this.hideBuildingAvatar();
+                    this.hideBuildingAvatar(previousLocation);
                     this.stateManager.setCurrentLocation(null);
 
                     if (this.uiRenderer) {
@@ -512,7 +515,7 @@ class Game {
             if (newStayTimer <= 0) {
                 const currentIndex = this.stateManager.getCurrentRouteIndex();
                 const nextIndex = this.scheduleManager
-                    ? this.scheduleManager.getNextIndex(currentIndex)
+                    ? this.scheduleManager.getNextIndex(currentIndex, gameTime)
                     : null;
                 if (this.scheduleManager && nextIndex === currentIndex) {
                     return;
@@ -533,17 +536,11 @@ class Game {
         const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
         const currentTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(currentRouteIndex) : null;
 
-        if (this.journalManager && currentTask) {
-            this.journalManager.endLocationStay(currentTask.name);
-        }
-
-        if (this.scheduleManager && currentTask) {
-            const departureTime = this._gameTimeToDate(this.timeManager.getGameTime());
-            this.scheduleManager.completeTask(currentRouteIndex, departureTime);
-        }
+        const gameTime = this.timeManager.getGameTime();
+        const departureTime = this._gameTimeToDate(gameTime);
 
         const newRouteIndex = this.scheduleManager
-            ? this.scheduleManager.getNextIndex(currentRouteIndex)
+            ? this.scheduleManager.getNextIndex(currentRouteIndex, gameTime)
             : currentRouteIndex;
         if (this.scheduleManager) {
             this.scheduleManager.setCurrentTaskIndex(newRouteIndex);
@@ -553,25 +550,32 @@ class Game {
 
         if (stayingInPlace) {
             console.log('⏸ Нет следующего назначения, остаемся на месте');
-            this.stateManager.setCurrentRouteIndex(newRouteIndex);
-            if (currentTask) {
-                this.stateManager.setCurrentLocation(currentTask.location || null);
-            }
+            this.stateManager.setCurrentRouteIndex(currentRouteIndex);
+            const location = currentTask ? currentTask.location : null;
+            this.stateManager.setCurrentLocation(location);
             if (this.carEntity) {
-                this.carEntity.setCurrentRouteIndex(newRouteIndex);
+                this.carEntity.setCurrentRouteIndex(currentRouteIndex);
                 this.carEntity.setAtDestination(true);
-                this.carEntity.setStayTimer(0);
+                this.carEntity.setStayTimer(currentTask ? currentTask.duration || 0 : 0);
             }
-            this.stateManager.clearStayStartTimeAbs();
-            this.stateManager.setStayTotalDuration(0);
+            this.stateManager.setStayStartTimeAbs(gameTime);
+            this.stateManager.setStayTotalDuration(currentTask ? currentTask.duration || 0 : 0);
             if (this.uiRenderer) {
-                this.uiRenderer.setCurrentRouteIndex(newRouteIndex);
-                this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
+                this.uiRenderer.setCurrentRouteIndex(currentRouteIndex);
+                this.uiRenderer.updateRouteDisplay(true);
             }
             return;
         }
 
-        this.hideBuildingAvatar();
+        if (this.journalManager && currentTask) {
+            this.journalManager.endLocationStay(currentTask.name);
+        }
+
+        if (this.scheduleManager && currentTask) {
+            this.scheduleManager.completeTask(currentRouteIndex, departureTime);
+        }
+
+        this.hideBuildingAvatar(currentTask ? currentTask.location : null);
         this.stateManager.setCurrentLocation(null);
         this.stateManager.setCurrentRouteIndex(newRouteIndex);
 
@@ -726,6 +730,14 @@ class Game {
             carRenderer.setAvatarVisible(false);
         }
 
+        if (this.buildingAvatars && this.buildingAvatars.has(locationKey)) {
+            const existing = this.buildingAvatars.get(locationKey);
+            if (existing?.parent) {
+                existing.parent.removeChild(existing);
+            }
+            this.buildingAvatars.delete(locationKey);
+        }
+
         const avatarContainer = new PIXI.Container();
 
         // Квадратный фон (исходный размер без скругления)
@@ -773,6 +785,7 @@ class Game {
             this.buildingAvatars = new Map();
         }
         this.buildingAvatars.set(locationKey, avatarContainer);
+        this.activeAvatarLocation = locationKey;
 
         console.log(`🏠 Показана аватарка в здании ${locationKey}`, {
             zone: zone,
@@ -784,23 +797,39 @@ class Game {
     /**
      * Скрыть аватарку в здании
      */
-    hideBuildingAvatar() {
-        const currentRouteIndex = this.stateManager.getCurrentRouteIndex();
-        const currentTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(currentRouteIndex) : null;
-        const locationKey = currentTask?.location;
-        
-        if (locationKey && this.buildingAvatars) {
-            const avatarContainer = this.buildingAvatars.get(locationKey);
-            if (avatarContainer && avatarContainer.parent) {
-                avatarContainer.parent.removeChild(avatarContainer);
-                this.buildingAvatars.delete(locationKey);
-                console.log(`🏠 Скрыта аватарка в здании ${locationKey}`);
+    hideBuildingAvatar(locationKeyOverride = null) {
+        if (!this.buildingAvatars || this.buildingAvatars.size === 0) {
+            if (this.carRenderer) {
+                this.carRenderer.setAvatarVisible(true);
             }
+            return;
         }
 
-        const carRenderer = this.carRenderer;
-        if (carRenderer) {
-            carRenderer.setAvatarVisible(true);
+        const keysToRemove = [];
+        if (locationKeyOverride) {
+            keysToRemove.push(locationKeyOverride);
+        } else if (this.activeAvatarLocation) {
+            keysToRemove.push(this.activeAvatarLocation);
+        } else {
+            keysToRemove.push(...this.buildingAvatars.keys());
+        }
+
+        keysToRemove.forEach((key) => {
+            const avatarContainer = this.buildingAvatars.get(key);
+            if (avatarContainer && avatarContainer.parent) {
+                avatarContainer.parent.removeChild(avatarContainer);
+            }
+            if (this.buildingAvatars.has(key)) {
+                this.buildingAvatars.delete(key);
+                console.log(`🏠 Скрыта аватарка в здании ${key}`);
+            }
+            if (this.activeAvatarLocation === key) {
+                this.activeAvatarLocation = null;
+            }
+        });
+
+        if (this.carRenderer) {
+            this.carRenderer.setAvatarVisible(true);
         }
     }
 
