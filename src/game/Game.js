@@ -357,6 +357,45 @@ class Game {
         const gameTime = this.timeManager.getGameTime();
         if (this.scheduleManager) {
             this.scheduleManager.update(gameTime);
+            const activeIndex = this.scheduleManager.getActiveTaskIndex();
+            const storedIndex = this.stateManager.getCurrentRouteIndex();
+            if (typeof activeIndex === 'number' && activeIndex !== storedIndex) {
+                const isAtDestination = this.carEntity ? this.carEntity.isAtDestination() : false;
+                if (isAtDestination) {
+                    this.nextDestination();
+                } else {
+                    this.stateManager.setCurrentRouteIndex(activeIndex);
+                    this.scheduleManager.setCurrentTaskIndex(activeIndex);
+                    this.hideBuildingAvatar();
+                    this.stateManager.setCurrentLocation(null);
+
+                    if (this.uiRenderer) {
+                        this.uiRenderer.setCurrentRouteIndex(activeIndex);
+                    }
+
+                    if (this.carEntity) {
+                        this.carEntity.setCurrentRouteIndex(activeIndex);
+                        this.carEntity.setAtDestination(false);
+                        this.carEntity.setStayTimer(0);
+                        const pathBuilder = this.dependencies.get('pathBuilder');
+                        if (pathBuilder) {
+                            const newPath = pathBuilder.buildCarPath(
+                                this.carEntity,
+                                activeIndex,
+                                this.stateManager.getSavedCarState(),
+                                this._getDestinationCenter.bind(this),
+                                this.debugLogAlways.bind(this)
+                            );
+                            this.carEntity.setPath(newPath);
+                        }
+                    }
+
+                    const newTask = this.scheduleManager.getTaskByIndex(activeIndex);
+                    if (newTask && this.journalManager) {
+                        this.journalManager.startTrip(newTask.name, newTask.location);
+                    }
+                }
+            }
         }
         this.dayNightManager.updateNightMode(gameTime);
         
@@ -471,6 +510,13 @@ class Game {
             this.carEntity.setStayTimer(newStayTimer);
             
             if (newStayTimer <= 0) {
+                const currentIndex = this.stateManager.getCurrentRouteIndex();
+                const nextIndex = this.scheduleManager
+                    ? this.scheduleManager.getNextIndex(currentIndex)
+                    : null;
+                if (this.scheduleManager && nextIndex === currentIndex) {
+                    return;
+                }
                 // Время пребывания закончилось, едем к следующему пункту
                 console.log('🚗 Время пребывания закончилось, продолжаем движение');
                 this.nextDestination();
@@ -496,16 +542,38 @@ class Game {
             this.scheduleManager.completeTask(currentRouteIndex, departureTime);
         }
 
-        this.hideBuildingAvatar();
-        this.stateManager.setCurrentLocation(null);
-
         const newRouteIndex = this.scheduleManager
             ? this.scheduleManager.getNextIndex(currentRouteIndex)
             : currentRouteIndex;
-        this.stateManager.setCurrentRouteIndex(newRouteIndex);
         if (this.scheduleManager) {
             this.scheduleManager.setCurrentTaskIndex(newRouteIndex);
         }
+
+        const stayingInPlace = newRouteIndex === currentRouteIndex;
+
+        if (stayingInPlace) {
+            console.log('⏸ Нет следующего назначения, остаемся на месте');
+            this.stateManager.setCurrentRouteIndex(newRouteIndex);
+            if (currentTask) {
+                this.stateManager.setCurrentLocation(currentTask.location || null);
+            }
+            if (this.carEntity) {
+                this.carEntity.setCurrentRouteIndex(newRouteIndex);
+                this.carEntity.setAtDestination(true);
+                this.carEntity.setStayTimer(0);
+            }
+            this.stateManager.clearStayStartTimeAbs();
+            this.stateManager.setStayTotalDuration(0);
+            if (this.uiRenderer) {
+                this.uiRenderer.setCurrentRouteIndex(newRouteIndex);
+                this.uiRenderer.updateRouteDisplay(this.carEntity ? this.carEntity.isAtDestination() : false);
+            }
+            return;
+        }
+
+        this.hideBuildingAvatar();
+        this.stateManager.setCurrentLocation(null);
+        this.stateManager.setCurrentRouteIndex(newRouteIndex);
 
         if (this.uiRenderer) {
             this.uiRenderer.setCurrentRouteIndex(newRouteIndex);
@@ -532,7 +600,10 @@ class Game {
             }
         }
 
-        const newTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(newRouteIndex) : null;
+        let newTask = this.scheduleManager ? this.scheduleManager.getTaskByIndex(newRouteIndex) : null;
+        if (!newTask && this.scheduleManager) {
+            newTask = this.scheduleManager.getReturnHomeTask();
+        }
         if (this.journalManager && newTask) {
             this.journalManager.startTrip(newTask.name, newTask.location);
         }

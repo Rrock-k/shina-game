@@ -1,601 +1,540 @@
 import { WEEKDAY_TEMPLATES, WEEKEND_TEMPLATES } from '../config/scheduleTemplates.js';
 
+const STATUS = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  IDLE: 'IDLE'
+};
+
+/**
+ * ScheduleManager управляет задачами на текущий день.
+ * - Генерирует дела утром на основе шаблонов (будни/выходные)
+ * - Поддерживает fallback "домой", но не показывает его в UI
+ * - Позволяет игре получать следующую задачу или вернуть Шину домой
+ */
 export class ScheduleManager {
   constructor(config, timeManager = null, options = {}) {
     this.config = config;
     this.timeManager = timeManager;
     this.options = {
-      dayStartHour: options.dayStartHour ?? 6,
+      dayStartHour: options.dayStartHour ?? 8,
       dayStartMinute: options.dayStartMinute ?? 0,
       lateHour: options.lateHour ?? 22
     };
 
+    this.randomFn = typeof options.random === 'function' ? options.random : Math.random;
     this.templates = options.scheduleTemplates || {
       weekday: WEEKDAY_TEMPLATES,
       weekend: WEEKEND_TEMPLATES
     };
-    this.randomFn = typeof options.random === 'function' ? options.random : Math.random;
 
     this.tasks = [];
-    this.currentTaskIndex = 0;
-    this.baseDate = null;
-    this.currentWeekKey = null;
+    this.currentTaskIndex = null;
+    this.currentDayKey = null;
+    this.homeTask = this._createHomeTask();
 
-    if (this._hasTemplateVariants()) {
-      this.generateWeeklySchedule();
-    } else {
-      this.initializeFromStaticTemplate();
-    }
+    this.generateTodaySchedule();
   }
 
   /**
-   * Проверить, доступны ли шаблоны расписания
-   * @returns {boolean}
+   * Обновить состояние расписания (вызывается каждый кадр)
+   * @param {Object|null} gameTime
    */
-  _hasTemplateVariants() {
-    const weekdayCount = Array.isArray(this.templates?.weekday) ? this.templates.weekday.length : 0;
-    const weekendCount = Array.isArray(this.templates?.weekend) ? this.templates.weekend.length : 0;
-    return weekdayCount > 0 && weekendCount > 0;
+  update(gameTime = null) {
+    const now = this._resolveDate(gameTime);
+    this.generateTodaySchedule(gameTime);
+    this._prepareStatuses(now);
+    this._cancelLateTasks(now);
+    this._prepareStatuses(now);
   }
 
   /**
-   * Инициализировать расписание из статичного конфига (fallback).
-   * @param {Object|null} gameTimeOverride - объект времени {year, month, day, hours, minutes}
+   * Сгенерировать дела на текущий день (если день сменился)
+   * @param {Object|null} gameTimeOverride
    */
-  initializeFromStaticTemplate(gameTimeOverride = null) {
-    const template = this.config?.ROUTE_SCHEDULE || [];
-
-    if (!template.length) {
-      this.tasks = [];
-      this.currentTaskIndex = 0;
+  generateTodaySchedule(gameTimeOverride = null) {
+    const now = this._resolveDate(gameTimeOverride);
+    const dayKey = this._formatDayKey(now);
+    if (this.currentDayKey === dayKey) {
       return;
     }
 
-    const baseGameTime = gameTimeOverride || (this.timeManager ? this.timeManager.getGameTime() : null);
-    const baseDate = baseGameTime
-      ? this._toDate(baseGameTime.year, baseGameTime.month, baseGameTime.day, baseGameTime.hours, baseGameTime.minutes)
-      : this._toDate(2025, 8, 7, this.options.dayStartHour, this.options.dayStartMinute);
+    this.currentDayKey = dayKey;
 
-    this.baseDate = baseDate;
-
-    let pointer = new Date(
-      baseDate.getFullYear(),
-      baseDate.getMonth(),
-      baseDate.getDate(),
+    const dayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
       this.options.dayStartHour,
       this.options.dayStartMinute,
       0,
       0
     );
 
-    this.tasks = template.map((item, index) => {
-      const plannedStart = new Date(pointer.getTime());
-      const stayMillis = (item.stayHours || 0) * 60 * 60 * 1000;
-      const plannedEnd = new Date(plannedStart.getTime() + stayMillis);
-      pointer = new Date(plannedEnd.getTime());
-      const dayLabel = this._formatDayLabel(plannedStart);
+    const template = this._selectTemplate(now);
+    this.tasks = this._buildTasksFromTemplate(template, dayStart);
+    this.homeTask = this._createHomeTask(dayStart);
 
-      return {
-        id: item.id || `${item.location}-${index}`,
-        order: index,
-        name: item.name,
-        location: item.location,
-        duration: item.stayHours || 0,
-        stayHours: item.stayHours || 0,
-        startTime: plannedStart,
-        endTime: plannedEnd,
-        dayLabel,
-        actualStartTime: null,
-        actualEndTime: null,
-        status: index === 0 ? 'ACTIVE' : 'PENDING'
-      };
+    this.tasks.forEach(task => {
+      task.status = STATUS.PENDING;
+      task.actualStartTime = null;
+      task.actualEndTime = null;
     });
 
-    this.currentTaskIndex = 0;
+    this.homeTask.status = this.tasks.length ? STATUS.IDLE : STATUS.ACTIVE;
+    this.homeTask.actualStartTime = null;
+    this.homeTask.actualEndTime = null;
+
+    this.currentTaskIndex = this.tasks.length ? 0 : this.getHomeIndex();
+    this._prepareStatuses(now);
   }
 
   /**
-   * Пересчитать базовую дату (например после смены дня)
-   * @param {Object} gameTime - объект времени
-   */
-  updateBaseDate(gameTime) {
-    if (!gameTime) return;
-    this.baseDate = this._toDate(gameTime.year, gameTime.month, gameTime.day, gameTime.hours, gameTime.minutes);
-  }
-
-  /**
-   * Сгенерировать расписание на неделю с использованием шаблонов.
-   * @param {Object|null} gameTimeOverride
-   */
-  generateWeeklySchedule(gameTimeOverride = null) {
-    const referenceGameTime = gameTimeOverride || (this.timeManager ? this.timeManager.getGameTime() : null);
-    const now = referenceGameTime
-      ? this._toDate(
-          referenceGameTime.year,
-          referenceGameTime.month,
-          referenceGameTime.day,
-          referenceGameTime.hours,
-          referenceGameTime.minutes
-        )
-      : new Date();
-
-    const weekStart = this._getWeekStart(now);
-    const weekKey = this._getWeekKey(weekStart);
-    this.currentWeekKey = weekKey;
-    this.baseDate = new Date(weekStart.getTime());
-
-    const { tasks } = this._buildWeeklyTasks(weekStart);
-    this.tasks = tasks;
-
-    this._prepareInitialStatuses(now);
-    this.currentTaskIndex = this.getActiveTaskIndex();
-  }
-
-  /**
-   * Получить индекс активной задачи
-   * @returns {number}
-   */
-  getActiveTaskIndex() {
-    const activeIndex = this.tasks.findIndex(task => task.status === 'ACTIVE');
-    if (activeIndex >= 0) {
-      return activeIndex;
-    }
-    const pendingIndex = this.tasks.findIndex(task => task.status === 'PENDING');
-    return pendingIndex >= 0 ? pendingIndex : 0;
-  }
-
-  /**
-   * Обновление состояния расписания (вызывается из игрового цикла)
-   * @param {Object|null} gameTime
-   */
-  update(gameTime = null) {
-    if (!this.tasks.length) return;
-
-    const nowGameTime = gameTime || (this.timeManager ? this.timeManager.getGameTime() : null);
-    if (!nowGameTime) return;
-
-    const now = this._toDate(
-      nowGameTime.year,
-      nowGameTime.month,
-      nowGameTime.day,
-      nowGameTime.hours,
-      nowGameTime.minutes
-    );
-
-    const currentWeekKey = this._getWeekKey(now);
-    if (this._hasTemplateVariants() && currentWeekKey !== this.currentWeekKey) {
-      this.generateWeeklySchedule(nowGameTime);
-      return;
-    }
-
-    this._unlockDayTasks(now);
-    this._cancelLateTasks(now);
-  }
-
-  /**
-   * Получить общее количество задач
+   * Получить общее количество "индексов" (дела + дом)
    */
   getTaskCount() {
+    return this.tasks.length + 1; // +1 для fallback "домой"
+  }
+
+  /**
+   * Индекс fallback "домой"
+   * @returns {number}
+   */
+  getHomeIndex() {
     return this.tasks.length;
   }
 
   /**
-   * Получить задачу по индексу
-   * @param {number} index
-   * @returns {Object|null}
+   * Получить задачу по индексу (включая дом)
    */
   getTaskByIndex(index) {
     if (index == null) return null;
-    return this.tasks[index] || null;
-  }
-
-  /**
-   * Получить следующую позицию
-   * @param {number} currentIndex
-   * @returns {number}
-   */
-  getNextIndex(currentIndex) {
-    const count = this.getTaskCount();
-    if (!count) return 0;
-    const now = this._now();
-
-    for (let i = currentIndex + 1; i < count; i += 1) {
-      const task = this.tasks[i];
-      if (this._canVisitTask(task, now)) {
-        return i;
-      }
+    if (index < 0) return null;
+    if (index < this.tasks.length) {
+      return this.tasks[index] || null;
     }
-
-    for (let i = 0; i < count; i += 1) {
-      const task = this.tasks[i];
-      if (this._canVisitTask(task, now)) {
-        return i;
-      }
+    if (index === this.getHomeIndex()) {
+      return this.homeTask;
     }
-
-    return currentIndex;
-  }
-
-  /**
-   * Установить текущий индекс (без изменения статусов).
-   * Используется для синхронизации со StateManager.
-   * @param {number} index
-   */
-  setCurrentTaskIndex(index) {
-    if (typeof index !== 'number') return;
-    this.currentTaskIndex = Math.max(0, Math.min(index, Math.max(0, this.getTaskCount() - 1)));
-  }
-
-  /**
-   * Пометить задачу как активную (прибыли в локацию)
-   * @param {number} index
-   * @param {Date|null} startDate
-   */
-  startTask(index, startDate = null) {
-    const task = this.getTaskByIndex(index);
-    if (!task) return;
-
-    this.currentTaskIndex = index;
-
-    this.tasks.forEach((item, i) => {
-      if (i === index) {
-        item.status = 'ACTIVE';
-        if (startDate) {
-          item.actualStartTime = startDate;
-          item.startTime = startDate;
-        } else if (!item.actualStartTime) {
-          item.actualStartTime = this._now();
-        }
-        item.actualEndTime = null;
-      } else if (i < index && item.status !== 'CANCELLED') {
-        item.status = 'COMPLETED';
-      } else if (i > index && item.status === 'COMPLETED') {
-        item.status = 'PENDING';
-      }
-    });
-  }
-
-  /**
-   * Пометить задачу как завершенную (уезжаем из локации)
-   * @param {number} index
-   * @param {Date|null} endDate
-   */
-  completeTask(index, endDate = null) {
-    const task = this.getTaskByIndex(index);
-    if (!task) return;
-
-    task.status = 'COMPLETED';
-    if (endDate) {
-      task.actualEndTime = endDate;
-      task.endTime = endDate;
-    } else if (!task.actualEndTime) {
-      task.actualEndTime = this._now();
-    }
-  }
-
-  /**
-   * Получить текущую задачу (состояние ACTIVE)
-   * @param {Date|null} referenceDate
-   * @param {string|null} locationKey
-   */
-  getCurrentTask(referenceDate = null, locationKey = null) {
-    if (!this.tasks.length) return null;
-
-    if (locationKey) {
-      const byLocation = this.tasks.find(task => task.location === locationKey);
-      if (byLocation) {
-        return byLocation;
-      }
-    }
-
-    const activeTask = this.tasks.find(task => task.status === 'ACTIVE');
-    if (activeTask) {
-      return activeTask;
-    }
-
-    if (referenceDate) {
-      const refTime = referenceDate.getTime();
-      const byTime = this.tasks.find(task => task.startTime <= referenceDate && task.endTime >= referenceDate);
-      if (byTime) return byTime;
-
-      const closestPast = this.tasks
-        .filter(task => task.endTime && task.endTime.getTime() <= refTime)
-        .pop();
-      if (closestPast) return closestPast;
-    }
-
     return null;
   }
 
   /**
-   * Получить ближайшую предстоящую задачу (статус PENDING)
+   * Установить текущий индекс задачи
+   * @param {number|null} index
+   */
+  setCurrentTaskIndex(index) {
+    if (index == null) {
+      this.currentTaskIndex = this.getHomeIndex();
+      return;
+    }
+
+    const clamped = Math.max(0, Math.min(index, this.getHomeIndex()));
+    this.currentTaskIndex = clamped;
+  }
+
+  /**
+   * Получить текущий активный индекс
+   */
+  getActiveTaskIndex() {
+    if (this.currentTaskIndex != null) {
+      return this.currentTaskIndex;
+    }
+
+    const activeIndex = this.tasks.findIndex(task => task.status === STATUS.ACTIVE);
+    if (activeIndex >= 0) {
+      this.currentTaskIndex = activeIndex;
+      return activeIndex;
+    }
+
+    if (this.homeTask.status === STATUS.ACTIVE) {
+      this.currentTaskIndex = this.getHomeIndex();
+      return this.currentTaskIndex;
+    }
+
+    const pendingIndex = this.tasks.findIndex(task => task.status === STATUS.PENDING);
+    if (pendingIndex >= 0) {
+      this.currentTaskIndex = pendingIndex;
+      return pendingIndex;
+    }
+
+    this.currentTaskIndex = this.getHomeIndex();
+    return this.currentTaskIndex;
+  }
+
+  /**
+   * Получить следующую задачу после текущей
+   * @param {number|null} currentIndex
+   * @returns {number}
+   */
+  getNextIndex(currentIndex, referenceTime = null) {
+    const homeIndex = this.getHomeIndex();
+    const now = this._resolveDate(referenceTime);
+    const nowMs = now ? now.getTime() : Date.now();
+
+    if (currentIndex == null) {
+      const firstAvailable = this.tasks.findIndex(task => {
+        if (task.status === STATUS.COMPLETED || task.status === STATUS.CANCELLED) return false;
+        if (task.startTime && task.startTime.getTime() > nowMs) return false;
+        return true;
+      });
+      return firstAvailable >= 0 ? firstAvailable : homeIndex;
+    }
+
+    if (currentIndex >= homeIndex) {
+      const nextActive = this.tasks.findIndex(task => {
+        if (task.status === STATUS.COMPLETED || task.status === STATUS.CANCELLED) return false;
+        if (task.startTime && task.startTime.getTime() > nowMs) return false;
+        return true;
+      });
+      return nextActive >= 0 ? nextActive : homeIndex;
+    }
+
+    for (let i = currentIndex + 1; i < this.tasks.length; i += 1) {
+      const task = this.tasks[i];
+      if (task.status !== STATUS.COMPLETED && task.status !== STATUS.CANCELLED) {
+        if (task.startTime && task.startTime.getTime() > nowMs) {
+          return homeIndex;
+        }
+        return i;
+      }
+    }
+
+    return homeIndex;
+  }
+
+  /**
+   * Пометить задачу как активную
+   */
+  startTask(index, startDate = null) {
+    if (index == null) return;
+    const homeIndex = this.getHomeIndex();
+
+    if (index === homeIndex) {
+      this.homeTask.status = STATUS.ACTIVE;
+      this.homeTask.actualStartTime = startDate || this._now();
+      this.currentTaskIndex = homeIndex;
+      return;
+    }
+
+    const task = this.getTaskByIndex(index);
+    if (!task) return;
+
+    this.currentTaskIndex = index;
+    this.homeTask.status = STATUS.IDLE;
+
+    this.tasks.forEach((item, i) => {
+      if (i === index) {
+        item.status = STATUS.ACTIVE;
+        item.actualStartTime = startDate || item.actualStartTime || this._now();
+        item.actualEndTime = null;
+      } else if (i < index && item.status !== STATUS.CANCELLED) {
+        item.status = STATUS.COMPLETED;
+      } else if (i > index && item.status === STATUS.COMPLETED) {
+        item.status = STATUS.PENDING;
+      }
+    });
+  }
+
+  /**
+   * Пометить задачу как завершённую
+   */
+  completeTask(index, endDate = null) {
+    if (index == null) return;
+    const homeIndex = this.getHomeIndex();
+
+    if (index === homeIndex) {
+      this.homeTask.status = STATUS.COMPLETED;
+      this.homeTask.actualEndTime = endDate || this._now();
+      return;
+    }
+
+    const task = this.getTaskByIndex(index);
+    if (!task) return;
+
+    task.status = STATUS.COMPLETED;
+    task.actualEndTime = endDate || this._now();
+
+    const hasPendingTasks = this.tasks.some(item => item.status === STATUS.PENDING);
+    if (!hasPendingTasks) {
+      this.homeTask.status = STATUS.PENDING;
+    }
+  }
+
+  /**
+   * Получить текущее активное дело (если нужно)
+   */
+  getCurrentTask() {
+    const index = this.getActiveTaskIndex();
+    return this.getTaskByIndex(index);
+  }
+
+  /**
+   * Получить предстоящее дело
    */
   getUpcomingTask() {
-    return this.tasks.find(task => task.status === 'PENDING') || null;
+    return this.tasks.find(task => task.status === STATUS.PENDING) || null;
   }
 
   /**
-   * Получить все задачи (в исходном порядке)
+   * Получить все дела для отображения (без fallback "домой")
    */
   getAllTasks() {
-    return [...this.tasks];
+    return this.tasks.map(task => ({ ...task }));
   }
 
   /**
-   * Получить задачу по локации
-   * @param {string} locationKey
-   */
-  getTaskByLocation(locationKey) {
-    if (!locationKey) return null;
-    return this.tasks.find(task => task.location === locationKey) || null;
-  }
-
-  /**
-   * Получить первую задачу как fallback
+   * Fallback-задача
    */
   getFallbackTask() {
-   return this.tasks[0] || null;
+    return { ...this.homeTask };
   }
 
   /**
-   * Выполнить отмену оставшихся задач дня, когда уже поздно
-   * @param {Date} now
+   * Получить backup при пустом дне
    */
-  _cancelLateTasks(now) {
-    const lateCutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), this.options.lateHour, 0, 0, 0);
-    if (now < lateCutoff) return;
+  getReturnHomeTask() {
+    return this.homeTask;
+  }
 
-    const targetDay = this._formatDayKey(now);
+  /**
+   * Помечает задачу как отменённую
+   */
+  cancelTask(index) {
+    const task = this.getTaskByIndex(index);
+    if (!task || task === this.homeTask) return;
 
-    this.tasks.forEach((task, index) => {
-      if (task.location === 'house') return;
-      if (task.dayKey !== targetDay) return;
+    task.status = STATUS.CANCELLED;
+    task.actualStartTime = null;
+    task.actualEndTime = null;
+  }
 
-      const isPlannedLate = task.startTime >= lateCutoff;
-      const isActiveAndLate = task.status === 'ACTIVE' && now >= lateCutoff;
-      const isPendingLate = task.status === 'PENDING' && now >= lateCutoff;
-
-      if (!isPlannedLate && !isActiveAndLate && !isPendingLate) {
-        return;
-      }
-
-      task.status = 'CANCELLED';
+  /**
+   * Снять все статусы (используется при смене дня)
+   */
+  resetStatuses() {
+    this.tasks.forEach(task => {
+      task.status = STATUS.PENDING;
       task.actualStartTime = null;
       task.actualEndTime = null;
-
-      if (index === this.currentTaskIndex) {
-        const nextIndex = this.getNextIndex(index);
-        if (nextIndex !== index) {
-          this.currentTaskIndex = nextIndex;
-        }
-      }
     });
+    this.homeTask.status = this.tasks.length ? STATUS.IDLE : STATUS.ACTIVE;
+    this.homeTask.actualStartTime = null;
+    this.homeTask.actualEndTime = null;
+    this.currentTaskIndex = this.tasks.length ? 0 : this.getHomeIndex();
   }
 
   /**
-   * Разблокировать задачи текущего дня
-   * @param {Date} now
+   * Внутренний helper: создать fallback "домой"
    */
-  _unlockDayTasks(now) {
-    const targetDay = this._formatDayKey(now);
-    let activeFound = false;
+  _createHomeTask(dayStart = null) {
+    const start = dayStart || this._now();
+    return {
+      id: `home-${this._formatDayKey(start)}`,
+      order: this.tasks.length,
+      name: 'Дом',
+      location: 'house',
+      duration: 0,
+      stayHours: 0,
+      startTime: new Date(start.getTime()),
+      endTime: new Date(start.getTime()),
+      dayKey: this._formatDayKey(start),
+      dayLabel: this._formatDayLabel(start),
+      status: STATUS.IDLE,
+      hidden: true,
+      actualStartTime: null,
+      actualEndTime: null
+    };
+  }
+
+  /**
+   * Построить задачи из шаблона
+   */
+  _buildTasksFromTemplate(template, dayStart) {
+    if (!template || !Array.isArray(template.tasks) || !template.tasks.length) {
+      return [];
+    }
+
+    const tasks = [];
+    let pointer = new Date(dayStart.getTime());
+
+    template.tasks.forEach((taskConfig, index) => {
+      const start = new Date(pointer.getTime());
+      const stayMillis = Math.max(taskConfig.stayHours || 0, 0) * 60 * 60 * 1000;
+      const end = new Date(start.getTime() + stayMillis);
+      pointer = new Date(end.getTime());
+
+      tasks.push({
+        id: `${template.id}-${index}`,
+        order: index,
+        templateId: template.id,
+        templateTitle: template.title,
+        name: taskConfig.name,
+        location: taskConfig.location,
+        duration: taskConfig.stayHours || 0,
+        stayHours: taskConfig.stayHours || 0,
+        startTime: start,
+        endTime: end,
+        dayKey: this._formatDayKey(start),
+        dayLabel: this._formatDayLabel(start),
+        status: STATUS.PENDING,
+        actualStartTime: null,
+        actualEndTime: null
+      });
+    });
+
+    return tasks;
+  }
+
+  /**
+   * Выбор подходящего шаблона
+   */
+  _selectTemplate(date) {
+    const isWeekend = [0, 6].includes(date.getDay());
+    const pool = isWeekend ? this.templates.weekend : this.templates.weekday;
+    if (!pool || !pool.length) {
+      return null;
+    }
+    const index = Math.floor(this.randomFn() * pool.length);
+    return pool[index];
+  }
+
+  /**
+   * Подготовка статусов в зависимости от текущего времени
+   */
+  _prepareStatuses(now) {
+    if (!now) return;
+
+    const nowMs = now.getTime();
+    let activeSet = false;
 
     this.tasks.forEach((task, index) => {
-      if (task.status === 'COMPLETED' || task.status === 'CANCELLED') {
+      if (task.status === STATUS.CANCELLED || task.status === STATUS.COMPLETED) {
         return;
       }
 
-      if (task.startTime <= now && task.endTime >= now && !activeFound) {
-        task.status = 'ACTIVE';
+      const startMs = task.startTime ? task.startTime.getTime() : null;
+      if (task.status === STATUS.ACTIVE) {
         this.currentTaskIndex = index;
-        activeFound = true;
-      } else if (task.startTime < now && task.endTime < now && task.status !== 'ACTIVE') {
-        task.status = 'COMPLETED';
-      } else if (task.status === 'PENDING' && task.dayKey === targetDay && task.startTime <= now && !activeFound) {
-        task.status = 'ACTIVE';
+        activeSet = true;
+        return;
+      }
+
+      if (startMs && startMs <= nowMs && !activeSet) {
+        task.status = STATUS.ACTIVE;
         this.currentTaskIndex = index;
-        activeFound = true;
+        activeSet = true;
+      } else {
+        task.status = STATUS.PENDING;
       }
     });
-  }
 
-  /**
-   * Проверить, можно ли посещать задачу в текущий момент
-   * @param {Object|null} task
-   * @param {Date} now
-   * @returns {boolean}
-   */
-  _canVisitTask(task, now) {
-    if (!task) return false;
-    if (task.status !== 'PENDING' && task.status !== 'ACTIVE') return false;
-    if (!task.startTime) return task.status !== 'CANCELLED';
-
-    const sameDay = this._formatDayKey(task.startTime) === this._formatDayKey(now);
-    return sameDay || task.startTime <= now;
-  }
-
-  /**
-   * Текущее время (Date) для внутренних нужд
-   * @returns {Date}
-   */
-  _now() {
-    if (this.timeManager && typeof this.timeManager.getGameTime === 'function') {
-      const gameTime = this.timeManager.getGameTime();
-      return this._toDate(gameTime.year, gameTime.month, gameTime.day, gameTime.hours, gameTime.minutes);
+    if (!activeSet) {
+      this.homeTask.status = STATUS.ACTIVE;
+      this.currentTaskIndex = this.getHomeIndex();
+    } else {
+      this.homeTask.status = STATUS.IDLE;
     }
-    return new Date();
   }
 
   /**
-   * Собрать Date из составляющих
+   * Отменить оставшиеся дела, если уже поздно
+   */
+  _cancelLateTasks(now) {
+    if (!this.tasks.length) return;
+
+    const cutoff = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      this.options.lateHour,
+      0,
+      0,
+      0
+    );
+
+    if (now < cutoff) return;
+
+    let cancelledAny = false;
+
+    this.tasks.forEach((task, index) => {
+      if (task.status === STATUS.COMPLETED || task.status === STATUS.CANCELLED) return;
+
+      task.status = STATUS.CANCELLED;
+      task.actualStartTime = null;
+      task.actualEndTime = null;
+      cancelledAny = true;
+
+      if (index === this.currentTaskIndex) {
+        this.currentTaskIndex = this.getHomeIndex();
+      }
+    });
+
+    if (cancelledAny) {
+      this.homeTask.status = STATUS.ACTIVE;
+      this.homeTask.actualStartTime = now;
+      this.homeTask.actualEndTime = null;
+      this.currentTaskIndex = this.getHomeIndex();
+    }
+  }
+
+  /**
+   * Конвертация игрового времени в Date
+   */
+  _resolveDate(gameTime = null) {
+    if (gameTime) {
+      const source = Array.isArray(gameTime) ? gameTime[0] : gameTime;
+      if (source && typeof source === 'object' && 'year' in source) {
+        return this._toDate(
+          source.year,
+          source.month,
+          source.day,
+          source.hours ?? this.options.dayStartHour,
+          source.minutes ?? this.options.dayStartMinute
+        );
+      }
+    }
+
+    if (this.timeManager && typeof this.timeManager.getGameTime === 'function') {
+      const time = this.timeManager.getGameTime();
+      return this._toDate(time.year, time.month, time.day, time.hours, time.minutes);
+    }
+
+    return this._now();
+  }
+
+  /**
+   * Создать Date из компонентов
    */
   _toDate(year, month, day, hours = 0, minutes = 0) {
     return new Date(year, month, day, Math.floor(hours), Math.floor(minutes), 0, 0);
   }
 
   /**
-   * Построить расписание на неделю относительно начала недели
-   * @param {Date} weekStart
-   * @returns {{tasks: Array}}
+   * Текущее Date
    */
-  _buildWeeklyTasks(weekStart) {
-    const tasks = [];
-    let globalOrder = 0;
-
-    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
-      const dayDate = new Date(weekStart.getTime());
-      dayDate.setDate(weekStart.getDate() + dayOffset);
-      dayDate.setHours(this.options.dayStartHour, this.options.dayStartMinute, 0, 0);
-
-      const isWeekend = dayOffset >= 5;
-      const dayTemplates = isWeekend ? this.templates.weekend : this.templates.weekday;
-      const template = this._selectTemplate(dayTemplates, dayDate, isWeekend ? 'weekend' : 'weekday');
-      const dayKey = this._formatDayKey(dayDate);
-      const dayLabel = this._formatDayLabel(dayDate);
-
-      let pointer = new Date(dayDate.getTime());
-
-      template.tasks.forEach((taskConfig, idx) => {
-        const startTime = new Date(pointer.getTime());
-        const stayMillis = (taskConfig.stayHours || 0) * 60 * 60 * 1000;
-        const endTime = new Date(startTime.getTime() + stayMillis);
-        pointer = new Date(endTime.getTime());
-
-        tasks.push({
-          id: `${dayKey}-${template.id}-${idx}`,
-          order: globalOrder,
-          dayIndex: dayOffset,
-          dayKey,
-          dayLabel,
-          templateId: template.id,
-          templateTitle: template.title,
-          name: taskConfig.name,
-          location: taskConfig.location,
-          duration: taskConfig.stayHours || 0,
-          stayHours: taskConfig.stayHours || 0,
-          startTime,
-          endTime,
-          isWeekend,
-          actualStartTime: null,
-          actualEndTime: null,
-          status: 'PENDING'
-        });
-
-        globalOrder += 1;
-      });
-    }
-
-    return { tasks };
+  _now() {
+    return new Date();
   }
 
   /**
-   * Выбрать шаблон дня (опционально детерминированно)
-   * @param {Array} templates
-   * @param {Date} dayDate
-   * @param {string} type
-   * @returns {Object}
-   */
-  _selectTemplate(templates, dayDate, type) {
-    if (!templates || !templates.length) {
-      return {
-        id: `${type}-default`,
-        title: 'Базовый день',
-        tasks: this.config?.ROUTE_SCHEDULE || []
-      };
-    }
-
-    const seedIndex = Math.abs(this._hash(`${dayDate.toISOString()}-${type}-${templates.length}`)) % templates.length;
-    const randomOffset = Math.floor(this.randomFn() * templates.length);
-    const index = (seedIndex + randomOffset) % templates.length;
-    return templates[index];
-  }
-
-  /**
-   * Подготовить статусы задач в соответствии с текущим временем
-   * @param {Date} now
-   */
-  _prepareInitialStatuses(now) {
-    let activeSet = false;
-
-    this.tasks.forEach((task, index) => {
-      if (task.endTime <= now) {
-        task.status = 'COMPLETED';
-      } else if (!activeSet && task.startTime <= now && task.endTime > now) {
-        task.status = 'ACTIVE';
-        this.currentTaskIndex = index;
-        activeSet = true;
-      } else {
-        task.status = 'PENDING';
-      }
-    });
-
-    if (!activeSet && this.tasks.length) {
-      this.tasks[0].status = 'ACTIVE';
-      this.currentTaskIndex = 0;
-    }
-  }
-
-  /**
-   * Получить начало недели (понедельник) для указанной даты
-   * @param {Date} date
-   * @returns {Date}
-   */
-  _getWeekStart(date) {
-    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate(), this.options.dayStartHour, this.options.dayStartMinute, 0, 0);
-    const day = result.getDay();
-    const diff = (day === 0 ? -6 : 1 - day); // переводим воскресенье в прошлый понедельник
-    result.setDate(result.getDate() + diff);
-    result.setHours(this.options.dayStartHour, this.options.dayStartMinute, 0, 0);
-    return result;
-  }
-
-  /**
-   * Сформировать ключ недели
-   * @param {Date} date
-   * @returns {string}
-   */
-  _getWeekKey(date) {
-    const weekStart = this._getWeekStart(date);
-    const year = weekStart.getFullYear();
-    const month = String(weekStart.getMonth() + 1).padStart(2, '0');
-    const day = String(weekStart.getDate()).padStart(2, '0');
-    return `${year}-W-${month}-${day}`;
-  }
-
-  /**
-   * Отформатировать день для вывода
-   * @param {Date} date
-   * @returns {string}
-   */
-  _formatDayLabel(date) {
-    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-    const dayName = days[date.getDay()];
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${dayName} ${day}.${month}`;
-  }
-
-  /**
-   * Ключ для идентификации дня
-   * @param {Date} date
-   * @returns {string}
+   * Формат ключа дня
    */
   _formatDayKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
   /**
-   * Простая хеш-функция для стабилизации выбора
-   * @param {string} str
-   * @returns {number}
+   * Формат подписи дня
    */
-  _hash(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i += 1) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return hash;
+  _formatDayLabel(date) {
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const dayName = days[date.getDay()] || '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${dayName} ${day}.${month}`;
   }
 }
 
