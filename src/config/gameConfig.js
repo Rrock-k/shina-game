@@ -87,13 +87,6 @@ export const CONFIG = {
     { x: 1500, y: 1283 },
     { x: 1950, y: 1283 }
   ],
-  ROUTE_SCHEDULE: [
-    { location: 'house', name: 'Дом', stayHours: 2 },
-    { location: 'institute', name: 'Институт', stayHours: 2 },
-    { location: 'work', name: 'Работа', stayHours: 5 },
-    { location: 'relatives', name: 'Родственники', stayHours: 1.5 },
-    { location: 'box', name: 'Бокс', stayHours: 1 },
-  ],
   BALANCING: {
     SIMULATION_MESSAGES_PER_3_HOURS: 3,
     FRIENDSHIP_PRIORITY_START: 0,

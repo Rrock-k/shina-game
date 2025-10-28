@@ -3,7 +3,7 @@
  * Обрабатывает меню, уведомления, дисплеи и кнопки
  */
 export class UIRenderer {
-  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager, carEntity) {
+  constructor(config, timeManager, pauseManager, dayNightManager, panningController, journalManager, carEntity, dependencies) {
     this.config = config;
     this.timeManager = timeManager;
     this.pauseManager = pauseManager;
@@ -11,6 +11,7 @@ export class UIRenderer {
     this.panningController = panningController;
     this.journalManager = journalManager;
     this.carEntity = carEntity;
+    this.dependencies = dependencies;
     
     // UI элементы
     this.datetimeDisplay = null;
@@ -418,7 +419,8 @@ export class UIRenderer {
    */
   updateRouteDisplay(isAtDestination = false) {
     if (!this.routeDisplay) return; // защита от вызова до инициализации
-    const currentDest = this.config.ROUTE_SCHEDULE[this.currentRouteIndex];
+    const routeSchedule = this.dependencies.get('routeSchedule');
+    const currentDest = routeSchedule.getTaskByIndex(this.currentRouteIndex);
     const prefixSpan = this.routeDisplay.querySelector('.route-prefix');
     const destinationSpan = this.routeDisplay.querySelector('.route-destination');
     
@@ -898,7 +900,9 @@ export class UIRenderer {
     const scheduleList = document.getElementById('schedule-list');
     if (!scheduleList || !this.config) return;
 
-    const schedule = this.config.ROUTE_SCHEDULE;
+    // Получаем расписание из RouteSchedule через контейнер зависимостей
+    const routeSchedule = this.dependencies.get('routeSchedule');
+    const schedule = routeSchedule.getAllTasks();
     let html = '';
     
     schedule.forEach((item, index) => {
@@ -1163,7 +1167,8 @@ export class UIRenderer {
     const scheduleList = document.getElementById('schedule-overlay-list');
     if (!scheduleList || !this.config) return;
 
-    const schedule = this.config.ROUTE_SCHEDULE;
+    const routeSchedule = this.dependencies.get('routeSchedule');
+    const schedule = routeSchedule.getAllTasks();
     let html = '';
     
     schedule.forEach((item, index) => {
